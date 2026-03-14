@@ -10,6 +10,26 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="POS">
 <link rel="apple-touch-icon" href="icon-192.png">
+<script>
+// Cargar Dexie con múltiples CDN de fallback
+(function(){
+  var cdns = [
+    'https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js',
+    'https://unpkg.com/dexie@3.2.4/dist/dexie.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/dexie/3.2.4/dexie.min.js'
+  ];
+  var idx = 0;
+  function loadNext(){
+    if(idx >= cdns.length){ console.warn('[Dexie] No se pudo cargar desde ningún CDN — modo sin BD local'); return; }
+    var s = document.createElement('script');
+    s.src = cdns[idx++];
+    s.onerror = function(){ console.warn('[Dexie] Falló CDN, probando siguiente...'); loadNext(); };
+    s.onload  = function(){ console.log('[Dexie] Cargado desde:', s.src); };
+    document.head.appendChild(s);
+  }
+  loadNext();
+})();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -623,10 +643,10 @@
   }
   .drawer-version { font-size: 12px; color: #555; }
 
+  @keyframes lic-spin { to { transform: rotate(360deg); } }
   /* ── LICENCIA / ACTIVACIÓN ── */
   #scActivacion, #scBloqueado, #scActivado {
     background: #1a1a1a;
-    display: none;
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -634,77 +654,85 @@
     inset: 0;
     z-index: 9999;
     padding: 32px 24px;
+    overflow-y: auto;
   }
-  #scActivacion.active, #scBloqueado.active, #scActivado.active {
-    display: flex;
-  }
-
   .lic-logo {
-    width: 80px; height: 80px; border-radius: 20px;
+    width: 76px; height: 76px; border-radius: 20px;
     background: var(--green); display: flex; align-items: center;
-    justify-content: center; margin-bottom: 20px;
-    box-shadow: 0 8px 32px rgba(76,175,80,.4);
+    justify-content: center; margin-bottom: 20px; flex-shrink: 0;
+    box-shadow: 0 8px 32px rgba(76,175,80,.35);
   }
-  .lic-title { font-size: 26px; font-weight: 800; color: #fff; margin-bottom: 6px; text-align: center; }
-  .lic-sub   { font-size: 14px; color: #777; text-align: center; margin-bottom: 32px; line-height: 1.5; }
-
-  .lic-form  { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 16px; }
+  .lic-title {
+    font-size: 24px; font-weight: 800; color: #fff;
+    margin-bottom: 8px; text-align: center;
+  }
+  .lic-sub {
+    font-size: 14px; color: #777; text-align: center;
+    margin-bottom: 28px; line-height: 1.5; max-width: 300px;
+  }
+  .lic-form {
+    width: 100%; max-width: 360px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
   .lic-field { display: flex; flex-direction: column; gap: 6px; }
-  .lic-label { font-size: 12px; color: #aaa; letter-spacing: .4px; }
+  .lic-label {
+    font-size: 11px; color: #888; letter-spacing: .8px;
+    text-transform: uppercase; font-weight: 700;
+  }
   .lic-input {
     background: #2a2a2a; border: 1.5px solid #444; border-radius: 8px;
     color: #fff; font-family: 'Barlow', sans-serif; font-size: 16px;
     padding: 13px 14px; outline: none; transition: border-color .2s;
-    letter-spacing: .5px;
+    width: 100%;
   }
   .lic-input:focus { border-color: var(--green); }
-  .lic-input::placeholder { color: #555; letter-spacing: 0; }
-  .lic-input.key { text-transform: uppercase; font-weight: 700; letter-spacing: 2px; }
-
+  .lic-input::placeholder { color: #555; font-size: 14px; }
+  .lic-input.key {
+    text-transform: uppercase; font-weight: 700;
+    letter-spacing: 2px; font-size: 15px;
+  }
   .lic-btn {
     background: var(--green); border: none; border-radius: 8px;
     color: #fff; font-family: 'Barlow', sans-serif;
     font-size: 15px; font-weight: 800; letter-spacing: 1px;
     text-transform: uppercase; padding: 16px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 10px;
-    transition: background .15s; margin-top: 8px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; transition: background .15s; width: 100%;
   }
-  .lic-btn:active { background: var(--green-btn); }
+  .lic-btn:active { filter: brightness(.9); }
   .lic-btn:disabled { background: #333; color: #666; cursor: not-allowed; }
-  .lic-btn.danger { background: #c62828; }
-  .lic-btn.outline { background: transparent; border: 1.5px solid #555; color: #aaa; }
-
+  .lic-btn.outline {
+    background: transparent; border: 1.5px solid #555;
+    color: #aaa; margin-top: 0;
+  }
   .lic-error {
     background: rgba(198,40,40,.15); border: 1px solid rgba(198,40,40,.4);
     border-radius: 6px; color: #ef5350; font-size: 13px;
     padding: 10px 14px; display: none; text-align: center;
   }
   .lic-error.show { display: block; }
-
   .lic-spinner {
-    width: 20px; height: 20px; border-radius: 50%;
+    width: 18px; height: 18px; border-radius: 50%;
     border: 2px solid rgba(255,255,255,.3);
     border-top-color: #fff;
-    animation: spin .8s linear infinite;
+    animation: lic-spin .8s linear infinite; flex-shrink: 0;
   }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
+  @keyframes lic-spin { to { transform: rotate(360deg); } }
   .lic-badge {
     background: rgba(76,175,80,.15); border: 1px solid rgba(76,175,80,.3);
     border-radius: 20px; color: var(--green);
-    font-size: 12px; font-weight: 700; padding: 4px 14px;
+    font-size: 12px; font-weight: 700; padding: 4px 16px;
     letter-spacing: .5px; margin-bottom: 8px;
   }
-
   .lic-bloqueo-icon {
-    width: 80px; height: 80px; border-radius: 20px;
-    background: rgba(198,40,40,.15); border: 2px solid #c62828;
+    width: 76px; height: 76px; border-radius: 20px;
+    background: rgba(198,40,40,.1); border: 2px solid #c62828;
     display: flex; align-items: center; justify-content: center;
     margin-bottom: 20px;
   }
   .lic-info {
     font-size: 12px; color: #555; text-align: center;
-    margin-top: 16px; line-height: 1.6;
+    margin-top: 4px; line-height: 1.7;
   }
   .lic-info a { color: #666; text-decoration: underline; cursor: pointer; }
 
@@ -2051,35 +2079,33 @@
 <!-- ═══════════════════════════════════════════
      PANTALLA: ACTIVACIÓN DE LICENCIA
 ═══════════════════════════════════════════ -->
-<div id="scActivacion">
-  <div class="lic-logo">
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
-      <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
-      <line x1="3" y1="6" x2="21" y2="6"/>
-      <path d="M16 10a4 4 0 0 1-8 0"/>
-    </svg>
+<div id="scActivacion" style="display:none;flex-direction:column;align-items:center;justify-content:center;position:fixed;inset:0;z-index:9999;padding:32px 24px;background:#1a1a1a;overflow-y:auto;">
+  <div style="width:76px;height:76px;border-radius:20px;background:#4caf50;display:flex;align-items:center;justify-content:center;margin-bottom:20px;box-shadow:0 8px 32px rgba(76,175,80,.35);">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
   </div>
-  <h1 class="lic-title">Activar sistema</h1>
-  <p class="lic-sub">Ingresá tu email y la clave de licencia<br>que recibiste al adquirir el sistema.</p>
-
-  <div class="lic-form">
-    <div class="lic-field">
-      <span class="lic-label">EMAIL</span>
-      <input class="lic-input" id="licEmail" type="email" placeholder="tu@email.com" autocomplete="email">
+  <h1 style="font-size:26px;font-weight:800;color:#fff;margin-bottom:8px;text-align:center;font-family:'Barlow',sans-serif;">Activar sistema</h1>
+  <p style="font-size:14px;color:#777;text-align:center;margin-bottom:28px;line-height:1.5;max-width:300px;font-family:'Barlow',sans-serif;">Ingresá tu email y la clave de licencia<br>que recibiste al adquirir el sistema.</p>
+  <div style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:14px;">
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <span style="font-size:11px;color:#888;letter-spacing:.8px;text-transform:uppercase;font-weight:700;font-family:'Barlow',sans-serif;">EMAIL</span>
+      <input id="licEmail" type="email" placeholder="tu@email.com"
+        style="background:#2a2a2a;border:1.5px solid #444;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:16px;padding:13px 14px;outline:none;width:100%;box-sizing:border-box;"
+        onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#444'">
     </div>
-    <div class="lic-field">
-      <span class="lic-label">CLAVE DE LICENCIA</span>
-      <input class="lic-input key" id="licClave" type="text"
-        placeholder="XXXX-XXXX-XXXX"
-        maxlength="20"
-        oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9-]/g,'')">
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <span style="font-size:11px;color:#888;letter-spacing:.8px;text-transform:uppercase;font-weight:700;font-family:'Barlow',sans-serif;">CLAVE DE LICENCIA</span>
+      <input id="licClave" type="text" placeholder="XXXX-XXXX-XXXX" maxlength="20"
+        style="background:#2a2a2a;border:1.5px solid #444;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;font-weight:700;letter-spacing:2px;padding:13px 14px;outline:none;width:100%;box-sizing:border-box;text-transform:uppercase;"
+        oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9-]/g,'')"
+        onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#444'">
     </div>
-    <div class="lic-error" id="licError"></div>
-    <button class="lic-btn" id="licActivarBtn" onclick="doActivar()">
+    <div id="licError" style="display:none;background:rgba(198,40,40,.15);border:1px solid rgba(198,40,40,.4);border-radius:6px;color:#ef5350;font-size:13px;padding:10px 14px;text-align:center;font-family:'Barlow',sans-serif;"></div>
+    <button id="licActivarBtn" onclick="doActivar()"
+      style="background:#4caf50;border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;">
       ACTIVAR
     </button>
-    <p class="lic-info">
-      ¿No tenés una licencia? <a onclick="toast('Contactá al proveedor del sistema')">Contactá al soporte</a><br>
+    <p style="font-size:12px;color:#555;text-align:center;font-family:'Barlow',sans-serif;line-height:1.7;">
+      ¿No tenés licencia? <a onclick="toast('Contactá al proveedor')" style="color:#666;text-decoration:underline;cursor:pointer;">Contactá al soporte</a><br>
       <small style="color:#444;">Demo: DEMO-2025-XXXX</small>
     </p>
   </div>
@@ -2088,54 +2114,107 @@
 <!-- ═══════════════════════════════════════════
      PANTALLA: ACTIVACIÓN EXITOSA
 ═══════════════════════════════════════════ -->
-<div id="scActivado">
-  <div class="lic-logo">
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
-      <polyline points="20 6 9 17 4 12"/>
-    </svg>
-  </div>
-  <div class="lic-badge" id="activadoPlan">Plan Básico</div>
-  <h1 class="lic-title">¡Activado!</h1>
-  <p class="lic-sub" id="activadoSub">Sistema activado correctamente.<br>Bienvenido.</p>
-  <div class="lic-form" style="max-width:320px;">
-    <div class="lic-field">
-      <span class="lic-label">NOMBRE DEL NEGOCIO</span>
-      <input class="lic-input" id="activadoNegocio" type="text" placeholder="Ej: Lomitón Express">
+<div id="scActivado" style="display:none;flex-direction:column;position:fixed;inset:0;z-index:9999;background:#1a1a1a;overflow-y:auto;">
+  <!-- Header fijo -->
+  <div style="text-align:center;padding:32px 24px 20px;flex-shrink:0;">
+    <div style="width:64px;height:64px;border-radius:18px;background:#4caf50;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;box-shadow:0 6px 24px rgba(76,175,80,.35);">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
     </div>
-    <button class="lic-btn" onclick="doEntrar()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <polyline points="9 18 15 12 9 6"/>
-      </svg>
+    <div id="activadoPlan" style="display:inline-block;background:rgba(76,175,80,.15);border:1px solid rgba(76,175,80,.3);border-radius:20px;color:#4caf50;font-size:12px;font-weight:700;padding:3px 14px;letter-spacing:.5px;margin-bottom:8px;font-family:'Barlow',sans-serif;">Plan Básico</div>
+    <h1 style="font-size:22px;font-weight:800;color:#fff;margin-bottom:4px;font-family:'Barlow',sans-serif;">¡Licencia activada!</h1>
+    <p id="activadoSub" style="font-size:13px;color:#666;line-height:1.4;font-family:'Barlow',sans-serif;">Completá los datos de tu negocio para continuar.</p>
+  </div>
+
+  <!-- Formulario scrolleable -->
+  <div style="padding:0 20px 32px;display:flex;flex-direction:column;gap:0;">
+
+    <!-- Separador de sección -->
+    <div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;font-weight:700;font-family:'Barlow',sans-serif;padding:4px 0 10px;border-bottom:1px solid #2a2a2a;margin-bottom:14px;">
+      Datos del negocio
+    </div>
+
+    <!-- Negocio -->
+    <div style="margin-bottom:14px;">
+      <span style="font-size:11px;color:#888;letter-spacing:.8px;text-transform:uppercase;font-weight:700;font-family:'Barlow',sans-serif;display:block;margin-bottom:6px;">NOMBRE DEL NEGOCIO *</span>
+      <input id="activadoNegocio" type="text" placeholder="Ej: Lomitón Express"
+        style="background:#2a2a2a;border:1.5px solid #444;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;padding:13px 14px;outline:none;width:100%;box-sizing:border-box;"
+        onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#444'">
+    </div>
+
+    <!-- Separador -->
+    <div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;font-weight:700;font-family:'Barlow',sans-serif;padding:4px 0 10px;border-bottom:1px solid #2a2a2a;margin-bottom:14px;margin-top:4px;">
+      Sucursal y depósito
+    </div>
+
+    <!-- Sucursal -->
+    <div style="margin-bottom:14px;">
+      <span style="font-size:11px;color:#888;letter-spacing:.8px;text-transform:uppercase;font-weight:700;font-family:'Barlow',sans-serif;display:block;margin-bottom:6px;">SUCURSAL *</span>
+      <input id="activadoSucursal" type="text" placeholder="Ej: Casa Central, Sucursal Norte..."
+        style="background:#2a2a2a;border:1.5px solid #444;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;padding:13px 14px;outline:none;width:100%;box-sizing:border-box;"
+        onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#444'">
+      <span style="font-size:11px;color:#555;font-family:'Barlow',sans-serif;margin-top:4px;display:block;">Nombre del local o punto de venta</span>
+    </div>
+
+    <!-- Depósito -->
+    <div style="margin-bottom:14px;">
+      <span style="font-size:11px;color:#888;letter-spacing:.8px;text-transform:uppercase;font-weight:700;font-family:'Barlow',sans-serif;display:block;margin-bottom:6px;">DEPÓSITO</span>
+      <input id="activadoDeposito" type="text" placeholder="Depósito Principal" value="Depósito Principal"
+        style="background:#2a2a2a;border:1.5px solid #444;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;padding:13px 14px;outline:none;width:100%;box-sizing:border-box;"
+        onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#444'">
+      <span style="font-size:11px;color:#555;font-family:'Barlow',sans-serif;margin-top:4px;display:block;">Depósito de stock de esta sucursal</span>
+    </div>
+
+    <!-- Separador -->
+    <div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;font-weight:700;font-family:'Barlow',sans-serif;padding:4px 0 10px;border-bottom:1px solid #2a2a2a;margin-bottom:14px;margin-top:4px;">
+      Terminal
+    </div>
+
+    <!-- Terminal -->
+    <div style="margin-bottom:20px;">
+      <span style="font-size:11px;color:#888;letter-spacing:.8px;text-transform:uppercase;font-weight:700;font-family:'Barlow',sans-serif;display:block;margin-bottom:6px;">NOMBRE DE ESTA TERMINAL *</span>
+      <input id="activadoTerminal" type="text" placeholder="Ej: Caja 1, Delivery, Barra..."
+        style="background:#2a2a2a;border:1.5px solid #444;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;padding:13px 14px;outline:none;width:100%;box-sizing:border-box;"
+        onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#444'">
+      <span style="font-size:11px;color:#555;font-family:'Barlow',sans-serif;margin-top:4px;display:block;">Nombre de este dispositivo/caja</span>
+    </div>
+
+    <!-- Botón -->
+    <button onclick="doEntrar()"
+      style="background:#4caf50;border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
       ENTRAR AL SISTEMA
     </button>
+
+    <p style="font-size:11px;color:#444;text-align:center;margin-top:12px;font-family:'Barlow',sans-serif;">
+      Estos datos se pueden modificar luego en Configuración
+    </p>
   </div>
 </div>
 
 <!-- ═══════════════════════════════════════════
      PANTALLA: LICENCIA BLOQUEADA
 ═══════════════════════════════════════════ -->
-<div id="scBloqueado">
-  <div class="lic-bloqueo-icon">
-    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ef5350" stroke-width="2">
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-    </svg>
+<div id="scBloqueado" style="display:none;flex-direction:column;align-items:center;justify-content:center;position:fixed;inset:0;z-index:9999;padding:32px 24px;background:#1a1a1a;">
+  <div style="width:76px;height:76px;border-radius:20px;background:rgba(198,40,40,.1);border:2px solid #c62828;display:flex;align-items:center;justify-content:center;margin-bottom:20px;">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ef5350" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
   </div>
-  <h1 class="lic-title" id="bloqueoTitulo">Acceso bloqueado</h1>
-  <p class="lic-sub" id="bloqueoSub">Tu licencia no está activa.</p>
-  <div class="lic-form" style="max-width:320px;gap:10px;">
-    <button class="lic-btn" onclick="doReintentar()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/>
-      </svg>
+  <h1 id="bloqueoTitulo" style="font-size:24px;font-weight:800;color:#fff;margin-bottom:8px;text-align:center;font-family:'Barlow',sans-serif;">Acceso bloqueado</h1>
+  <p id="bloqueoSub" style="font-size:14px;color:#777;text-align:center;margin-bottom:24px;line-height:1.5;max-width:300px;font-family:'Barlow',sans-serif;">Tu licencia no está activa.</p>
+  <div style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:10px;">
+    <button onclick="doReintentar()"
+      style="background:#4caf50;border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:15px;cursor:pointer;width:100%;">
       REINTENTAR
     </button>
-    <button class="lic-btn outline" onclick="doContactarSoporte()">CONTACTAR SOPORTE</button>
-    <button class="lic-btn outline" style="font-size:12px;padding:10px;" onclick="doDesactivar()">
+    <button onclick="doContactarSoporte()"
+      style="background:transparent;border:1.5px solid #555;border-radius:8px;color:#aaa;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:14px;cursor:pointer;width:100%;">
+      CONTACTAR SOPORTE
+    </button>
+    <button onclick="doDesactivar()"
+      style="background:transparent;border:1.5px solid #444;border-radius:8px;color:#666;font-family:'Barlow',sans-serif;font-size:12px;font-weight:600;padding:10px;cursor:pointer;width:100%;">
       Activar con otra licencia
     </button>
   </div>
-  <p class="lic-info" id="bloqueoInfo"></p>
+  <p id="bloqueoInfo" style="font-size:12px;color:#555;text-align:center;margin-top:16px;font-family:'Barlow',sans-serif;"></p>
 </div>
 
 <!-- ======== SCREEN: TURNO CERRADO ======== -->
@@ -2469,20 +2548,10 @@
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 const PRODS = [
-  {id:1,name:'ASADITO',price:35000,color:'#e65100',cat:'Comidas'},
-  {id:2,name:'COCA COLA 1,5L',price:8000,color:'#c62828',cat:'Bebidas'},
-  {id:3,name:'COCA COLA 500ML',price:5000,color:'#b71c1c',cat:'Bebidas'},
-  {id:4,name:'LOMITO ÁRABE POLLO',price:28000,color:'#2e7d32',cat:'Minutas'},
-  {id:5,name:'LOMITOS ÁRABE CARNE',price:30000,color:'#1b5e20',cat:'Minutas'},
-  {id:6,name:'PAPAS CON CHEDAR',price:15000,color:'#827717',cat:'Extras'},
-  {id:7,name:'PAPAS FRITAS G',price:12000,color:'#6d6f1a',cat:'Extras'},
-  {id:8,name:'PAPAS FRITAS P',price:8000,color:'#6d6f1a',cat:'Extras'},
-  {id:9,name:'SÁNDWICH LOMITO C.',price:32000,color:'#33691e',cat:'Minutas'},
-  {id:10,name:'AGUA MINERAL',price:3000,color:'#01579b',cat:'Bebidas'},
-  {id:11,name:'SPRITE 500ML',price:5000,color:'#2e7d32',cat:'Bebidas'},
-  {id:12,name:'MILANESA COMPLETA',price:38000,color:'#bf360c',cat:'Comidas'},
-  {id:99,name:'ÍTEM LIBRE',price:0,color:'#546e7a',cat:'Otros',precioVariable:true,itemLibre:true,iva:'10'},
-];
+  // El ítem libre siempre existe (id:99) — no se guarda en Supabase
+  {id:99,name:'ÍTEM LIBRE',price:0,color:'#546e7a',cat:'Otros',
+   precioVariable:true,itemLibre:true,iva:'10',colorPropio:false},
+]
 
 let cart=[], curCat='Todos los artículos', showTkt=false, npCtx='', npVal='';
 
@@ -3767,14 +3836,8 @@ const COLORES_TILE = [
   '#827717','#6d6f1a','#33691e','#4e342e','#37474f',
   '#558b2f','#bf360c','#00695c','#0277bd','#283593',
 ];
-let CATEGORIAS = [
-  { id:1, nombre:'Comidas',  color:'#e65100' },
-  { id:2, nombre:'Bebidas',  color:'#c62828' },
-  { id:3, nombre:'Minutas',  color:'#2e7d32' },
-  { id:4, nombre:'Extras',   color:'#827717' },
-  { id:5, nombre:'Otros',    color:'#546e7a' },
-];
-let nextCatId = 6;
+let CATEGORIAS = [];
+let nextCatId  = 1;
 const CATEGORIAS_DEFAULT = CATEGORIAS.map(c => c.nombre);
 let artEditIdx = -1;
 let artColorSel = COLORES_TILE[0];
@@ -3954,16 +4017,26 @@ function guardarArticulo(){
       colorPropio: artColorManual,
       cat: artCatSel, iva: artIvaSel, mitad, inventario, comanda
     });
+    const prod = PRODS[artEditIdx];
+    // Guardar en Dexie y Supabase
+    dbSaveProducto(prod);
+    supaUpsertProducto(prod);
     toast('Artículo actualizado');
+    if(db) dbSaveProducto(PRODS[artEditIdx]);
+    supaUpsertProducto(PRODS[artEditIdx]);
   } else {
-    PRODS.push({
+    const newProd = {
       id: nextProdId, prodId: nextProdId,
       name: nombre.toUpperCase(), price: precioVariable?0:precio,
       precioVariable, costo, codigo, color: artColorSel,
       colorPropio: artColorManual,
       cat: artCatSel, iva: artIvaSel, mitad, inventario, comanda
-    });
+    };
+    PRODS.push(newProd);
     nextProdId++;
+    // Guardar en Dexie y Supabase
+    dbSaveProducto(newProd);
+    supaUpsertProducto(newProd);
     toast('Artículo agregado');
   }
   filterP(); renderArtList();
@@ -3972,11 +4045,14 @@ function guardarArticulo(){
 
 function eliminarArticulo(){
   if(artEditIdx < 0) return;
-  const nombre = PRODS[artEditIdx].name;
+  const prod = PRODS[artEditIdx];
   PRODS.splice(artEditIdx, 1);
+  // Eliminar de Dexie y Supabase
+  dbDeleteProducto(prod.id);
+  supaDeleteProducto(prod.id);
   filterP(); renderArtList();
   goTo('scArticulosList');
-  toast('Eliminado: ' + nombre.substring(0,20));
+  toast('Eliminado: ' + prod.name.substring(0,20));
 }
 
 // ── PRECIO VARIABLE ──────────────────────────────────────────────────────────
@@ -4129,14 +4205,20 @@ function guardarCategoria(){
       if(p.cat === old) p.cat = nombre;
       if(!p.colorPropio && p.color === oldColor) p.color = catColorSel;
     });
+    supaUpsertCategoria(CATEGORIAS[catEditIdx]);
     toast('Categoría actualizada');
   } else {
     if(CATEGORIAS.find(c => c.nombre.toLowerCase() === nombre.toLowerCase())){ toast('Ya existe esa categoría'); return; }
-    CATEGORIAS.push({ id: nextCatId++, nombre, color: catColorSel });
+    const newCat = { id: nextCatId++, nombre, color: catColorSel };
+    CATEGORIAS.push(newCat);
+    supaUpsertCategoria(newCat);
     toast('Categoría creada');
   }
   CATEGORIAS_DEFAULT.length = 0;
   CATEGORIAS.forEach(c => CATEGORIAS_DEFAULT.push(c.nombre));
+  // Sync con Supabase
+  const catObj = catEditIdx >= 0 ? CATEGORIAS[catEditIdx] : CATEGORIAS[CATEGORIAS.length-1];
+  if(catObj) supaUpsertCategoria(catObj);
   filterP(); renderCatListScreen();
   goTo('scCategorias');
 }
@@ -4368,11 +4450,16 @@ function cerrarPreviewCierre(){
 
 // ── CONFIGURACIÓN ────────────────────────────────────────────────────────────
 let configData = {
-  negocio: 'MI NEGOCIO',
-  direccion: 'ASUNCION',
-  telefono: '',
-  ruc: '',
-  email: 'usuario@email.com',
+  negocio:      'MI NEGOCIO',
+  direccion:    'ASUNCION',
+  telefono:     '',
+  ruc:          '',
+  email:        'usuario@email.com',
+  terminal:     localStorage.getItem('pos_terminal')  || 'Terminal 1',
+  sucursal:     localStorage.getItem('pos_sucursal')  || 'Principal',
+  deposito:     localStorage.getItem('pos_deposito')  || 'Depósito Principal',
+  sucursal_id:  localStorage.getItem('pos_sucursal_id') || null,
+  deposito_id:  localStorage.getItem('pos_deposito_id') || null,
 };
 
 let printers = {
@@ -4531,40 +4618,566 @@ async function imprimirBluetooth(device, htmlContent, size){
   }
 }
 
+// ══════════════════════════════════════════════════════════
+// SYNC PRODUCTOS Y CATEGORÍAS CON SUPABASE
+// ══════════════════════════════════════════════════════════
+
+// Guardar producto en Supabase (en background, no bloquea)
+function supaUpsertProducto(prod){
+  if(USAR_DEMO || !navigator.onLine) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+  const data = {
+    id: prod.id, nombre: prod.name, precio: prod.price||0,
+    precio_variable: prod.precioVariable||false,
+    costo: prod.costo||0, codigo: prod.codigo||'',
+    categoria: prod.cat, iva: prod.iva||'10',
+    color: prod.color, color_propio: prod.colorPropio||false,
+    mitad: prod.mitad||false, inventario: prod.inventario||false,
+    comanda: prod.comanda||false, item_libre: prod.itemLibre||false,
+    activo: true, licencia_email: email,
+    updated_at: new Date().toISOString()
+  };
+  fetch(SUPA_URL+'/rest/v1/pos_productos', {
+    method: 'POST',
+    headers:{
+      'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+      'Content-Type':'application/json',
+      'Prefer':'resolution=merge-duplicates'
+    },
+    body: JSON.stringify(data)
+  }).then(r=>{ if(!r.ok) r.text().then(t=>console.warn('[Supa] Prod upsert error:',t)); })
+    .catch(e=>console.warn('[Supa] Prod offline:', e.message));
+}
+
+function supaUpsertCategoria(cat){
+  if(USAR_DEMO || !navigator.onLine) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+  const data = {
+    id: cat.id, nombre: cat.nombre, color: cat.color,
+    licencia_email: email, updated_at: new Date().toISOString()
+  };
+  fetch(SUPA_URL+'/rest/v1/pos_categorias', {
+    method: 'POST',
+    headers:{
+      'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+      'Content-Type':'application/json',
+      'Prefer':'resolution=merge-duplicates'
+    },
+    body: JSON.stringify(data)
+  }).then(r=>{ if(!r.ok) r.text().then(t=>console.warn('[Supa] Cat upsert error:',t)); })
+    .catch(e=>console.warn('[Supa] Cat offline:', e.message));
+}
+
+async function supaLoadProductos(){
+  if(USAR_DEMO) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+  try {
+    const data = await supaGet('pos_productos',
+      'licencia_email=eq.'+encodeURIComponent(email)+'&activo=eq.true&order=nombre.asc&select=*'
+    );
+    if(!data || !data.length) return;
+    // Mantener el ítem libre
+    const itemLibre = PRODS.find(p=>p.itemLibre);
+    PRODS.length = 0;
+    if(itemLibre) PRODS.push(itemLibre);
+    data.forEach(p => {
+      PRODS.push({
+        id:             p.id,
+        prodId:         p.id,
+        name:           p.nombre,
+        price:          p.precio || 0,
+        precioVariable: p.precio_variable || false,
+        costo:          p.costo || 0,
+        codigo:         p.codigo || '',
+        cat:            p.categoria || 'Sin categoría',
+        iva:            p.iva || '10',
+        color:          p.color || '#546e7a',
+        colorPropio:    p.color_propio || false,
+        mitad:          p.mitad || false,
+        inventario:     p.inventario || false,
+        comanda:        p.comanda || false,
+        itemLibre:      false,
+      });
+    });
+    // Actualizar nextProdId
+    const maxId = Math.max(...PRODS.filter(p=>!p.itemLibre).map(p=>p.id), 0);
+    nextProdId = maxId + 1;
+    console.log('[Supabase] Productos cargados:', PRODS.length-1);
+    filterP();
+  } catch(e){
+    // "Failed to fetch" = sin internet | tabla vacía es normal al inicio
+    if(!e.message.includes('Failed to fetch'))
+      console.warn('[Supabase] Productos:', e.message);
+  }
+}
+
+async function supaLoadCategorias(){
+  if(USAR_DEMO) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+  try {
+    const data = await supaGet('pos_categorias',
+      'licencia_email=eq.'+encodeURIComponent(email)+'&order=nombre.asc&select=*'
+    );
+    if(!data || !data.length) return;
+    CATEGORIAS.length = 0;
+    data.forEach(c => CATEGORIAS.push({ id:c.id, nombre:c.nombre, color:c.color }));
+    const maxId = Math.max(...CATEGORIAS.map(c=>c.id), 0);
+    nextCatId = maxId + 1;
+    CATEGORIAS_DEFAULT.length = 0;
+    CATEGORIAS.forEach(c => CATEGORIAS_DEFAULT.push(c.nombre));
+    console.log('[Supabase] Categorías cargadas:', CATEGORIAS.length);
+  } catch(e){
+    if(!e.message.includes('Failed to fetch'))
+      console.warn('[Supabase] Categorías:', e.message);
+  }
+}
+
+async function supaGet(tabla, qs){
+  const url = SUPA_URL+'/rest/v1/'+tabla+(qs?'?'+qs:'');
+  const res = await fetch(url, {
+    method: 'GET',
+    headers:{
+      'apikey':          SUPA_ANON,
+      'Authorization':   'Bearer '+SUPA_ANON,
+      'Content-Type':    'application/json',
+      'Accept':          'application/json',
+    }
+  });
+  if(!res.ok){
+    const txt = await res.text();
+    throw new Error('HTTP '+res.status+': '+txt);
+  }
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
+async function supaUpsertProducto(prod){
+  if(USAR_DEMO) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email || prod.itemLibre) return;
+  try {
+    const row = {
+      id:              prod.id,
+      nombre:          prod.name,
+      precio:          prod.price || 0,
+      precio_variable: prod.precioVariable || false,
+      costo:           prod.costo || 0,
+      codigo:          prod.codigo || '',
+      categoria:       prod.cat || 'Sin categoría',
+      iva:             prod.iva || '10',
+      color:           prod.color || '#546e7a',
+      color_propio:    prod.colorPropio || false,
+      mitad:           prod.mitad || false,
+      inventario:      prod.inventario || false,
+      comanda:         prod.comanda || false,
+      activo:          true,
+      licencia_email:  email,
+      terminal:        localStorage.getItem('pos_terminal') || 'Principal',
+      updated_at:      new Date().toISOString(),
+    };
+    const res = await fetch(SUPA_URL+'/rest/v1/pos_productos', {
+      method:  'POST',
+      headers: {
+        'apikey':        SUPA_ANON,
+        'Authorization': 'Bearer '+SUPA_ANON,
+        'Content-Type':  'application/json',
+        'Prefer':        'resolution=merge-duplicates',
+      },
+      body: JSON.stringify(row)
+    });
+    if(!res.ok) throw new Error(await res.text());
+    console.log('[Supabase] Producto guardado:', prod.name);
+  } catch(e){ console.warn('[Supabase] Error guardando producto:', e.message); }
+}
+
+async function supaDeleteProducto(id){
+  if(USAR_DEMO) return;
+  try {
+    await fetch(SUPA_URL+'/rest/v1/pos_productos?id=eq.'+id, {
+      method:  'PATCH',
+      headers: {
+        'apikey':        SUPA_ANON,
+        'Authorization': 'Bearer '+SUPA_ANON,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify({ activo: false })
+    });
+    console.log('[Supabase] Producto eliminado ID:', id);
+  } catch(e){ console.warn('[Supabase] Error eliminando producto:', e.message); }
+}
+
+async function supaUpsertCategoria(cat){
+  if(USAR_DEMO) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+  try {
+    const row = {
+      id:             cat.id,
+      nombre:         cat.nombre,
+      color:          cat.color,
+      licencia_email: email,
+      updated_at:     new Date().toISOString(),
+    };
+    const res = await fetch(SUPA_URL+'/rest/v1/pos_categorias', {
+      method:  'POST',
+      headers: {
+        'apikey':        SUPA_ANON,
+        'Authorization': 'Bearer '+SUPA_ANON,
+        'Content-Type':  'application/json',
+        'Prefer':        'resolution=merge-duplicates',
+      },
+      body: JSON.stringify(row)
+    });
+    if(!res.ok) throw new Error(await res.text());
+    console.log('[Supabase] Categoría guardada:', cat.nombre);
+  } catch(e){ console.warn('[Supabase] Error guardando categoría:', e.message); }
+}
+
 // UTILS
 function gs(n){ return '₲'+Math.round(n).toLocaleString('es-PY'); }
 
 let _tt;
 function toast(m){
   const t=document.getElementById('toast');
+  if(!t) return;
   t.textContent=m; t.classList.add('show');
   clearTimeout(_tt); _tt=setTimeout(()=>t.classList.remove('show'),1800);
 }
 
 // ══════════════════════════════════════════════════════════
+// DEXIE.JS — BASE DE DATOS LOCAL (IndexedDB)
+// ══════════════════════════════════════════════════════════
+
+// Inicializar base de datos
+let db;
+
+async function initDB(){
+  // Esperar hasta 3 segundos a que Dexie cargue
+  for(let i=0; i<30; i++){
+    if(typeof Dexie !== 'undefined') break;
+    await new Promise(r=>setTimeout(r,100));
+  }
+
+  if(typeof Dexie === 'undefined'){
+    console.warn('[DB] Dexie no disponible — app funciona sin BD local');
+    db = null;
+    return null;
+  }
+
+  try {
+    db = new Dexie('POSDatabase');
+    db.version(1).stores({
+      productos:   '++id, nombre, categoria, activo, updatedAt',
+      categorias:  '++id, nombre, updatedAt',
+      ventas:      '++id, fecha, turno_id, terminal, sincronizado',
+      turno:       '++id, fecha_apertura, estado, terminal',
+      egresos:     '++id, turno_id, fecha, sincronizado',
+      config:      'clave',
+      sync_queue:  '++id, tabla, sincronizado, timestamp',
+    });
+    await db.open();
+    console.log('[DB] IndexedDB inicializado OK');
+    await dbLoadConfig();
+    await dbLoadProductos();
+    return db;
+  } catch(e){
+    console.warn('[DB] Error al abrir IndexedDB:', e.message);
+    db = null;
+    return null;
+  }
+}
+
+// ── CONFIG ────────────────────────────────────────────────
+async function dbSaveConfig(clave, valor){
+  if(!db) return;
+  await db.config.put({ clave, valor });
+}
+
+async function dbGetConfig(clave){
+  if(!db) return null;
+  const row = await db.config.get(clave);
+  return row ? row.valor : null;
+}
+
+async function dbLoadConfig(){
+  try {
+    const negocio   = await dbGetConfig('negocio');
+    const direccion = await dbGetConfig('direccion');
+    const telefono  = await dbGetConfig('telefono');
+    const ruc       = await dbGetConfig('ruc');
+    const terminal  = await dbGetConfig('terminal');
+
+    if(negocio && typeof configData !== 'undefined'){
+      configData.negocio   = negocio   || configData.negocio;
+      configData.direccion = direccion || configData.direccion;
+      configData.telefono  = telefono  || configData.telefono;
+      configData.ruc       = ruc       || configData.ruc;
+    }
+    if(terminal) configData.terminal = terminal;
+    console.log('[DB] Config cargada');
+  } catch(e){ console.log('[DB] Config no disponible aún'); }
+}
+
+async function dbSaveConfigAll(){
+  if(typeof configData === 'undefined') return;
+  await dbSaveConfig('negocio',   configData.negocio);
+  await dbSaveConfig('direccion', configData.direccion);
+  await dbSaveConfig('telefono',  configData.telefono);
+  await dbSaveConfig('ruc',       configData.ruc);
+  toast('Configuración guardada');
+}
+
+// ── PRODUCTOS ─────────────────────────────────────────────
+async function dbSaveProducto(prod){
+  if(!db) return;
+  const data = {
+    id:             prod.id,
+    nombre:         prod.name,
+    precio:         prod.price,
+    precio_variable: prod.precioVariable || false,
+    costo:          prod.costo || 0,
+    codigo:         prod.codigo || '',
+    categoria:      prod.cat,
+    iva:            prod.iva || '10',
+    color:          prod.color,
+    color_propio:   prod.colorPropio || false,
+    mitad:          prod.mitad || false,
+    inventario:     prod.inventario || false,
+    comanda:        prod.comanda || false,
+    item_libre:     prod.itemLibre || false,
+    activo:         true,
+    updatedAt:      new Date().toISOString(),
+  };
+  await db.productos.put(data);
+  await dbQueueSync('productos', 'upsert', data);
+}
+
+async function dbDeleteProducto(id){
+  await db.productos.update(id, { activo: false, updatedAt: new Date().toISOString() });
+  await dbQueueSync('productos', 'delete', { id });
+}
+
+async function dbLoadProductos(){
+  try {
+    const prods = await db.productos.where('activo').equals(1).toArray();
+    if(prods.length === 0) return; // usar los hardcodeados
+    // Mapear de DB a formato PRODS
+    PRODS.length = 0;
+    prods.forEach(p => {
+      PRODS.push({
+        id:             p.id,
+        name:           p.nombre,
+        price:          p.precio,
+        precioVariable: p.precio_variable,
+        costo:          p.costo,
+        codigo:         p.codigo,
+        cat:            p.categoria,
+        iva:            p.iva,
+        color:          p.color,
+        colorPropio:    p.color_propio,
+        mitad:          p.mitad,
+        inventario:     p.inventario,
+        comanda:        p.comanda,
+        itemLibre:      p.item_libre,
+      });
+    });
+    console.log('[DB] Productos cargados:', PRODS.length);
+  } catch(e){ console.log('[DB] Productos no disponibles aún'); }
+}
+
+// ── CATEGORÍAS ────────────────────────────────────────────
+async function dbSaveCategoria(cat){
+  const data = {
+    id:        cat.id,
+    nombre:    cat.nombre,
+    color:     cat.color,
+    updatedAt: new Date().toISOString(),
+  };
+  await db.categorias.put(data);
+  await dbQueueSync('categorias', 'upsert', data);
+}
+
+async function dbLoadCategorias(){
+  if(!db) return;
+  try {
+    const cats = await db.categorias.toArray();
+    if(cats.length === 0) return;
+    CATEGORIAS.length = 0;
+    cats.forEach(c => CATEGORIAS.push({ id:c.id, nombre:c.nombre, color:c.color }));
+    CATEGORIAS_DEFAULT.length = 0;
+    CATEGORIAS.forEach(c => CATEGORIAS_DEFAULT.push(c.nombre));
+    console.log('[DB] Categorias cargadas:', CATEGORIAS.length);
+  } catch(e){ console.log('[DB] Categorias no disponibles aún'); }
+}
+
+// ── VENTAS ────────────────────────────────────────────────
+async function dbSaveVenta(data){
+  const venta = {
+    fecha:        data.fecha ? data.fecha.toISOString() : new Date().toISOString(),
+    turno_id:     data.turnoId || null,
+    terminal:     (typeof configData !== 'undefined' ? configData.terminal : null) || 'Principal',
+    total:        data.total,
+    metodo_pago:  data.metodo,
+    comprobante:  data.comprobante || '',
+    items:        JSON.stringify(data.items),
+    tiene_factura: !!data.factura,
+    factura_ruc:  data.factura ? data.factura.ruc : '',
+    factura_nombre: data.factura ? data.factura.nombre : '',
+    sincronizado: 0,
+  };
+  const id = await db.ventas.add(venta);
+  await dbQueueSync('ventas', 'insert', { ...venta, id });
+  return id;
+}
+
+// ── TURNO ─────────────────────────────────────────────────
+async function dbAbrirTurno(efectivoInicial){
+  if(!db) return null;
+  const turno = {
+    fecha_apertura:  new Date().toISOString(),
+    efectivo_inicial: efectivoInicial,
+    estado:          'abierto',
+    terminal:        (typeof configData !== 'undefined' ? configData.terminal : null) || 'Principal',
+    sincronizado:    0,
+  };
+  const id = await db.turno.add(turno);
+  turnoData.dbId = id;
+  await dbQueueSync('turno', 'insert', { ...turno, id });
+  return id;
+}
+
+async function dbCerrarTurno(turnoDbId, totalContado, diferencia){
+  await db.turno.update(turnoDbId, {
+    fecha_cierre:  new Date().toISOString(),
+    estado:        'cerrado',
+    total_contado: totalContado,
+    diferencia,
+    sincronizado:  0,
+  });
+  await dbQueueSync('turno', 'update', { id: turnoDbId, estado:'cerrado', total_contado: totalContado, diferencia });
+}
+
+async function dbSaveEgreso(egreso){
+  const data = {
+    turno_id:    turnoData.dbId || null,
+    descripcion: egreso.desc,
+    monto:       egreso.monto,
+    fecha:       egreso.fecha ? egreso.fecha.toISOString() : new Date().toISOString(),
+    sincronizado: 0,
+  };
+  const id = await db.egresos.add(data);
+  await dbQueueSync('egresos', 'insert', { ...data, id });
+}
+
+// ── SYNC QUEUE ────────────────────────────────────────────
+async function dbQueueSync(tabla, operacion, datos){
+  if(!db) return;
+  await db.sync_queue.add({
+    tabla,
+    operacion,
+    datos:       JSON.stringify(datos),
+    timestamp:   new Date().toISOString(),
+    sincronizado: 0,
+  });
+}
+
+// ── SINCRONIZACIÓN CON SUPABASE ───────────────────────────
+let syncEnProceso = false;
+
+async function syncConSupabase(){
+  if(syncEnProceso || !navigator.onLine) return;
+  if(typeof SUPA_URL === 'undefined' || SUPA_URL.includes('XXXX')) return;
+  if(!db){ console.log('[Sync] Sin BD local, omitiendo sync'); return; }
+
+  syncEnProceso = true;
+  try {
+    const pendientes = await db.sync_queue
+      .where('sincronizado').equals(0)
+      .limit(50)
+      .toArray();
+
+    if(pendientes.length === 0){ syncEnProceso=false; return; }
+
+    console.log('[Sync] Enviando', pendientes.length, 'registros...');
+
+    for(const item of pendientes){
+      try {
+        const datos = JSON.parse(item.datos);
+        const tabla = 'pos_' + item.tabla; // prefijo en Supabase
+
+        if(item.operacion === 'delete'){
+          await supaFetch('DELETE', tabla, null, { id: 'eq.'+datos.id });
+        } else {
+          await supaFetch('POST', tabla, datos);
+        }
+
+        await db.sync_queue.update(item.id, { sincronizado: 1 });
+      } catch(e){
+        console.log('[Sync] Error en item', item.id, e.message);
+      }
+    }
+    console.log('[Sync] Completado');
+  } catch(e){
+    console.log('[Sync] Error general:', e.message);
+  }
+  syncEnProceso = false;
+}
+
+async function supaFetch(method, tabla, body, params){
+  let url = SUPA_URL + '/rest/v1/' + tabla;
+  if(params){
+    const q = Object.entries(params).map(([k,v])=>k+'='+v).join('&');
+    url += '?' + q;
+  }
+  const opts = {
+    method,
+    headers: {
+      'Content-Type':  'application/json',
+      'apikey':        SUPA_ANON,
+      'Authorization': 'Bearer ' + SUPA_ANON,
+      'Prefer':        'resolution=merge-duplicates',
+    },
+  };
+  if(body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  if(!res.ok) throw new Error(await res.text());
+  return res;
+}
+
+// Sincronizar cada 2 minutos cuando hay internet
+setInterval(syncConSupabase, 2 * 60 * 1000);
+window.addEventListener('online', () => {
+  console.log('[Sync] Conexion detectada, sincronizando...');
+  setTimeout(syncConSupabase, 2000);
+});
+
+// ══════════════════════════════════════════════════════════
 // SISTEMA DE LICENCIAS
 // ══════════════════════════════════════════════════════════
-// ── SUPABASE CONFIG ──────────────────────────────────────
-// TODO: reemplazar con tus valores reales de Supabase
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
-// Llama a una función RPC de Supabase
 async function supaRPC(fn, params){
-  const res = await fetch(SUPA_URL + '/rest/v1/rpc/' + fn, {
+  const url = SUPA_URL + '/rest/v1/rpc/' + fn;
+  console.log('[RPC] Llamando:', fn, params);
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type':  'application/json',
       'apikey':        SUPA_ANON,
       'Authorization': 'Bearer ' + SUPA_ANON,
+      'Accept':        'application/json',
     },
     body: JSON.stringify(params)
   });
-  if(!res.ok){
-    const err = await res.text();
-    throw new Error(err);
-  }
-  return await res.json();
+  const text = await res.text();
+  console.log('[RPC] Respuesta', fn, ':', res.status, text.substring(0,200));
+  if(!res.ok) throw new Error('RPC '+fn+' HTTP '+res.status+': '+text);
+  try { return JSON.parse(text); } catch(e){ return text; }
 }
 
 const SK = {
@@ -4573,13 +5186,12 @@ const SK = {
   activated:'lic_activated', deviceId:'lic_device_id', fallos:'lic_fallos'
 };
 
-// Claves demo — solo para desarrollo sin Supabase
 const DEMO_KEYS = {
   'DEMO-2025-XXXX': { plan:'Basico',   vence:'2026-12-31' },
   'PRO-2025-YYYY':  { plan:'Pro',      vence:'2026-12-31' },
   'FULL-2025-ZZZZ': { plan:'Completo', vence:'2027-12-31' },
 };
-const USAR_DEMO = (SUPA_URL === 'https://XXXXXXXXXXXXXXXX.supabase.co'); // true hasta que configures Supabase
+const USAR_DEMO = (SUPA_URL === 'https://XXXXXXXXXXXXXXXX.supabase.co');
 
 function licGetDeviceId(){
   let id=localStorage.getItem(SK.deviceId);
@@ -4589,30 +5201,25 @@ function licGetDeviceId(){
 function licIsActivated(){ return !!localStorage.getItem(SK.activated); }
 
 async function licActivar(email,clave){
-  const claveUp = clave.toUpperCase().trim();
+  const claveUp=clave.toUpperCase().trim();
   if(!email||!email.includes('@')) return {ok:false,error:'Email invalido'};
   if(!claveUp) return {ok:false,error:'Ingresa la clave de licencia'};
-
   if(USAR_DEMO){
-    // ── MODO DEMO (sin Supabase configurado) ──
     await new Promise(r=>setTimeout(r,1200));
     const licData=DEMO_KEYS[claveUp];
     if(!licData) return {ok:false,error:'Clave invalida. (Demo: DEMO-2025-XXXX)'};
     const token='tk_demo_'+btoa(email+':'+claveUp).replace(/=/g,'').substring(0,24);
     return {ok:true,token,email,plan:licData.plan,vence:licData.vence};
   }
-
-  // ── MODO REAL (Supabase) ──
   try {
-    const data = await supaRPC('activar_licencia', {
-      p_clave:     claveUp,
-      p_email:     email,
-      p_device_id: licGetDeviceId()
-    });
-    if(!data.ok) return {ok:false, error:data.error||'Error al activar'};
-    return {ok:true, token:data.token, email, plan:data.plan, vence:data.vence};
+    console.log('[Licencia] Activando con Supabase...', claveUp);
+    const data=await supaRPC('activar_licencia',{p_clave:claveUp,p_email:email,p_device_id:licGetDeviceId()});
+    console.log('[Licencia] Respuesta Supabase:', data);
+    if(!data.ok) return {ok:false,error:data.error||'Error al activar'};
+    return {ok:true,token:data.token,email,plan:data.plan,vence:data.vence};
   } catch(e){
-    return {ok:false, error:'Sin conexion con el servidor. Verifica tu internet.'};
+    console.error('[Licencia] Error Supabase:', e.message);
+    return {ok:false,error:'Error de conexion: '+e.message};
   }
 }
 
@@ -4629,22 +5236,19 @@ function licGuardar(data){
 function licSetNegocio(nombre){
   localStorage.setItem(SK.negocio,nombre);
   if(typeof configData!=='undefined') configData.negocio=nombre;
+  if(db) dbSaveConfig('negocio',nombre);
+}
+
+function licGetTerminal(){
+  return localStorage.getItem('pos_terminal') || 'Terminal 1';
 }
 
 async function licVerificarServidor(){
-  if(USAR_DEMO){
-    // ── MODO DEMO ──
-    await new Promise(r=>setTimeout(r,400));
-    return true; // siempre activa en demo
-  }
-  // ── MODO REAL (Supabase) ──
-  const email = localStorage.getItem(SK.email);
+  if(USAR_DEMO){ await new Promise(r=>setTimeout(r,400)); return true; }
+  const email=localStorage.getItem(SK.email);
   if(!email) return false;
-  const data = await supaRPC('verificar_licencia', {
-    p_device_id: licGetDeviceId(),
-    p_email:     email
-  });
-  return data.activa === true;
+  const data=await supaRPC('verificar_licencia',{p_device_id:licGetDeviceId(),p_email:email});
+  return data.activa===true;
 }
 
 async function licCheckPeriodico(){
@@ -4665,21 +5269,21 @@ async function licCheckPeriodico(){
 
 function licMostrarBloqueo(motivo){
   const msgs={
-    'SUSPENDIDA': {t:'Licencia suspendida',s:'Tu licencia fue suspendida. Contacta al soporte para reactivarla.',i:''},
-    'SIN_CONEXION':{t:'Sin verificacion',s:'No se pudo verificar la licencia por 3 dias. Verifica tu internet.',i:'Si el problema persiste, contacta soporte.'},
-    'VENCIDA':    {t:'Licencia vencida',s:'Tu periodo de uso vencio. Renovala para continuar.',i:''},
+    'SUSPENDIDA':{t:'Licencia suspendida',s:'Tu licencia fue suspendida. Contacta al soporte.',i:''},
+    'SIN_CONEXION':{t:'Sin verificacion',s:'No se pudo verificar por 3 dias. Verifica tu internet.',i:''},
+    'VENCIDA':{t:'Licencia vencida',s:'Tu periodo vencio. Renova tu licencia para continuar.',i:''},
   };
   const m=msgs[motivo]||msgs['SUSPENDIDA'];
   document.getElementById('bloqueoTitulo').textContent=m.t;
   document.getElementById('bloqueoSub').textContent=m.s;
   document.getElementById('bloqueoInfo').textContent=m.i;
-  document.querySelectorAll('.screen,#scActivacion,#scActivado').forEach(s=>s.classList.remove('active'));
-  document.getElementById('scBloqueado').classList.add('active');
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); ['scActivacion','scActivado','scBloqueado'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  document.getElementById('scBloqueado').style.display='flex';
 }
 
 async function licInit(){
   if(!licIsActivated()){
-    document.getElementById('scActivacion').classList.add('active');
+    document.getElementById('scActivacion').style.display='flex';
     return false;
   }
   await licCheckPeriodico();
@@ -4693,35 +5297,98 @@ async function doActivar(){
   const clave=document.getElementById('licClave').value.trim();
   const btn=document.getElementById('licActivarBtn');
   const errEl=document.getElementById('licError');
-  errEl.classList.remove('show');
+  errEl.style.display='none';
   if(!email){licShowError('Ingresa tu email');return;}
-  if(!clave){licShowError('Ingresa la clave de licencia');return;}
+  if(clave.length < 5){licShowError('Ingresa la clave de licencia');return;}
   btn.disabled=true;
-  btn.innerHTML='<div class="lic-spinner"></div> Verificando...';
+  btn.style.background='#333';
+  btn.innerHTML='<div style="width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:lic-spin .8s linear infinite;display:inline-block;margin-right:8px;vertical-align:middle;"></div> Verificando...';
   const res=await licActivar(email,clave);
   if(!res.ok){
-    btn.disabled=false; btn.innerHTML='ACTIVAR';
+    btn.disabled=false;
+    btn.style.background='#4caf50';
+    btn.innerHTML='ACTIVAR';
     licShowError(res.error); return;
   }
   licGuardar(res);
-  document.getElementById('scActivacion').classList.remove('active');
+  document.getElementById('scActivacion').style.display='none';
   document.getElementById('activadoPlan').textContent='Plan '+res.plan;
   document.getElementById('activadoSub').textContent='Licencia activa hasta '+res.vence+'. Bienvenido.';
   document.getElementById('activadoNegocio').value='';
-  document.getElementById('scActivado').classList.add('active');
+  document.getElementById('scActivado').style.display='flex';
 }
 
 function licShowError(msg){
   const el=document.getElementById('licError');
-  el.textContent=msg; el.classList.add('show');
+  if(!el) return;
+  el.textContent=msg;
+  el.style.display='block';
 }
 
-function doEntrar(){
-  const negocio=document.getElementById('activadoNegocio').value.trim();
-  if(negocio) licSetNegocio(negocio);
-  document.getElementById('scActivado').classList.remove('active');
-  renderP(PRODS);
-  goTo('scClosed');
+async function doEntrar(){
+  const negocio  = document.getElementById('activadoNegocio').value.trim();
+  const terminal = document.getElementById('activadoTerminal').value.trim() || 'Terminal 1';
+  const sucursal = document.getElementById('activadoSucursal').value.trim() || 'Principal';
+  const deposito = document.getElementById('activadoDeposito').value.trim() || 'Depósito Principal';
+
+  if(!negocio){ alert('Ingresá el nombre del negocio'); return; }
+  if(!sucursal){ alert('Ingresá el nombre de la sucursal'); return; }
+
+  licSetNegocio(negocio);
+
+  // Guardar todo localmente
+  localStorage.setItem('pos_terminal', terminal);
+  localStorage.setItem('pos_sucursal', sucursal);
+  localStorage.setItem('pos_deposito', deposito);
+  if(db){
+    await dbSaveConfig('terminal', terminal);
+    await dbSaveConfig('sucursal', sucursal);
+    await dbSaveConfig('deposito', deposito);
+  }
+  if(typeof configData !== 'undefined'){
+    configData.terminal = terminal;
+    configData.sucursal = sucursal;
+    configData.deposito = deposito;
+  }
+
+  // Crear sucursal + depósito en Supabase
+  if(!USAR_DEMO){
+    try {
+      // Primero actualizar activación
+      await supaRPC('actualizar_activacion', {
+        p_device_id: licGetDeviceId(),
+        p_email:     localStorage.getItem(SK.email),
+        p_negocio:   negocio,
+        p_terminal:  terminal,
+        p_sucursal:  sucursal,
+      });
+      // Obtener licencia_id desde activaciones
+      const activ = await supaFetch('GET', 'activaciones?device_id=eq.'+licGetDeviceId()+'&select=licencia_id');
+      const activData = await activ.json();
+      if(activData && activData[0]){
+        const licId = activData[0].licencia_id;
+        // Crear sucursal y depósito (si no existe ya)
+        const result = await supaRPC('crear_sucursal', {
+          p_licencia_id: licId,
+          p_nombre:      sucursal,
+          p_direccion:   '',
+          p_deposito:    deposito,
+        });
+        if(result && result.sucursal_id){
+          localStorage.setItem('pos_sucursal_id', result.sucursal_id);
+          localStorage.setItem('pos_deposito_id', result.deposito_id);
+          if(db){
+            await dbSaveConfig('sucursal_id', String(result.sucursal_id));
+            await dbSaveConfig('deposito_id', String(result.deposito_id));
+          }
+          console.log('[Setup] Sucursal ID:', result.sucursal_id, '| Depósito ID:', result.deposito_id);
+        }
+      }
+    } catch(e){ console.log('Setup Supabase:', e.message); }
+  }
+
+  document.getElementById('scActivado').style.display='none';
+  await iniciarApp();
 }
 
 async function doReintentar(){
@@ -4731,8 +5398,8 @@ async function doReintentar(){
       localStorage.setItem(SK.fallos,'0');
       localStorage.setItem(SK.activated,'1');
       localStorage.setItem(SK.nextCheck,String(Date.now()+24*60*60*1000));
-      document.getElementById('scBloqueado').classList.remove('active');
-      renderP(PRODS); goTo('scClosed');
+      document.getElementById('scBloqueado').style.display='none';
+      await iniciarApp();
     } else { licMostrarBloqueo('SUSPENDIDA'); }
   } catch(e){ licMostrarBloqueo('SIN_CONEXION'); }
 }
@@ -4745,14 +5412,55 @@ function doContactarSoporte(){
 function doDesactivar(){
   if(!confirm('Desactivar esta licencia en este dispositivo?')) return;
   Object.values(SK).forEach(k=>localStorage.removeItem(k));
-  document.getElementById('scBloqueado').classList.remove('active');
-  document.getElementById('scActivacion').classList.add('active');
+  document.getElementById('scBloqueado').style.display='none';
+  document.getElementById('scActivacion').style.display='flex';
+}
+
+// ── FUNCIÓN CENTRAL DE INICIO ─────────────────────────────
+async function iniciarApp(){
+  // Restaurar config desde localStorage
+  const terminal = localStorage.getItem('pos_terminal');
+  const sucursal = localStorage.getItem('pos_sucursal');
+  const deposito = localStorage.getItem('pos_deposito');
+  if(terminal && typeof configData !== 'undefined') configData.terminal = terminal;
+  if(sucursal && typeof configData !== 'undefined') configData.sucursal = sucursal;
+  if(deposito && typeof configData !== 'undefined') configData.deposito = deposito;
+
+  // Mostrar pantalla de carga mientras trae datos
+  goTo('scClosed');
+  renderP(PRODS);
+
+  // Cargar categorías y productos desde Supabase
+  if(!USAR_DEMO && navigator.onLine){
+    try {
+      await supaLoadCategorias();
+      await supaLoadProductos();
+      renderP(PRODS);
+      filterP();
+    } catch(e){ console.warn('[App] Error cargando datos:', e.message); }
+  } else if(db){
+    // Si offline, cargar desde Dexie
+    await dbLoadCategorias();
+    await dbLoadProductos();
+    renderP(PRODS);
+  }
+
+  // Sincronizar en background
+  setTimeout(syncConSupabase, 5000);
 }
 
 // ── ARRANQUE ──────────────────────────────────────────────
 (async function(){
-  const ok=await licInit();
-  if(ok){ renderP(PRODS); goTo('scClosed'); }
+  try {
+    await initDB();
+    await dbLoadCategorias();
+    await dbLoadProductos();
+  } catch(e){
+    console.log('[DB] Error al iniciar:', e.message);
+  }
+
+  const ok = await licInit();
+  if(ok) await iniciarApp();
 })();
 </script>
 </body>
