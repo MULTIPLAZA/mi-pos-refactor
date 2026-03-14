@@ -624,6 +624,98 @@
   }
   .drawer-version { font-size: 12px; color: #555; }
 
+  /* ── LICENCIA / ACTIVACIÓN ── */
+  #scActivacion, #scBloqueado, #scActivado {
+    background: #1a1a1a;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    padding: 32px 24px;
+    overflow-y: auto;
+  }
+  .lic-logo {
+    width: 76px; height: 76px; border-radius: 20px;
+    background: var(--green); display: flex; align-items: center;
+    justify-content: center; margin-bottom: 20px; flex-shrink: 0;
+    box-shadow: 0 8px 32px rgba(76,175,80,.35);
+  }
+  .lic-title {
+    font-size: 24px; font-weight: 800; color: #fff;
+    margin-bottom: 8px; text-align: center;
+  }
+  .lic-sub {
+    font-size: 14px; color: #777; text-align: center;
+    margin-bottom: 28px; line-height: 1.5; max-width: 300px;
+  }
+  .lic-form {
+    width: 100%; max-width: 360px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .lic-field { display: flex; flex-direction: column; gap: 6px; }
+  .lic-label {
+    font-size: 11px; color: #888; letter-spacing: .8px;
+    text-transform: uppercase; font-weight: 700;
+  }
+  .lic-input {
+    background: #2a2a2a; border: 1.5px solid #444; border-radius: 8px;
+    color: #fff; font-family: 'Barlow', sans-serif; font-size: 16px;
+    padding: 13px 14px; outline: none; transition: border-color .2s;
+    width: 100%;
+  }
+  .lic-input:focus { border-color: var(--green); }
+  .lic-input::placeholder { color: #555; font-size: 14px; }
+  .lic-input.key {
+    text-transform: uppercase; font-weight: 700;
+    letter-spacing: 2px; font-size: 15px;
+  }
+  .lic-btn {
+    background: var(--green); border: none; border-radius: 8px;
+    color: #fff; font-family: 'Barlow', sans-serif;
+    font-size: 15px; font-weight: 800; letter-spacing: 1px;
+    text-transform: uppercase; padding: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; transition: background .15s; width: 100%;
+  }
+  .lic-btn:active { filter: brightness(.9); }
+  .lic-btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+  .lic-btn.outline {
+    background: transparent; border: 1.5px solid #555;
+    color: #aaa; margin-top: 0;
+  }
+  .lic-error {
+    background: rgba(198,40,40,.15); border: 1px solid rgba(198,40,40,.4);
+    border-radius: 6px; color: #ef5350; font-size: 13px;
+    padding: 10px 14px; display: none; text-align: center;
+  }
+  .lic-error.show { display: block; }
+  .lic-spinner {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.3);
+    border-top-color: #fff;
+    animation: lic-spin .8s linear infinite; flex-shrink: 0;
+  }
+  @keyframes lic-spin { to { transform: rotate(360deg); } }
+  .lic-badge {
+    background: rgba(76,175,80,.15); border: 1px solid rgba(76,175,80,.3);
+    border-radius: 20px; color: var(--green);
+    font-size: 12px; font-weight: 700; padding: 4px 16px;
+    letter-spacing: .5px; margin-bottom: 8px;
+  }
+  .lic-bloqueo-icon {
+    width: 76px; height: 76px; border-radius: 20px;
+    background: rgba(198,40,40,.1); border: 2px solid #c62828;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px;
+  }
+  .lic-info {
+    font-size: 12px; color: #555; text-align: center;
+    margin-top: 4px; line-height: 1.7;
+  }
+  .lic-info a { color: #666; text-decoration: underline; cursor: pointer; }
+
   /* SCREENS */
   .screen {
     display:none; flex-direction:column; position:absolute;
@@ -1967,47 +2059,63 @@
 <!-- ═══════════════════════════════════════════
      PANTALLA: ACTIVACIÓN DE LICENCIA
 ═══════════════════════════════════════════ -->
-<div id="scActivacion" style="display:none;flex-direction:column;align-items:center;justify-content:center;position:fixed;inset:0;z-index:9999;padding:32px 24px;background:#1a1a1a;">
-  <div class="lic-logo">
+<div id="scActivacion" style="display:none;flex-direction:column;align-items:center;justify-content:center;position:fixed;inset:0;z-index:9999;padding:32px 24px;background:#1a1a1a;overflow-y:auto;">
+  <div style="width:76px;height:76px;border-radius:20px;background:#4caf50;display:flex;align-items:center;justify-content:center;margin-bottom:20px;box-shadow:0 8px 32px rgba(76,175,80,.35);">
     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
   </div>
-  <h1 class="lic-title">Activar sistema</h1>
-  <p class="lic-sub">Ingresá tu email y la clave de licencia<br>que recibiste al adquirir el sistema.</p>
-  <div class="lic-form">
-    <div class="lic-field">
-      <span class="lic-label">EMAIL</span>
-      <input class="lic-input" id="licEmail" type="email" placeholder="tu@email.com">
+  <h1 style="font-size:26px;font-weight:800;color:#fff;margin-bottom:8px;text-align:center;font-family:'Barlow',sans-serif;">Activar sistema</h1>
+  <p style="font-size:14px;color:#777;text-align:center;margin-bottom:28px;line-height:1.5;max-width:300px;font-family:'Barlow',sans-serif;">Ingresá tu email y la clave de licencia<br>que recibiste al adquirir el sistema.</p>
+  <div style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:14px;">
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <span style="font-size:11px;color:#888;letter-spacing:.8px;text-transform:uppercase;font-weight:700;font-family:'Barlow',sans-serif;">EMAIL</span>
+      <input id="licEmail" type="email" placeholder="tu@email.com"
+        style="background:#2a2a2a;border:1.5px solid #444;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:16px;padding:13px 14px;outline:none;width:100%;box-sizing:border-box;"
+        onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#444'">
     </div>
-    <div class="lic-field">
-      <span class="lic-label">CLAVE DE LICENCIA</span>
-      <input class="lic-input key" id="licClave" type="text" placeholder="XXXX-XXXX-XXXX" maxlength="20" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9-]/g,'')">
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <span style="font-size:11px;color:#888;letter-spacing:.8px;text-transform:uppercase;font-weight:700;font-family:'Barlow',sans-serif;">CLAVE DE LICENCIA</span>
+      <input id="licClave" type="text" placeholder="XXXX-XXXX-XXXX" maxlength="20"
+        style="background:#2a2a2a;border:1.5px solid #444;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;font-weight:700;letter-spacing:2px;padding:13px 14px;outline:none;width:100%;box-sizing:border-box;text-transform:uppercase;"
+        oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9-]/g,'')"
+        onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#444'">
     </div>
-    <div class="lic-error" id="licError"></div>
-    <button class="lic-btn" id="licActivarBtn" onclick="doActivar()">ACTIVAR</button>
-    <p class="lic-info">¿No tenés licencia? <a onclick="toast('Contactá al proveedor')">Contactá al soporte</a><br><small style="color:#444;">Demo: DEMO-2025-XXXX</small></p>
+    <div id="licError" style="display:none;background:rgba(198,40,40,.15);border:1px solid rgba(198,40,40,.4);border-radius:6px;color:#ef5350;font-size:13px;padding:10px 14px;text-align:center;font-family:'Barlow',sans-serif;"></div>
+    <button id="licActivarBtn" onclick="doActivar()"
+      style="background:#4caf50;border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;">
+      ACTIVAR
+    </button>
+    <p style="font-size:12px;color:#555;text-align:center;font-family:'Barlow',sans-serif;line-height:1.7;">
+      ¿No tenés licencia? <a onclick="toast('Contactá al proveedor')" style="color:#666;text-decoration:underline;cursor:pointer;">Contactá al soporte</a><br>
+      <small style="color:#444;">Demo: DEMO-2025-XXXX</small>
+    </p>
   </div>
 </div>
 
 <!-- ═══════════════════════════════════════════
      PANTALLA: ACTIVACIÓN EXITOSA
 ═══════════════════════════════════════════ -->
-<div id="scActivado" style="display:none;flex-direction:column;align-items:center;justify-content:center;position:fixed;inset:0;z-index:9999;padding:32px 24px;background:#1a1a1a;">
-  <div class="lic-logo">
+<div id="scActivado" style="display:none;flex-direction:column;align-items:center;justify-content:center;position:fixed;inset:0;z-index:9999;padding:32px 24px;background:#1a1a1a;overflow-y:auto;">
+  <div style="width:76px;height:76px;border-radius:20px;background:#4caf50;display:flex;align-items:center;justify-content:center;margin-bottom:16px;box-shadow:0 8px 32px rgba(76,175,80,.35);">
     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
   </div>
-  <div class="lic-badge" id="activadoPlan">Plan Básico</div>
-  <h1 class="lic-title">¡Activado!</h1>
-  <p class="lic-sub" id="activadoSub">Sistema activado correctamente.</p>
-  <div class="lic-form" style="max-width:320px;">
-    <div class="lic-field">
-      <span class="lic-label">NOMBRE DEL NEGOCIO</span>
-      <input class="lic-input" id="activadoNegocio" type="text" placeholder="Ej: Lomitón Express">
+  <div id="activadoPlan" style="background:rgba(76,175,80,.15);border:1px solid rgba(76,175,80,.3);border-radius:20px;color:#4caf50;font-size:12px;font-weight:700;padding:4px 16px;letter-spacing:.5px;margin-bottom:10px;font-family:'Barlow',sans-serif;">Plan Básico</div>
+  <h1 style="font-size:26px;font-weight:800;color:#fff;margin-bottom:8px;text-align:center;font-family:'Barlow',sans-serif;">¡Activado!</h1>
+  <p id="activadoSub" style="font-size:14px;color:#777;text-align:center;margin-bottom:24px;line-height:1.5;max-width:300px;font-family:'Barlow',sans-serif;">Sistema activado correctamente.</p>
+  <div style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:14px;">
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <span style="font-size:11px;color:#888;letter-spacing:.8px;text-transform:uppercase;font-weight:700;font-family:'Barlow',sans-serif;">NOMBRE DEL NEGOCIO</span>
+      <input id="activadoNegocio" type="text" placeholder="Ej: Lomitón Express"
+        style="background:#2a2a2a;border:1.5px solid #444;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;padding:13px 14px;outline:none;width:100%;box-sizing:border-box;"
+        onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#444'">
     </div>
-    <div class="lic-field">
-      <span class="lic-label">NOMBRE DE ESTA TERMINAL</span>
-      <input class="lic-input" id="activadoTerminal" type="text" placeholder="Ej: Caja Local, Delivery, Barra...">
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <span style="font-size:11px;color:#888;letter-spacing:.8px;text-transform:uppercase;font-weight:700;font-family:'Barlow',sans-serif;">NOMBRE DE ESTA TERMINAL</span>
+      <input id="activadoTerminal" type="text" placeholder="Ej: Caja Local, Delivery, Barra..."
+        style="background:#2a2a2a;border:1.5px solid #444;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;padding:13px 14px;outline:none;width:100%;box-sizing:border-box;"
+        onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#444'">
     </div>
-    <button class="lic-btn" onclick="doEntrar()">
+    <button onclick="doEntrar()"
+      style="background:#4caf50;border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:4px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
       ENTRAR AL SISTEMA
     </button>
@@ -2018,17 +2126,26 @@
      PANTALLA: LICENCIA BLOQUEADA
 ═══════════════════════════════════════════ -->
 <div id="scBloqueado" style="display:none;flex-direction:column;align-items:center;justify-content:center;position:fixed;inset:0;z-index:9999;padding:32px 24px;background:#1a1a1a;">
-  <div class="lic-bloqueo-icon">
+  <div style="width:76px;height:76px;border-radius:20px;background:rgba(198,40,40,.1);border:2px solid #c62828;display:flex;align-items:center;justify-content:center;margin-bottom:20px;">
     <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ef5350" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
   </div>
-  <h1 class="lic-title" id="bloqueoTitulo">Acceso bloqueado</h1>
-  <p class="lic-sub" id="bloqueoSub">Tu licencia no está activa.</p>
-  <div class="lic-form" style="max-width:320px;gap:10px;">
-    <button class="lic-btn" onclick="doReintentar()">REINTENTAR</button>
-    <button class="lic-btn outline" onclick="doContactarSoporte()">CONTACTAR SOPORTE</button>
-    <button class="lic-btn outline" style="font-size:12px;padding:10px;" onclick="doDesactivar()">Activar con otra licencia</button>
+  <h1 id="bloqueoTitulo" style="font-size:24px;font-weight:800;color:#fff;margin-bottom:8px;text-align:center;font-family:'Barlow',sans-serif;">Acceso bloqueado</h1>
+  <p id="bloqueoSub" style="font-size:14px;color:#777;text-align:center;margin-bottom:24px;line-height:1.5;max-width:300px;font-family:'Barlow',sans-serif;">Tu licencia no está activa.</p>
+  <div style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:10px;">
+    <button onclick="doReintentar()"
+      style="background:#4caf50;border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:15px;cursor:pointer;width:100%;">
+      REINTENTAR
+    </button>
+    <button onclick="doContactarSoporte()"
+      style="background:transparent;border:1.5px solid #555;border-radius:8px;color:#aaa;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:14px;cursor:pointer;width:100%;">
+      CONTACTAR SOPORTE
+    </button>
+    <button onclick="doDesactivar()"
+      style="background:transparent;border:1.5px solid #444;border-radius:8px;color:#666;font-family:'Barlow',sans-serif;font-size:12px;font-weight:600;padding:10px;cursor:pointer;width:100%;">
+      Activar con otra licencia
+    </button>
   </div>
-  <p class="lic-info" id="bloqueoInfo"></p>
+  <p id="bloqueoInfo" style="font-size:12px;color:#555;text-align:center;margin-top:16px;font-family:'Barlow',sans-serif;"></p>
 </div>
 
 <!-- ======== SCREEN: TURNO CERRADO ======== -->
