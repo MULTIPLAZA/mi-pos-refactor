@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Super Admin — POS Licencias</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --bg:#0a0a0a;--card:#141414;--card2:#1a1a1a;
+    --green:#4caf50;--red:#c62828;--orange:#ff9800;--blue:#1565c0;
+    --border:#222;--text:#fff;--muted:#777;
+  }
+  body{font-family:'Barlow',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+  /* LOGIN */
+  .login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;}
+  .login-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:32px;width:100%;max-width:360px;}
+  .login-brand{text-align:center;margin-bottom:20px;}
+  .login-brand-name{font-size:20px;font-weight:800;color:var(--green);}
+  .login-brand-sub{font-size:12px;color:var(--muted);}
+  .field{margin-bottom:14px;}
+  .field label{font-size:11px;color:var(--muted);display:block;margin-bottom:5px;letter-spacing:.5px;text-transform:uppercase;}
+  .field input{width:100%;background:#1e1e1e;border:1.5px solid #333;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;padding:11px 14px;outline:none;transition:border-color .2s;}
+  .field input:focus{border-color:var(--green);}
+  .btn{width:100%;border:none;border-radius:8px;font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:13px;cursor:pointer;transition:all .15s;}
+  .btn-green{background:var(--green);color:#fff;}
+  .btn-green:hover{background:#43a047;}
+  .btn-red{background:var(--red);color:#fff;}
+  .btn-outline{background:transparent;border:1.5px solid #444;color:#aaa;}
+  .btn-sm{padding:7px 14px;font-size:11px;border-radius:6px;}
+  .err{color:#ef5350;font-size:12px;text-align:center;margin-top:8px;display:none;}
+
+  /* LAYOUT */
+  .app{display:none;}
+  .sidebar{
+    width:220px;background:var(--card);border-right:1px solid var(--border);
+    position:fixed;left:0;top:0;bottom:0;padding:20px 0;display:flex;flex-direction:column;
+  }
+  .sidebar-brand{padding:0 20px 20px;border-bottom:1px solid var(--border);margin-bottom:12px;}
+  .sidebar-brand-name{font-size:16px;font-weight:800;color:var(--green);}
+  .sidebar-brand-sub{font-size:11px;color:var(--muted);}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:11px 20px;cursor:pointer;font-size:14px;font-weight:600;color:var(--muted);transition:all .15s;border-left:3px solid transparent;}
+  .nav-item:hover{background:rgba(255,255,255,.03);color:#ddd;}
+  .nav-item.active{color:var(--green);border-left-color:var(--green);background:rgba(76,175,80,.06);}
+  .sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border);}
+  .sidebar-user{font-size:12px;color:var(--muted);margin-bottom:8px;}
+  .main-content{margin-left:220px;padding:28px;min-height:100vh;}
+
+  /* HEADER */
+  .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;}
+  .page-title{font-size:22px;font-weight:800;}
+  .page-sub{font-size:13px;color:var(--muted);margin-top:2px;}
+
+  /* KPI */
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+  .kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px;}
+  .kpi-lbl{font-size:11px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px;}
+  .kpi-val{font-size:26px;font-weight:800;}
+  .kpi-val.green{color:var(--green);}
+  .kpi-val.orange{color:var(--orange);}
+  .kpi-val.red{color:#ef5350;}
+  .kpi-trend{font-size:12px;color:var(--muted);margin-top:3px;}
+
+  /* TABLE */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;}
+  .card-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
+  .card-title{font-size:15px;font-weight:700;}
+  table{width:100%;border-collapse:collapse;}
+  th{padding:11px 16px;font-size:11px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;text-align:left;background:#111;}
+  td{padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:rgba(255,255,255,.015);}
+
+  /* BADGES */
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+  .badge-ok{background:rgba(76,175,80,.15);color:var(--green);}
+  .badge-off{background:#1e1e1e;color:var(--muted);}
+  .badge-warn{background:rgba(255,152,0,.15);color:var(--orange);}
+  .badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+  /* MODAL */
+  .modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;padding:24px;}
+  .modal-ov.open{display:flex;}
+  .modal{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:28px;width:100%;max-width:480px;}
+  .modal-title{font-size:18px;font-weight:700;margin-bottom:20px;}
+  .modal-row{display:flex;gap:10px;margin-top:16px;}
+  .form-group{margin-bottom:14px;}
+  .form-label{font-size:11px;color:var(--muted);display:block;margin-bottom:5px;letter-spacing:.5px;text-transform:uppercase;}
+  .form-input{width:100%;background:#1e1e1e;border:1.5px solid #333;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:10px 14px;outline:none;transition:border-color .2s;}
+  .form-input:focus{border-color:var(--green);}
+  select.form-input{cursor:pointer;}
+
+  /* TOAST */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);background:#333;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;transition:transform .3s;z-index:999;opacity:0;}
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+
+  /* Responsive */
+  @media(max-width:900px){
+    .sidebar{display:none;}
+    .main-content{margin-left:0;}
+    .kpi-row{grid-template-columns:repeat(2,1fr);}
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-box">
+    <div class="login-brand">
+      <div class="login-brand-name">⚡ POS Admin</div>
+      <div class="login-brand-sub">Panel de administración</div>
+    </div>
+    <div class="field"><label>Usuario admin</label><input type="text" id="saUser" placeholder="admin"></div>
+    <div class="field"><label>Contraseña</label><input type="password" id="saPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doSaLogin()"></div>
+    <button class="btn btn-green" onclick="doSaLogin()">INGRESAR</button>
+    <div class="err" id="saErr"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <div class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-name">⚡ POS Admin</div>
+      <div class="sidebar-brand-sub">Super Administrador</div>
+    </div>
+    <div class="nav-item active" onclick="showPage('licencias',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      Licencias
+    </div>
+    <div class="nav-item" onclick="showPage('clientes',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Clientes
+    </div>
+    <div class="nav-item" onclick="showPage('terminales',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Terminales
+    </div>
+    <div class="nav-item" onclick="showPage('reportes',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Reportes
+    </div>
+    <div class="sidebar-footer">
+      <div class="sidebar-user" id="saUserLabel">admin</div>
+      <button class="btn btn-outline btn-sm" onclick="doSaLogout()">SALIR</button>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <!-- KPIs globales -->
+    <div class="kpi-row" id="kpiRow">
+      <div class="kpi"><div class="kpi-lbl">Licencias activas</div><div class="kpi-val green" id="kLicActivas">—</div></div>
+      <div class="kpi"><div class="kpi-lbl">Terminales conectadas</div><div class="kpi-val" id="kTerminales">—</div></div>
+      <div class="kpi"><div class="kpi-lbl">Vencen este mes</div><div class="kpi-val orange" id="kVencen">—</div></div>
+      <div class="kpi"><div class="kpi-lbl">Suspendidas</div><div class="kpi-val red" id="kSuspendidas">—</div></div>
+    </div>
+
+    <!-- PAGE: LICENCIAS -->
+    <div id="pageLicencias">
+      <div class="page-header">
+        <div><div class="page-title">Licencias</div><div class="page-sub">Gestioná todas las licencias del sistema</div></div>
+        <button class="btn btn-green btn-sm" onclick="openModalNuevaLicencia()">+ NUEVA LICENCIA</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Todas las licencias</span>
+          <input style="background:#1e1e1e;border:1px solid #333;border-radius:6px;color:#fff;padding:6px 12px;font-family:'Barlow',sans-serif;font-size:13px;outline:none;" placeholder="Buscar..." oninput="filtrarLicencias(this.value)">
+        </div>
+        <table>
+          <thead><tr><th>Clave</th><th>Cliente</th><th>Plan</th><th>Vence</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="licTableBody"><tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted);">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PAGE: CLIENTES -->
+    <div id="pageClientes" style="display:none;">
+      <div class="page-header">
+        <div><div class="page-title">Clientes</div><div class="page-sub">Todos los negocios registrados</div></div>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Negocio</th><th>Email</th><th>Plan</th><th>Terminales</th><th>Última actividad</th></tr></thead>
+          <tbody id="clientesBody"><tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted);">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PAGE: TERMINALES -->
+    <div id="pageTerminales" style="display:none;">
+      <div class="page-header">
+        <div><div class="page-title">Terminales</div><div class="page-sub">Todos los dispositivos activados</div></div>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Terminal</th><th>Negocio</th><th>Email</th><th>Device ID</th><th>Última consulta</th><th>Estado</th></tr></thead>
+          <tbody id="terminalesBody"><tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted);">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PAGE: REPORTES -->
+    <div id="pageReportes" style="display:none;">
+      <div class="page-header">
+        <div><div class="page-title">Reportes globales</div><div class="page-sub">Ventas de todos los clientes</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Ventas por cliente (hoy)</span></div>
+        <table>
+          <thead><tr><th>Negocio</th><th>Terminal</th><th>Ventas</th><th>Total</th></tr></thead>
+          <tbody id="reportesBody"><tr><td colspan="4" style="text-align:center;padding:30px;color:var(--muted);">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NUEVA LICENCIA -->
+<div class="modal-ov" id="modalLicencia" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <div class="modal-title">Nueva licencia</div>
+    <div class="form-group">
+      <label class="form-label">Clave de licencia</label>
+      <div style="display:flex;gap:8px;">
+        <input class="form-input" id="mClave" placeholder="PRO-2025-XXXX" style="flex:1;text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
+        <button class="btn btn-outline btn-sm" onclick="generarClave()" style="white-space:nowrap;">GENERAR</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Plan</label>
+      <select class="form-input" id="mPlan">
+        <option value="1">Básico — 1 dispositivo</option>
+        <option value="2">Pro — 3 dispositivos</option>
+        <option value="3">Completo — ilimitado</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Nombre del cliente</label>
+      <input class="form-input" id="mNombre" placeholder="Ej: Pizzería Express">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email del cliente</label>
+      <input class="form-input" id="mEmail" type="email" placeholder="cliente@email.com">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Fecha de vencimiento</label>
+      <input class="form-input" id="mVence" type="date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notas</label>
+      <input class="form-input" id="mNotas" placeholder="Pago único, contrato anual, etc.">
+    </div>
+    <div class="modal-row">
+      <button class="btn btn-outline" style="flex:1" onclick="document.getElementById('modalLicencia').classList.remove('open')">CANCELAR</button>
+      <button class="btn btn-green" style="flex:2" onclick="guardarLicencia()">GUARDAR LICENCIA</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPA_URL  = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
+const SUPA_ANON = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
+// Contraseña del super admin — cambiar en producción
+const SA_PASS = 'admin2025';
+
+let allLicencias = [];
+let currentPage  = 'licencias';
+
+function toast(m){
+  const t=document.getElementById('toast');
+  t.textContent=m; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2000);
+}
+
+// ── LOGIN ─────────────────────────────────────────────────
+function doSaLogin(){
+  const user=document.getElementById('saUser').value.trim();
+  const pass=document.getElementById('saPass').value;
+  const err =document.getElementById('saErr');
+  if(user==='admin' && pass===SA_PASS){
+    localStorage.setItem('sa_logged','1');
+    document.getElementById('loginWrap').style.display='none';
+    document.getElementById('app').style.display='block';
+    document.getElementById('saUserLabel').textContent=user;
+    cargarTodo();
+  } else {
+    err.textContent='Usuario o contraseña incorrectos';
+    err.style.display='block';
+  }
+}
+
+function doSaLogout(){
+  localStorage.removeItem('sa_logged');
+  document.getElementById('app').style.display='none';
+  document.getElementById('loginWrap').style.display='flex';
+}
+
+// ── NAVEGACIÓN ────────────────────────────────────────────
+function showPage(page, navEl){
+  currentPage = page;
+  ['licencias','clientes','terminales','reportes'].forEach(p=>{
+    document.getElementById('page'+p.charAt(0).toUpperCase()+p.slice(1)).style.display = p===page?'block':'none';
+  });
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  if(navEl) navEl.classList.add('active');
+  cargarPagina(page);
+}
+
+// ── SUPABASE ──────────────────────────────────────────────
+async function supaGet(tabla, qs){
+  const url = SUPA_URL+'/rest/v1/'+tabla+(qs?'?'+qs:'');
+  const res = await fetch(url,{headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
+  if(!res.ok) throw new Error(await res.text());
+  return await res.json();
+}
+
+async function supaPost(tabla, body){
+  const res = await fetch(SUPA_URL+'/rest/v1/'+tabla,{
+    method:'POST',
+    headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=representation'},
+    body:JSON.stringify(body)
+  });
+  if(!res.ok) throw new Error(await res.text());
+  return await res.json();
+}
+
+async function supaPatch(tabla, id, body){
+  const res = await fetch(SUPA_URL+'/rest/v1/'+tabla+'?id=eq.'+id,{
+    method:'PATCH',
+    headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  if(!res.ok) throw new Error(await res.text());
+}
+
+// ── CARGAR TODO ───────────────────────────────────────────
+async function cargarTodo(){
+  await Promise.all([cargarKPIs(), cargarPagina('licencias')]);
+}
+
+async function cargarPagina(page){
+  if(page==='licencias')  await cargarLicencias();
+  if(page==='clientes')   await cargarClientes();
+  if(page==='terminales') await cargarTerminales();
+  if(page==='reportes')   await cargarReportes();
+}
+
+async function cargarKPIs(){
+  try {
+    const lics  = await supaGet('licencias','select=id,activa,fecha_vence');
+    const activas     = lics.filter(l=>l.activa).length;
+    const suspendidas = lics.filter(l=>!l.activa).length;
+    const hoy = new Date();
+    const fin_mes = new Date(hoy.getFullYear(), hoy.getMonth()+1, 0);
+    const vencen = lics.filter(l=>{
+      const v=new Date(l.fecha_vence);
+      return l.activa && v >= hoy && v <= fin_mes;
+    }).length;
+    const terms = await supaGet('activaciones','select=id&activa=eq.true');
+    document.getElementById('kLicActivas').textContent  = activas;
+    document.getElementById('kTerminales').textContent  = terms.length;
+    document.getElementById('kVencen').textContent      = vencen;
+    document.getElementById('kSuspendidas').textContent = suspendidas;
+  } catch(e){
+    // Demo
+    document.getElementById('kLicActivas').textContent  = '3';
+    document.getElementById('kTerminales').textContent  = '5';
+    document.getElementById('kVencen').textContent      = '1';
+    document.getElementById('kSuspendidas').textContent = '0';
+  }
+}
+
+// ── LICENCIAS ─────────────────────────────────────────────
+async function cargarLicencias(){
+  try {
+    allLicencias = await supaGet('licencias','select=*,planes(nombre)&order=created_at.desc');
+  } catch(e){
+    allLicencias = DEMO_LICENCIAS;
+  }
+  renderLicencias(allLicencias);
+}
+
+function renderLicencias(lista){
+  const pad = n=>String(n).padStart(2,'0');
+  const fmtFecha = f => { if(!f)return'—'; const d=new Date(f); return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear(); };
+  const hoy = new Date();
+  document.getElementById('licTableBody').innerHTML = lista.map(l=>{
+    const vence = new Date(l.fecha_vence);
+    const diasRestantes = Math.ceil((vence-hoy)/(1000*60*60*24));
+    const statusBadge = l.activa
+      ? (diasRestantes < 30 ? '<span class="badge badge-warn"><span class="dot"></span>VENCE PRONTO</span>' : '<span class="badge badge-ok"><span class="dot"></span>ACTIVA</span>')
+      : '<span class="badge badge-off">SUSPENDIDA</span>';
+    const planNombre = l.planes ? l.planes.nombre : (l.plan_id===1?'Básico':l.plan_id===2?'Pro':'Completo');
+    return `<tr>
+      <td style="font-family:monospace;font-weight:700;color:#ddd;">${l.clave}</td>
+      <td>${l.nombre_cliente||'—'}<br><small style="color:var(--muted)">${l.email_cliente||''}</small></td>
+      <td>${planNombre}</td>
+      <td>${fmtFecha(l.fecha_vence)}<br><small style="color:${diasRestantes<30?'var(--orange)':'var(--muted)'}">${diasRestantes>0?diasRestantes+' días':'VENCIDA'}</small></td>
+      <td>${statusBadge}</td>
+      <td>
+        <button class="btn btn-outline btn-sm" onclick="copiarClave('${l.clave}')" style="margin-right:4px;">COPIAR</button>
+        ${l.activa
+          ? `<button class="btn btn-sm" style="background:rgba(198,40,40,.15);border:1px solid var(--red);color:#ef5350;" onclick="suspenderLicencia(${l.id})">SUSPENDER</button>`
+          : `<button class="btn btn-sm" style="background:rgba(76,175,80,.15);border:1px solid var(--green);color:var(--green);" onclick="reactivarLicencia(${l.id})">REACTIVAR</button>`
+        }
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted);">Sin licencias</td></tr>';
+}
+
+function filtrarLicencias(q){
+  if(!q){ renderLicencias(allLicencias); return; }
+  const f = q.toLowerCase();
+  renderLicencias(allLicencias.filter(l=>
+    (l.clave||'').toLowerCase().includes(f) ||
+    (l.nombre_cliente||'').toLowerCase().includes(f) ||
+    (l.email_cliente||'').toLowerCase().includes(f)
+  ));
+}
+
+function copiarClave(clave){
+  navigator.clipboard.writeText(clave).then(()=>toast('Clave copiada: '+clave));
+}
+
+async function suspenderLicencia(id){
+  if(!confirm('¿Suspender esta licencia? El cliente perderá acceso en la próxima verificación.')) return;
+  try {
+    await supaPatch('licencias', id, { activa: false });
+    toast('Licencia suspendida');
+    await cargarLicencias();
+    await cargarKPIs();
+  } catch(e){ toast('Error: '+e.message); }
+}
+
+async function reactivarLicencia(id){
+  try {
+    await supaPatch('licencias', id, { activa: true });
+    toast('Licencia reactivada');
+    await cargarLicencias();
+    await cargarKPIs();
+  } catch(e){ toast('Error: '+e.message); }
+}
+
+// ── NUEVA LICENCIA ────────────────────────────────────────
+function openModalNuevaLicencia(){
+  generarClave();
+  const hoy = new Date();
+  hoy.setFullYear(hoy.getFullYear()+1);
+  const pad = n=>String(n).padStart(2,'0');
+  document.getElementById('mVence').value = hoy.getFullYear()+'-'+pad(hoy.getMonth()+1)+'-'+pad(hoy.getDate());
+  document.getElementById('mNombre').value='';
+  document.getElementById('mEmail').value='';
+  document.getElementById('mNotas').value='';
+  document.getElementById('modalLicencia').classList.add('open');
+}
+
+function generarClave(){
+  const planes = ['BASIC','PRO','FULL'];
+  const plan = document.getElementById('mPlan');
+  const prefix = plan ? planes[parseInt(plan.value)-1] : 'PRO';
+  const year = new Date().getFullYear();
+  const rand = Math.random().toString(36).toUpperCase().slice(2,6);
+  document.getElementById('mClave').value = prefix+'-'+year+'-'+rand;
+}
+
+async function guardarLicencia(){
+  const clave  = document.getElementById('mClave').value.trim().toUpperCase();
+  const planId = parseInt(document.getElementById('mPlan').value);
+  const nombre = document.getElementById('mNombre').value.trim();
+  const email  = document.getElementById('mEmail').value.trim();
+  const vence  = document.getElementById('mVence').value;
+  const notas  = document.getElementById('mNotas').value.trim();
+  if(!clave||!vence){ toast('Completá clave y fecha'); return; }
+  try {
+    await supaPost('licencias',{clave,plan_id:planId,nombre_cliente:nombre,email_cliente:email,fecha_vence:vence,notas,activa:true});
+    document.getElementById('modalLicencia').classList.remove('open');
+    toast('✓ Licencia creada: '+clave);
+    await cargarLicencias();
+    await cargarKPIs();
+  } catch(e){ toast('Error: '+e.message); }
+}
+
+// ── CLIENTES ──────────────────────────────────────────────
+async function cargarClientes(){
+  try {
+    const activs = await supaGet('activaciones','select=*,licencias(clave,planes(nombre))&order=fecha_activacion.desc');
+    const pad=n=>String(n).padStart(2,'0');
+    const fmt=f=>{if(!f)return'—';const d=new Date(f);return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();};
+    // Agrupar por email
+    const byEmail = {};
+    activs.forEach(a=>{
+      if(!byEmail[a.email]) byEmail[a.email]={email:a.email,nombre:a.nombre_negocio,plan:a.licencias?.planes?.nombre||'—',terminales:0,ultima:null};
+      byEmail[a.email].terminales++;
+      if(!byEmail[a.email].ultima||a.ultima_consulta>byEmail[a.email].ultima) byEmail[a.email].ultima=a.ultima_consulta;
+    });
+    document.getElementById('clientesBody').innerHTML = Object.values(byEmail).map(c=>`
+      <tr>
+        <td style="font-weight:700;">${c.nombre||'Sin nombre'}</td>
+        <td>${c.email}</td>
+        <td>${c.plan}</td>
+        <td>${c.terminales} terminal${c.terminales!==1?'es':''}</td>
+        <td>${fmt(c.ultima)}</td>
+      </tr>`).join('');
+  } catch(e){
+    document.getElementById('clientesBody').innerHTML='<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted);">Sin datos o sin conexión</td></tr>';
+  }
+}
+
+// ── TERMINALES ────────────────────────────────────────────
+async function cargarTerminales(){
+  try {
+    const terms = await supaGet('activaciones','select=*,licencias(clave)&order=ultima_consulta.desc');
+    const pad=n=>String(n).padStart(2,'0');
+    const fmt=f=>{if(!f)return'—';const d=new Date(f);return pad(d.getDate())+'/'+pad(d.getMonth()+1)+' '+pad(d.getHours())+':'+pad(d.getMinutes());};
+    const hoy=new Date();
+    document.getElementById('terminalesBody').innerHTML = terms.map(t=>{
+      const ultima = t.ultima_consulta ? new Date(t.ultima_consulta) : null;
+      const horas = ultima ? (hoy-ultima)/(1000*60*60) : 999;
+      const online = horas < 25;
+      return `<tr>
+        <td style="font-weight:700;">${t.nombre_negocio||'—'}</td>
+        <td>${t.email}</td>
+        <td style="font-family:monospace;font-size:12px;color:var(--muted);">${t.device_id?.substring(0,20)}...</td>
+        <td>${fmt(t.ultima_consulta)}</td>
+        <td>${online?'<span class="badge badge-ok"><span class="dot"></span>Online</span>':'<span class="badge badge-off">Offline</span>'}</td>
+        <td><button class="btn btn-sm btn-outline" onclick="suspenderTerminal(${t.id})">Suspender</button></td>
+      </tr>`;
+    }).join('');
+  } catch(e){
+    document.getElementById('terminalesBody').innerHTML='<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted);">Sin datos</td></tr>';
+  }
+}
+
+async function suspenderTerminal(id){
+  if(!confirm('¿Suspender esta terminal?')) return;
+  try { await supaPatch('activaciones',id,{activa:false}); toast('Terminal suspendida'); await cargarTerminales(); }
+  catch(e){ toast('Error: '+e.message); }
+}
+
+// ── REPORTES ──────────────────────────────────────────────
+async function cargarReportes(){
+  try {
+    const hoy = new Date();
+    const pad=n=>String(n).padStart(2,'0');
+    const desde=hoy.getFullYear()+'-'+pad(hoy.getMonth()+1)+'-'+pad(hoy.getDate())+'T00:00:00';
+    const ventas = await supaGet('pos_ventas','select=terminal,licencia_email,total&fecha=gte.'+desde+'&order=terminal');
+    const byTerminal={};
+    ventas.forEach(v=>{
+      const k=v.terminal+'|'+v.licencia_email;
+      if(!byTerminal[k])byTerminal[k]={terminal:v.terminal,email:v.licencia_email,cant:0,total:0};
+      byTerminal[k].cant++;
+      byTerminal[k].total+=v.total||0;
+    });
+    const gs=n=>'₲'+Math.round(n||0).toLocaleString('es-PY');
+    document.getElementById('reportesBody').innerHTML=Object.values(byTerminal).map(r=>`
+      <tr>
+        <td>${r.email}</td>
+        <td style="font-weight:700;">${r.terminal}</td>
+        <td>${r.cant}</td>
+        <td style="font-weight:700;color:var(--green);">${gs(r.total)}</td>
+      </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--muted);">Sin ventas hoy</td></tr>';
+  } catch(e){
+    document.getElementById('reportesBody').innerHTML='<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted);">Sin datos</td></tr>';
+  }
+}
+
+// ── DATOS DEMO ────────────────────────────────────────────
+const DEMO_LICENCIAS = [
+  {id:1,clave:'DEMO-2025-XXXX',nombre_cliente:'Cliente Demo',email_cliente:'demo@test.com',plan_id:1,fecha_vence:'2026-12-31',activa:true,planes:{nombre:'Básico'}},
+  {id:2,clave:'PRO-2025-YYYY', nombre_cliente:'Pizzería Express',email_cliente:'pizza@test.com',plan_id:2,fecha_vence:'2026-06-30',activa:true,planes:{nombre:'Pro'}},
+  {id:3,clave:'FULL-2025-ZZZZ',nombre_cliente:'Cadena Burguer',email_cliente:'burguer@test.com',plan_id:3,fecha_vence:'2025-12-31',activa:false,planes:{nombre:'Completo'}},
+];
+
+// ── AUTO LOGIN ────────────────────────────────────────────
+if(localStorage.getItem('sa_logged')){
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('app').style.display='block';
+  cargarTodo();
+}
+</script>
+</body>
+</html>

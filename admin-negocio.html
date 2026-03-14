@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel del Negocio — POS Admin</title>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --bg:#0f0f0f; --card:#1a1a1a; --card2:#222;
+    --green:#4caf50; --border:#2a2a2a;
+    --text:#fff; --muted:#888;
+  }
+  body { font-family:'Barlow',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  /* LOGIN */
+  .login-wrap { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px; }
+  .login-box { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:32px; width:100%; max-width:380px; }
+  .login-logo { text-align:center; margin-bottom:24px; }
+  .login-logo svg { color:var(--green); }
+  .login-title { font-size:22px; font-weight:800; text-align:center; margin-bottom:4px; }
+  .login-sub { font-size:13px; color:var(--muted); text-align:center; margin-bottom:24px; }
+  .field { margin-bottom:16px; }
+  .field label { font-size:12px; color:var(--muted); display:block; margin-bottom:5px; letter-spacing:.4px; }
+  .field input {
+    width:100%; background:#2a2a2a; border:1.5px solid #333; border-radius:8px;
+    color:#fff; font-family:'Barlow',sans-serif; font-size:15px;
+    padding:12px 14px; outline:none; transition:border-color .2s;
+  }
+  .field input:focus { border-color:var(--green); }
+  .btn-primary {
+    width:100%; background:var(--green); border:none; border-radius:8px;
+    color:#fff; font-family:'Barlow',sans-serif; font-size:14px; font-weight:800;
+    letter-spacing:1px; text-transform:uppercase; padding:14px;
+    cursor:pointer; transition:background .15s; margin-top:8px;
+  }
+  .btn-primary:hover { background:#43a047; }
+  .error-msg { color:#ef5350; font-size:13px; text-align:center; margin-top:10px; display:none; }
+
+  /* DASHBOARD */
+  .dashboard { display:none; }
+  .topbar {
+    background:var(--card); border-bottom:1px solid var(--border);
+    padding:0 24px; height:60px; display:flex; align-items:center; justify-content:space-between;
+    position:sticky; top:0; z-index:10;
+  }
+  .topbar-title { font-size:18px; font-weight:800; }
+  .topbar-right { display:flex; align-items:center; gap:16px; }
+  .terminal-badge {
+    background:#2a2a2a; border:1px solid #333; border-radius:20px;
+    font-size:12px; font-weight:600; color:var(--muted);
+    padding:4px 12px; display:flex; align-items:center; gap:6px;
+  }
+  .terminal-badge .dot { width:7px; height:7px; border-radius:50%; background:var(--green); }
+  .btn-logout { background:none; border:none; color:var(--muted); cursor:pointer; font-size:13px; }
+
+  .main { padding:24px; max-width:1200px; margin:0 auto; }
+
+  /* Fecha selector */
+  .date-bar {
+    display:flex; gap:10px; margin-bottom:24px; flex-wrap:wrap; align-items:center;
+  }
+  .date-btn {
+    background:var(--card2); border:1px solid var(--border); border-radius:8px;
+    color:var(--muted); font-family:'Barlow',sans-serif; font-size:13px; font-weight:600;
+    padding:8px 16px; cursor:pointer; transition:all .15s;
+  }
+  .date-btn.active { background:rgba(76,175,80,.15); border-color:var(--green); color:var(--green); }
+  .date-input { background:var(--card2); border:1px solid var(--border); border-radius:8px; color:#fff; font-family:'Barlow',sans-serif; font-size:13px; padding:8px 12px; outline:none; }
+
+  /* KPI Cards */
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:24px; }
+  .kpi-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:20px; }
+  .kpi-label { font-size:11px; color:var(--muted); letter-spacing:.8px; text-transform:uppercase; margin-bottom:8px; }
+  .kpi-value { font-size:28px; font-weight:800; }
+  .kpi-value.green { color:var(--green); }
+  .kpi-value.orange { color:#ff9800; }
+  .kpi-sub { font-size:12px; color:var(--muted); margin-top:4px; }
+
+  /* Terminales */
+  .section-title { font-size:16px; font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+  .terminals-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; margin-bottom:24px; }
+  .terminal-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:18px; }
+  .terminal-card.online { border-color:rgba(76,175,80,.4); }
+  .tc-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .tc-name { font-size:15px; font-weight:700; }
+  .tc-status { font-size:11px; font-weight:700; padding:3px 10px; border-radius:10px; }
+  .tc-status.online { background:rgba(76,175,80,.15); color:var(--green); }
+  .tc-status.offline { background:#2a2a2a; color:var(--muted); }
+  .tc-row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .tc-row:last-child { border-bottom:none; }
+  .tc-row-lbl { color:var(--muted); }
+  .tc-row-val { font-weight:600; }
+
+  /* Tabla ventas */
+  .table-wrap { background:var(--card); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:24px; }
+  table { width:100%; border-collapse:collapse; }
+  th { background:#1e1e1e; padding:12px 16px; font-size:11px; color:var(--muted); letter-spacing:.8px; text-transform:uppercase; text-align:left; }
+  td { padding:12px 16px; border-bottom:1px solid var(--border); font-size:14px; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover td { background:rgba(255,255,255,.02); }
+  .badge { display:inline-block; padding:3px 10px; border-radius:10px; font-size:11px; font-weight:700; }
+  .badge-ef  { background:rgba(76,175,80,.15);  color:var(--green); }
+  .badge-pos { background:rgba(21,101,192,.15); color:#64b5f6; }
+  .badge-tr  { background:rgba(255,152,0,.15);  color:#ff9800; }
+
+  /* Loading */
+  .loading { text-align:center; padding:40px; color:var(--muted); font-size:14px; }
+  .spinner { display:inline-block; width:20px; height:20px; border:2px solid #333; border-top-color:var(--green); border-radius:50%; animation:spin .8s linear infinite; margin-right:8px; vertical-align:middle; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* Responsive */
+  @media(max-width:600px){
+    .main { padding:16px; }
+    .kpi-value { font-size:22px; }
+    .topbar { padding:0 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════ LOGIN ══════════════ -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-box">
+    <div class="login-logo">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <path d="M16 10a4 4 0 0 1-8 0"/>
+      </svg>
+    </div>
+    <div class="login-title">Panel del Negocio</div>
+    <div class="login-sub">Accedé con el email de tu licencia</div>
+    <div class="field">
+      <label>EMAIL</label>
+      <input type="email" id="loginEmail" placeholder="tu@email.com">
+    </div>
+    <div class="field">
+      <label>CLAVE DE LICENCIA</label>
+      <input type="text" id="loginClave" placeholder="XXXX-XXXX-XXXX"
+        oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9-]/g,'')">
+    </div>
+    <button class="btn-primary" onclick="doLogin()">INGRESAR</button>
+    <div class="error-msg" id="loginError"></div>
+  </div>
+</div>
+
+<!-- ══════════════ DASHBOARD ══════════════ -->
+<div class="dashboard" id="dashboard">
+  <div class="topbar">
+    <div class="topbar-title" id="topbarNegocio">Mi Negocio</div>
+    <div class="topbar-right">
+      <div class="terminal-badge">
+        <div class="dot"></div>
+        <span id="topbarPlan">Plan Básico</span>
+      </div>
+      <button class="btn-logout" onclick="doLogout()">Salir</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- Selector de fecha -->
+    <div class="date-bar">
+      <button class="date-btn active" onclick="setFiltro('hoy',this)">Hoy</button>
+      <button class="date-btn" onclick="setFiltro('semana',this)">Esta semana</button>
+      <button class="date-btn" onclick="setFiltro('mes',this)">Este mes</button>
+      <input class="date-input" type="date" id="fechaCustom" onchange="setFiltroCustom(this.value)">
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid" id="kpiGrid">
+      <div class="kpi-card"><div class="kpi-label">Total Ventas</div><div class="kpi-value green" id="kpiTotal">₲0</div><div class="kpi-sub" id="kpiCant">0 operaciones</div></div>
+      <div class="kpi-card"><div class="kpi-label">Ticket Promedio</div><div class="kpi-value" id="kpiProm">₲0</div><div class="kpi-sub">Por venta</div></div>
+      <div class="kpi-card"><div class="kpi-label">Efectivo</div><div class="kpi-value green" id="kpiEfectivo">₲0</div><div class="kpi-sub" id="kpiEfOps">0 ops</div></div>
+      <div class="kpi-card"><div class="kpi-label">POS / Transferencia</div><div class="kpi-value orange" id="kpiElectronico">₲0</div><div class="kpi-sub" id="kpiElOps">0 ops</div></div>
+    </div>
+
+    <!-- Terminales -->
+    <div class="section-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Terminales
+    </div>
+    <div class="terminals-grid" id="terminalesGrid">
+      <div class="loading"><span class="spinner"></span>Cargando terminales...</div>
+    </div>
+
+    <!-- Últimas ventas -->
+    <div class="section-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Últimas ventas
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha / Hora</th>
+            <th>Terminal</th>
+            <th>Método</th>
+            <th>Items</th>
+            <th style="text-align:right">Total</th>
+          </tr>
+        </thead>
+        <tbody id="ventasBody">
+          <tr><td colspan="5" class="loading"><span class="spinner"></span>Cargando ventas...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── SUPABASE CONFIG ───────────────────────────────────────
+const SUPA_URL  = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
+const SUPA_ANON = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
+
+let sessionEmail = null;
+let sessionPlan  = null;
+let filtroActual = 'hoy';
+
+function gs(n){ return '₲'+Math.round(n||0).toLocaleString('es-PY'); }
+
+async function supaGet(tabla, params){
+  let url = SUPA_URL + '/rest/v1/' + tabla + '?';
+  url += Object.entries(params).map(([k,v])=>k+'='+v).join('&');
+  const res = await fetch(url, {
+    headers:{ 'apikey':SUPA_ANON, 'Authorization':'Bearer '+SUPA_ANON }
+  });
+  if(!res.ok) throw new Error(await res.text());
+  return await res.json();
+}
+
+async function supaRPC(fn, params){
+  const res = await fetch(SUPA_URL+'/rest/v1/rpc/'+fn,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON},
+    body:JSON.stringify(params)
+  });
+  if(!res.ok) throw new Error(await res.text());
+  return await res.json();
+}
+
+// ── LOGIN ─────────────────────────────────────────────────
+async function doLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const clave = document.getElementById('loginClave').value.trim().toUpperCase();
+  const errEl = document.getElementById('loginError');
+  errEl.style.display = 'none';
+
+  if(!email||!clave){ showErr('Completá todos los campos'); return; }
+
+  try {
+    // Verificar que la licencia existe y coincide con el email
+    const data = await supaRPC('activar_licencia',{
+      p_clave: clave,
+      p_email: email,
+      p_device_id: 'admin_panel'
+    });
+
+    if(!data.ok){ showErr(data.error||'Datos incorrectos'); return; }
+
+    sessionEmail = email;
+    sessionPlan  = data.plan;
+    localStorage.setItem('admin_email', email);
+    localStorage.setItem('admin_plan',  data.plan);
+    localStorage.setItem('admin_negocio', data.negocio || 'Mi Negocio');
+
+    showDashboard();
+  } catch(e){
+    // Demo mode si Supabase no está configurado
+    if(clave === 'DEMO-2025-XXXX'){
+      sessionEmail = email;
+      sessionPlan  = 'Basico';
+      showDashboard();
+    } else {
+      showErr('Error de conexión. Verificá tu internet.');
+    }
+  }
+}
+
+function showErr(msg){
+  const el = document.getElementById('loginError');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function doLogout(){
+  localStorage.removeItem('admin_email');
+  localStorage.removeItem('admin_plan');
+  sessionEmail = null;
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('loginWrap').style.display = 'flex';
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────
+function showDashboard(){
+  document.getElementById('loginWrap').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('topbarPlan').textContent = 'Plan ' + sessionPlan;
+
+  const neg = localStorage.getItem('admin_negocio') || 'Mi Negocio';
+  document.getElementById('topbarNegocio').textContent = neg;
+
+  cargarDatos();
+}
+
+function getFechaFiltro(){
+  const hoy = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const fmt = d => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+
+  if(filtroActual === 'hoy'){
+    return { desde: fmt(hoy)+'T00:00:00', hasta: fmt(hoy)+'T23:59:59' };
+  } else if(filtroActual === 'semana'){
+    const lunes = new Date(hoy);
+    lunes.setDate(hoy.getDate() - hoy.getDay() + 1);
+    return { desde: fmt(lunes)+'T00:00:00', hasta: fmt(hoy)+'T23:59:59' };
+  } else if(filtroActual === 'mes'){
+    const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    return { desde: fmt(inicio)+'T00:00:00', hasta: fmt(hoy)+'T23:59:59' };
+  } else {
+    return { desde: filtroActual+'T00:00:00', hasta: filtroActual+'T23:59:59' };
+  }
+}
+
+function setFiltro(filtro, btn){
+  filtroActual = filtro;
+  document.querySelectorAll('.date-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  cargarDatos();
+}
+
+function setFiltroCustom(fecha){
+  filtroActual = fecha;
+  document.querySelectorAll('.date-btn').forEach(b=>b.classList.remove('active'));
+  cargarDatos();
+}
+
+async function cargarDatos(){
+  const { desde, hasta } = getFechaFiltro();
+
+  try {
+    // Intentar cargar desde Supabase
+    const ventas = await supaGet('pos_ventas', {
+      'fecha': 'gte.'+desde,
+      'and': '(fecha.lte.'+hasta+')',
+      'licencia_email': 'eq.'+sessionEmail,
+      'order': 'fecha.desc',
+      'limit': '100',
+      'select': '*'
+    });
+    renderKPIs(ventas);
+    renderTerminales(ventas);
+    renderVentas(ventas);
+  } catch(e){
+    // Datos demo
+    renderKPIs(DEMO_VENTAS);
+    renderTerminales(DEMO_VENTAS);
+    renderVentas(DEMO_VENTAS);
+  }
+}
+
+// ── RENDER KPIs ───────────────────────────────────────────
+function renderKPIs(ventas){
+  const total   = ventas.reduce((s,v)=>s+(v.total||0),0);
+  const cant    = ventas.length;
+  const prom    = cant > 0 ? Math.round(total/cant) : 0;
+  const efectivo = ventas.filter(v=>(v.metodo_pago||'').toUpperCase()==='EFECTIVO').reduce((s,v)=>s+(v.total||0),0);
+  const efOps   = ventas.filter(v=>(v.metodo_pago||'').toUpperCase()==='EFECTIVO').length;
+  const electronico = ventas.filter(v=>(v.metodo_pago||'').toUpperCase()!=='EFECTIVO').reduce((s,v)=>s+(v.total||0),0);
+  const elOps   = ventas.filter(v=>(v.metodo_pago||'').toUpperCase()!=='EFECTIVO').length;
+
+  document.getElementById('kpiTotal').textContent     = gs(total);
+  document.getElementById('kpiCant').textContent      = cant+' operaciones';
+  document.getElementById('kpiProm').textContent      = gs(prom);
+  document.getElementById('kpiEfectivo').textContent  = gs(efectivo);
+  document.getElementById('kpiEfOps').textContent     = efOps+' ops';
+  document.getElementById('kpiElectronico').textContent = gs(electronico);
+  document.getElementById('kpiElOps').textContent     = elOps+' ops';
+}
+
+// ── RENDER TERMINALES ─────────────────────────────────────
+function renderTerminales(ventas){
+  const terminals = {};
+  ventas.forEach(v => {
+    const t = v.terminal || 'Principal';
+    if(!terminals[t]) terminals[t] = { total:0, ops:0, ultima:null };
+    terminals[t].total += v.total||0;
+    terminals[t].ops++;
+    if(!terminals[t].ultima || v.fecha > terminals[t].ultima) terminals[t].ultima = v.fecha;
+  });
+
+  const grid = document.getElementById('terminalesGrid');
+  if(Object.keys(terminals).length === 0){
+    grid.innerHTML = '<div class="loading">Sin datos para el período seleccionado</div>';
+    return;
+  }
+
+  grid.innerHTML = Object.entries(terminals).map(([nombre, data]) => {
+    const pad = n=>String(n).padStart(2,'0');
+    const ultimaFecha = data.ultima ? new Date(data.ultima) : null;
+    const ultimaStr = ultimaFecha ?
+      pad(ultimaFecha.getDate())+'/'+pad(ultimaFecha.getMonth()+1)+' '+pad(ultimaFecha.getHours())+':'+pad(ultimaFecha.getMinutes()) : '—';
+    return `<div class="terminal-card online">
+      <div class="tc-header">
+        <div class="tc-name">${nombre}</div>
+        <div class="tc-status online">ACTIVA</div>
+      </div>
+      <div class="tc-row"><span class="tc-row-lbl">Total ventas</span><span class="tc-row-val" style="color:var(--green)">${gs(data.total)}</span></div>
+      <div class="tc-row"><span class="tc-row-lbl">Operaciones</span><span class="tc-row-val">${data.ops}</span></div>
+      <div class="tc-row"><span class="tc-row-lbl">Última venta</span><span class="tc-row-val">${ultimaStr}</span></div>
+    </div>`;
+  }).join('');
+}
+
+// ── RENDER VENTAS ─────────────────────────────────────────
+function renderVentas(ventas){
+  const body = document.getElementById('ventasBody');
+  if(!ventas.length){
+    body.innerHTML = '<tr><td colspan="5" class="loading">Sin ventas en este período</td></tr>';
+    return;
+  }
+  const metodoBadge = m => {
+    const mu = (m||'EFECTIVO').toUpperCase();
+    if(mu==='EFECTIVO') return '<span class="badge badge-ef">EFECTIVO</span>';
+    if(mu==='POS')      return '<span class="badge badge-pos">POS</span>';
+    return '<span class="badge badge-tr">TRANSFER.</span>';
+  };
+  const pad = n=>String(n).padStart(2,'0');
+  const fmtFecha = f => {
+    if(!f) return '—';
+    const d=new Date(f);
+    return pad(d.getDate())+'/'+pad(d.getMonth()+1)+' '+pad(d.getHours())+':'+pad(d.getMinutes());
+  };
+  body.innerHTML = ventas.slice(0,50).map(v=>`
+    <tr>
+      <td>${fmtFecha(v.fecha)}</td>
+      <td>${v.terminal||'Principal'}</td>
+      <td>${metodoBadge(v.metodo_pago)}</td>
+      <td style="color:var(--muted)">${v.tiene_factura?'🧾 Con factura':''}</td>
+      <td style="text-align:right;font-weight:700;">${gs(v.total)}</td>
+    </tr>`).join('');
+}
+
+// ── DATOS DEMO ────────────────────────────────────────────
+const DEMO_VENTAS = [
+  {terminal:'Caja Local',   fecha:new Date().toISOString(), total:55000, metodo_pago:'EFECTIVO', tiene_factura:false},
+  {terminal:'Caja Local',   fecha:new Date().toISOString(), total:30000, metodo_pago:'POS',      tiene_factura:true},
+  {terminal:'Delivery',     fecha:new Date().toISOString(), total:85000, metodo_pago:'TRANSFERENCIA', tiene_factura:false},
+  {terminal:'Delivery',     fecha:new Date().toISOString(), total:42000, metodo_pago:'EFECTIVO', tiene_factura:false},
+  {terminal:'Caja Local',   fecha:new Date().toISOString(), total:28000, metodo_pago:'EFECTIVO', tiene_factura:false},
+];
+
+// ── AUTO LOGIN ────────────────────────────────────────────
+(function(){
+  const saved = localStorage.getItem('admin_email');
+  const plan  = localStorage.getItem('admin_plan');
+  if(saved && plan){
+    sessionEmail = saved;
+    sessionPlan  = plan;
+    showDashboard();
+  }
+})();
+</script>
+</body>
+</html>

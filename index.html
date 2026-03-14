@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="POS">
 <link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -622,91 +623,6 @@
     flex-shrink: 0;
   }
   .drawer-version { font-size: 12px; color: #555; }
-
-  /* ── LICENCIA / ACTIVACIÓN ── */
-  #scActivacion, #scBloqueado, #scActivado {
-    background: #1a1a1a;
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    padding: 32px 24px;
-  }
-  #scActivacion.active, #scBloqueado.active, #scActivado.active {
-    display: flex;
-  }
-
-  .lic-logo {
-    width: 80px; height: 80px; border-radius: 20px;
-    background: var(--green); display: flex; align-items: center;
-    justify-content: center; margin-bottom: 20px;
-    box-shadow: 0 8px 32px rgba(76,175,80,.4);
-  }
-  .lic-title { font-size: 26px; font-weight: 800; color: #fff; margin-bottom: 6px; text-align: center; }
-  .lic-sub   { font-size: 14px; color: #777; text-align: center; margin-bottom: 32px; line-height: 1.5; }
-
-  .lic-form  { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 16px; }
-  .lic-field { display: flex; flex-direction: column; gap: 6px; }
-  .lic-label { font-size: 12px; color: #aaa; letter-spacing: .4px; }
-  .lic-input {
-    background: #2a2a2a; border: 1.5px solid #444; border-radius: 8px;
-    color: #fff; font-family: 'Barlow', sans-serif; font-size: 16px;
-    padding: 13px 14px; outline: none; transition: border-color .2s;
-    letter-spacing: .5px;
-  }
-  .lic-input:focus { border-color: var(--green); }
-  .lic-input::placeholder { color: #555; letter-spacing: 0; }
-  .lic-input.key { text-transform: uppercase; font-weight: 700; letter-spacing: 2px; }
-
-  .lic-btn {
-    background: var(--green); border: none; border-radius: 8px;
-    color: #fff; font-family: 'Barlow', sans-serif;
-    font-size: 15px; font-weight: 800; letter-spacing: 1px;
-    text-transform: uppercase; padding: 16px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 10px;
-    transition: background .15s; margin-top: 8px;
-  }
-  .lic-btn:active { background: var(--green-btn); }
-  .lic-btn:disabled { background: #333; color: #666; cursor: not-allowed; }
-  .lic-btn.danger { background: #c62828; }
-  .lic-btn.outline { background: transparent; border: 1.5px solid #555; color: #aaa; }
-
-  .lic-error {
-    background: rgba(198,40,40,.15); border: 1px solid rgba(198,40,40,.4);
-    border-radius: 6px; color: #ef5350; font-size: 13px;
-    padding: 10px 14px; display: none; text-align: center;
-  }
-  .lic-error.show { display: block; }
-
-  .lic-spinner {
-    width: 20px; height: 20px; border-radius: 50%;
-    border: 2px solid rgba(255,255,255,.3);
-    border-top-color: #fff;
-    animation: spin .8s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .lic-badge {
-    background: rgba(76,175,80,.15); border: 1px solid rgba(76,175,80,.3);
-    border-radius: 20px; color: var(--green);
-    font-size: 12px; font-weight: 700; padding: 4px 14px;
-    letter-spacing: .5px; margin-bottom: 8px;
-  }
-
-  .lic-bloqueo-icon {
-    width: 80px; height: 80px; border-radius: 20px;
-    background: rgba(198,40,40,.15); border: 2px solid #c62828;
-    display: flex; align-items: center; justify-content: center;
-    margin-bottom: 20px;
-  }
-  .lic-info {
-    font-size: 12px; color: #555; text-align: center;
-    margin-top: 16px; line-height: 1.6;
-  }
-  .lic-info a { color: #666; text-decoration: underline; cursor: pointer; }
 
   /* SCREENS */
   .screen {
@@ -2051,61 +1967,48 @@
 <!-- ═══════════════════════════════════════════
      PANTALLA: ACTIVACIÓN DE LICENCIA
 ═══════════════════════════════════════════ -->
-<div id="scActivacion">
+<div id="scActivacion" style="display:none;flex-direction:column;align-items:center;justify-content:center;position:fixed;inset:0;z-index:9999;padding:32px 24px;background:#1a1a1a;">
   <div class="lic-logo">
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
-      <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
-      <line x1="3" y1="6" x2="21" y2="6"/>
-      <path d="M16 10a4 4 0 0 1-8 0"/>
-    </svg>
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
   </div>
   <h1 class="lic-title">Activar sistema</h1>
   <p class="lic-sub">Ingresá tu email y la clave de licencia<br>que recibiste al adquirir el sistema.</p>
-
   <div class="lic-form">
     <div class="lic-field">
       <span class="lic-label">EMAIL</span>
-      <input class="lic-input" id="licEmail" type="email" placeholder="tu@email.com" autocomplete="email">
+      <input class="lic-input" id="licEmail" type="email" placeholder="tu@email.com">
     </div>
     <div class="lic-field">
       <span class="lic-label">CLAVE DE LICENCIA</span>
-      <input class="lic-input key" id="licClave" type="text"
-        placeholder="XXXX-XXXX-XXXX"
-        maxlength="20"
-        oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9-]/g,'')">
+      <input class="lic-input key" id="licClave" type="text" placeholder="XXXX-XXXX-XXXX" maxlength="20" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9-]/g,'')">
     </div>
     <div class="lic-error" id="licError"></div>
-    <button class="lic-btn" id="licActivarBtn" onclick="doActivar()">
-      ACTIVAR
-    </button>
-    <p class="lic-info">
-      ¿No tenés una licencia? <a onclick="toast('Contactá al proveedor del sistema')">Contactá al soporte</a><br>
-      <small style="color:#444;">Demo: DEMO-2025-XXXX</small>
-    </p>
+    <button class="lic-btn" id="licActivarBtn" onclick="doActivar()">ACTIVAR</button>
+    <p class="lic-info">¿No tenés licencia? <a onclick="toast('Contactá al proveedor')">Contactá al soporte</a><br><small style="color:#444;">Demo: DEMO-2025-XXXX</small></p>
   </div>
 </div>
 
 <!-- ═══════════════════════════════════════════
      PANTALLA: ACTIVACIÓN EXITOSA
 ═══════════════════════════════════════════ -->
-<div id="scActivado">
+<div id="scActivado" style="display:none;flex-direction:column;align-items:center;justify-content:center;position:fixed;inset:0;z-index:9999;padding:32px 24px;background:#1a1a1a;">
   <div class="lic-logo">
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
-      <polyline points="20 6 9 17 4 12"/>
-    </svg>
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
   </div>
   <div class="lic-badge" id="activadoPlan">Plan Básico</div>
   <h1 class="lic-title">¡Activado!</h1>
-  <p class="lic-sub" id="activadoSub">Sistema activado correctamente.<br>Bienvenido.</p>
+  <p class="lic-sub" id="activadoSub">Sistema activado correctamente.</p>
   <div class="lic-form" style="max-width:320px;">
     <div class="lic-field">
       <span class="lic-label">NOMBRE DEL NEGOCIO</span>
       <input class="lic-input" id="activadoNegocio" type="text" placeholder="Ej: Lomitón Express">
     </div>
+    <div class="lic-field">
+      <span class="lic-label">NOMBRE DE ESTA TERMINAL</span>
+      <input class="lic-input" id="activadoTerminal" type="text" placeholder="Ej: Caja Local, Delivery, Barra...">
+    </div>
     <button class="lic-btn" onclick="doEntrar()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <polyline points="9 18 15 12 9 6"/>
-      </svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
       ENTRAR AL SISTEMA
     </button>
   </div>
@@ -2114,26 +2017,16 @@
 <!-- ═══════════════════════════════════════════
      PANTALLA: LICENCIA BLOQUEADA
 ═══════════════════════════════════════════ -->
-<div id="scBloqueado">
+<div id="scBloqueado" style="display:none;flex-direction:column;align-items:center;justify-content:center;position:fixed;inset:0;z-index:9999;padding:32px 24px;background:#1a1a1a;">
   <div class="lic-bloqueo-icon">
-    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ef5350" stroke-width="2">
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-    </svg>
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ef5350" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
   </div>
   <h1 class="lic-title" id="bloqueoTitulo">Acceso bloqueado</h1>
   <p class="lic-sub" id="bloqueoSub">Tu licencia no está activa.</p>
   <div class="lic-form" style="max-width:320px;gap:10px;">
-    <button class="lic-btn" onclick="doReintentar()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/>
-      </svg>
-      REINTENTAR
-    </button>
+    <button class="lic-btn" onclick="doReintentar()">REINTENTAR</button>
     <button class="lic-btn outline" onclick="doContactarSoporte()">CONTACTAR SOPORTE</button>
-    <button class="lic-btn outline" style="font-size:12px;padding:10px;" onclick="doDesactivar()">
-      Activar con otra licencia
-    </button>
+    <button class="lic-btn outline" style="font-size:12px;padding:10px;" onclick="doDesactivar()">Activar con otra licencia</button>
   </div>
   <p class="lic-info" id="bloqueoInfo"></p>
 </div>
@@ -4537,19 +4430,306 @@ function gs(n){ return '₲'+Math.round(n).toLocaleString('es-PY'); }
 let _tt;
 function toast(m){
   const t=document.getElementById('toast');
+  if(!t) return;
   t.textContent=m; t.classList.add('show');
   clearTimeout(_tt); _tt=setTimeout(()=>t.classList.remove('show'),1800);
 }
 
 // ══════════════════════════════════════════════════════════
+// DEXIE.JS — BASE DE DATOS LOCAL (IndexedDB)
+// ══════════════════════════════════════════════════════════
+
+// Inicializar base de datos
+let db;
+
+async function initDB(){
+  db = new Dexie('POSDatabase');
+
+  db.version(1).stores({
+    productos:   '++id, nombre, categoria, activo, updatedAt',
+    categorias:  '++id, nombre, updatedAt',
+    ventas:      '++id, fecha, turno_id, terminal, sincronizado',
+    turno:       '++id, fecha_apertura, estado, terminal',
+    egresos:     '++id, turno_id, fecha, sincronizado',
+    config:      'clave',
+    sync_queue:  '++id, tabla, sincronizado, timestamp',
+  });
+
+  await db.open();
+  console.log('[DB] IndexedDB inicializado');
+
+  // Cargar config guardada
+  await dbLoadConfig();
+
+  // Cargar productos desde DB (si hay)
+  await dbLoadProductos();
+
+  return db;
+}
+
+// ── CONFIG ────────────────────────────────────────────────
+async function dbSaveConfig(clave, valor){
+  await db.config.put({ clave, valor });
+}
+
+async function dbGetConfig(clave){
+  const row = await db.config.get(clave);
+  return row ? row.valor : null;
+}
+
+async function dbLoadConfig(){
+  try {
+    const negocio   = await dbGetConfig('negocio');
+    const direccion = await dbGetConfig('direccion');
+    const telefono  = await dbGetConfig('telefono');
+    const ruc       = await dbGetConfig('ruc');
+    const terminal  = await dbGetConfig('terminal');
+
+    if(negocio && typeof configData !== 'undefined'){
+      configData.negocio   = negocio   || configData.negocio;
+      configData.direccion = direccion || configData.direccion;
+      configData.telefono  = telefono  || configData.telefono;
+      configData.ruc       = ruc       || configData.ruc;
+    }
+    if(terminal) configData.terminal = terminal;
+    console.log('[DB] Config cargada');
+  } catch(e){ console.log('[DB] Config no disponible aún'); }
+}
+
+async function dbSaveConfigAll(){
+  if(typeof configData === 'undefined') return;
+  await dbSaveConfig('negocio',   configData.negocio);
+  await dbSaveConfig('direccion', configData.direccion);
+  await dbSaveConfig('telefono',  configData.telefono);
+  await dbSaveConfig('ruc',       configData.ruc);
+  toast('Configuración guardada');
+}
+
+// ── PRODUCTOS ─────────────────────────────────────────────
+async function dbSaveProducto(prod){
+  const data = {
+    id:             prod.id,
+    nombre:         prod.name,
+    precio:         prod.price,
+    precio_variable: prod.precioVariable || false,
+    costo:          prod.costo || 0,
+    codigo:         prod.codigo || '',
+    categoria:      prod.cat,
+    iva:            prod.iva || '10',
+    color:          prod.color,
+    color_propio:   prod.colorPropio || false,
+    mitad:          prod.mitad || false,
+    inventario:     prod.inventario || false,
+    comanda:        prod.comanda || false,
+    item_libre:     prod.itemLibre || false,
+    activo:         true,
+    updatedAt:      new Date().toISOString(),
+  };
+  await db.productos.put(data);
+  await dbQueueSync('productos', 'upsert', data);
+}
+
+async function dbDeleteProducto(id){
+  await db.productos.update(id, { activo: false, updatedAt: new Date().toISOString() });
+  await dbQueueSync('productos', 'delete', { id });
+}
+
+async function dbLoadProductos(){
+  try {
+    const prods = await db.productos.where('activo').equals(1).toArray();
+    if(prods.length === 0) return; // usar los hardcodeados
+    // Mapear de DB a formato PRODS
+    PRODS.length = 0;
+    prods.forEach(p => {
+      PRODS.push({
+        id:             p.id,
+        name:           p.nombre,
+        price:          p.precio,
+        precioVariable: p.precio_variable,
+        costo:          p.costo,
+        codigo:         p.codigo,
+        cat:            p.categoria,
+        iva:            p.iva,
+        color:          p.color,
+        colorPropio:    p.color_propio,
+        mitad:          p.mitad,
+        inventario:     p.inventario,
+        comanda:        p.comanda,
+        itemLibre:      p.item_libre,
+      });
+    });
+    console.log('[DB] Productos cargados:', PRODS.length);
+  } catch(e){ console.log('[DB] Productos no disponibles aún'); }
+}
+
+// ── CATEGORÍAS ────────────────────────────────────────────
+async function dbSaveCategoria(cat){
+  const data = {
+    id:        cat.id,
+    nombre:    cat.nombre,
+    color:     cat.color,
+    updatedAt: new Date().toISOString(),
+  };
+  await db.categorias.put(data);
+  await dbQueueSync('categorias', 'upsert', data);
+}
+
+async function dbLoadCategorias(){
+  try {
+    const cats = await db.categorias.toArray();
+    if(cats.length === 0) return;
+    CATEGORIAS.length = 0;
+    cats.forEach(c => CATEGORIAS.push({ id:c.id, nombre:c.nombre, color:c.color }));
+    CATEGORIAS_DEFAULT.length = 0;
+    CATEGORIAS.forEach(c => CATEGORIAS_DEFAULT.push(c.nombre));
+    console.log('[DB] Categorias cargadas:', CATEGORIAS.length);
+  } catch(e){ console.log('[DB] Categorias no disponibles aún'); }
+}
+
+// ── VENTAS ────────────────────────────────────────────────
+async function dbSaveVenta(data){
+  const venta = {
+    fecha:        data.fecha ? data.fecha.toISOString() : new Date().toISOString(),
+    turno_id:     data.turnoId || null,
+    terminal:     (typeof configData !== 'undefined' ? configData.terminal : null) || 'Principal',
+    total:        data.total,
+    metodo_pago:  data.metodo,
+    comprobante:  data.comprobante || '',
+    items:        JSON.stringify(data.items),
+    tiene_factura: !!data.factura,
+    factura_ruc:  data.factura ? data.factura.ruc : '',
+    factura_nombre: data.factura ? data.factura.nombre : '',
+    sincronizado: 0,
+  };
+  const id = await db.ventas.add(venta);
+  await dbQueueSync('ventas', 'insert', { ...venta, id });
+  return id;
+}
+
+// ── TURNO ─────────────────────────────────────────────────
+async function dbAbrirTurno(efectivoInicial){
+  const turno = {
+    fecha_apertura:  new Date().toISOString(),
+    efectivo_inicial: efectivoInicial,
+    estado:          'abierto',
+    terminal:        (typeof configData !== 'undefined' ? configData.terminal : null) || 'Principal',
+    sincronizado:    0,
+  };
+  const id = await db.turno.add(turno);
+  turnoData.dbId = id;
+  await dbQueueSync('turno', 'insert', { ...turno, id });
+  return id;
+}
+
+async function dbCerrarTurno(turnoDbId, totalContado, diferencia){
+  await db.turno.update(turnoDbId, {
+    fecha_cierre:  new Date().toISOString(),
+    estado:        'cerrado',
+    total_contado: totalContado,
+    diferencia,
+    sincronizado:  0,
+  });
+  await dbQueueSync('turno', 'update', { id: turnoDbId, estado:'cerrado', total_contado: totalContado, diferencia });
+}
+
+async function dbSaveEgreso(egreso){
+  const data = {
+    turno_id:    turnoData.dbId || null,
+    descripcion: egreso.desc,
+    monto:       egreso.monto,
+    fecha:       egreso.fecha ? egreso.fecha.toISOString() : new Date().toISOString(),
+    sincronizado: 0,
+  };
+  const id = await db.egresos.add(data);
+  await dbQueueSync('egresos', 'insert', { ...data, id });
+}
+
+// ── SYNC QUEUE ────────────────────────────────────────────
+async function dbQueueSync(tabla, operacion, datos){
+  await db.sync_queue.add({
+    tabla,
+    operacion,
+    datos:       JSON.stringify(datos),
+    timestamp:   new Date().toISOString(),
+    sincronizado: 0,
+  });
+}
+
+// ── SINCRONIZACIÓN CON SUPABASE ───────────────────────────
+let syncEnProceso = false;
+
+async function syncConSupabase(){
+  if(syncEnProceso || !navigator.onLine) return;
+  if(typeof SUPA_URL === 'undefined' || SUPA_URL.includes('XXXX')) return;
+
+  syncEnProceso = true;
+  try {
+    const pendientes = await db.sync_queue
+      .where('sincronizado').equals(0)
+      .limit(50)
+      .toArray();
+
+    if(pendientes.length === 0){ syncEnProceso=false; return; }
+
+    console.log('[Sync] Enviando', pendientes.length, 'registros...');
+
+    for(const item of pendientes){
+      try {
+        const datos = JSON.parse(item.datos);
+        const tabla = 'pos_' + item.tabla; // prefijo en Supabase
+
+        if(item.operacion === 'delete'){
+          await supaFetch('DELETE', tabla, null, { id: 'eq.'+datos.id });
+        } else {
+          await supaFetch('POST', tabla, datos);
+        }
+
+        await db.sync_queue.update(item.id, { sincronizado: 1 });
+      } catch(e){
+        console.log('[Sync] Error en item', item.id, e.message);
+      }
+    }
+    console.log('[Sync] Completado');
+  } catch(e){
+    console.log('[Sync] Error general:', e.message);
+  }
+  syncEnProceso = false;
+}
+
+async function supaFetch(method, tabla, body, params){
+  let url = SUPA_URL + '/rest/v1/' + tabla;
+  if(params){
+    const q = Object.entries(params).map(([k,v])=>k+'='+v).join('&');
+    url += '?' + q;
+  }
+  const opts = {
+    method,
+    headers: {
+      'Content-Type':  'application/json',
+      'apikey':        SUPA_ANON,
+      'Authorization': 'Bearer ' + SUPA_ANON,
+      'Prefer':        'resolution=merge-duplicates',
+    },
+  };
+  if(body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  if(!res.ok) throw new Error(await res.text());
+  return res;
+}
+
+// Sincronizar cada 2 minutos cuando hay internet
+setInterval(syncConSupabase, 2 * 60 * 1000);
+window.addEventListener('online', () => {
+  console.log('[Sync] Conexion detectada, sincronizando...');
+  setTimeout(syncConSupabase, 2000);
+});
+
+// ══════════════════════════════════════════════════════════
 // SISTEMA DE LICENCIAS
 // ══════════════════════════════════════════════════════════
-// ── SUPABASE CONFIG ──────────────────────────────────────
-// TODO: reemplazar con tus valores reales de Supabase
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
-// Llama a una función RPC de Supabase
 async function supaRPC(fn, params){
   const res = await fetch(SUPA_URL + '/rest/v1/rpc/' + fn, {
     method: 'POST',
@@ -4560,10 +4740,7 @@ async function supaRPC(fn, params){
     },
     body: JSON.stringify(params)
   });
-  if(!res.ok){
-    const err = await res.text();
-    throw new Error(err);
-  }
+  if(!res.ok){ const err = await res.text(); throw new Error(err); }
   return await res.json();
 }
 
@@ -4573,13 +4750,12 @@ const SK = {
   activated:'lic_activated', deviceId:'lic_device_id', fallos:'lic_fallos'
 };
 
-// Claves demo — solo para desarrollo sin Supabase
 const DEMO_KEYS = {
   'DEMO-2025-XXXX': { plan:'Basico',   vence:'2026-12-31' },
   'PRO-2025-YYYY':  { plan:'Pro',      vence:'2026-12-31' },
   'FULL-2025-ZZZZ': { plan:'Completo', vence:'2027-12-31' },
 };
-const USAR_DEMO = (SUPA_URL === 'https://XXXXXXXXXXXXXXXX.supabase.co'); // true hasta que configures Supabase
+const USAR_DEMO = (SUPA_URL === 'https://XXXXXXXXXXXXXXXX.supabase.co');
 
 function licGetDeviceId(){
   let id=localStorage.getItem(SK.deviceId);
@@ -4589,31 +4765,21 @@ function licGetDeviceId(){
 function licIsActivated(){ return !!localStorage.getItem(SK.activated); }
 
 async function licActivar(email,clave){
-  const claveUp = clave.toUpperCase().trim();
+  const claveUp=clave.toUpperCase().trim();
   if(!email||!email.includes('@')) return {ok:false,error:'Email invalido'};
   if(!claveUp) return {ok:false,error:'Ingresa la clave de licencia'};
-
   if(USAR_DEMO){
-    // ── MODO DEMO (sin Supabase configurado) ──
     await new Promise(r=>setTimeout(r,1200));
     const licData=DEMO_KEYS[claveUp];
     if(!licData) return {ok:false,error:'Clave invalida. (Demo: DEMO-2025-XXXX)'};
     const token='tk_demo_'+btoa(email+':'+claveUp).replace(/=/g,'').substring(0,24);
     return {ok:true,token,email,plan:licData.plan,vence:licData.vence};
   }
-
-  // ── MODO REAL (Supabase) ──
   try {
-    const data = await supaRPC('activar_licencia', {
-      p_clave:     claveUp,
-      p_email:     email,
-      p_device_id: licGetDeviceId()
-    });
-    if(!data.ok) return {ok:false, error:data.error||'Error al activar'};
-    return {ok:true, token:data.token, email, plan:data.plan, vence:data.vence};
-  } catch(e){
-    return {ok:false, error:'Sin conexion con el servidor. Verifica tu internet.'};
-  }
+    const data=await supaRPC('activar_licencia',{p_clave:claveUp,p_email:email,p_device_id:licGetDeviceId()});
+    if(!data.ok) return {ok:false,error:data.error||'Error al activar'};
+    return {ok:true,token:data.token,email,plan:data.plan,vence:data.vence};
+  } catch(e){ return {ok:false,error:'Sin conexion con el servidor.'}; }
 }
 
 function licGuardar(data){
@@ -4629,22 +4795,19 @@ function licGuardar(data){
 function licSetNegocio(nombre){
   localStorage.setItem(SK.negocio,nombre);
   if(typeof configData!=='undefined') configData.negocio=nombre;
+  if(db) dbSaveConfig('negocio',nombre);
+}
+
+function licGetTerminal(){
+  return localStorage.getItem('pos_terminal') || 'Terminal 1';
 }
 
 async function licVerificarServidor(){
-  if(USAR_DEMO){
-    // ── MODO DEMO ──
-    await new Promise(r=>setTimeout(r,400));
-    return true; // siempre activa en demo
-  }
-  // ── MODO REAL (Supabase) ──
-  const email = localStorage.getItem(SK.email);
+  if(USAR_DEMO){ await new Promise(r=>setTimeout(r,400)); return true; }
+  const email=localStorage.getItem(SK.email);
   if(!email) return false;
-  const data = await supaRPC('verificar_licencia', {
-    p_device_id: licGetDeviceId(),
-    p_email:     email
-  });
-  return data.activa === true;
+  const data=await supaRPC('verificar_licencia',{p_device_id:licGetDeviceId(),p_email:email});
+  return data.activa===true;
 }
 
 async function licCheckPeriodico(){
@@ -4665,21 +4828,21 @@ async function licCheckPeriodico(){
 
 function licMostrarBloqueo(motivo){
   const msgs={
-    'SUSPENDIDA': {t:'Licencia suspendida',s:'Tu licencia fue suspendida. Contacta al soporte para reactivarla.',i:''},
-    'SIN_CONEXION':{t:'Sin verificacion',s:'No se pudo verificar la licencia por 3 dias. Verifica tu internet.',i:'Si el problema persiste, contacta soporte.'},
-    'VENCIDA':    {t:'Licencia vencida',s:'Tu periodo de uso vencio. Renovala para continuar.',i:''},
+    'SUSPENDIDA':{t:'Licencia suspendida',s:'Tu licencia fue suspendida. Contacta al soporte.',i:''},
+    'SIN_CONEXION':{t:'Sin verificacion',s:'No se pudo verificar por 3 dias. Verifica tu internet.',i:''},
+    'VENCIDA':{t:'Licencia vencida',s:'Tu periodo vencio. Renova tu licencia para continuar.',i:''},
   };
   const m=msgs[motivo]||msgs['SUSPENDIDA'];
   document.getElementById('bloqueoTitulo').textContent=m.t;
   document.getElementById('bloqueoSub').textContent=m.s;
   document.getElementById('bloqueoInfo').textContent=m.i;
-  document.querySelectorAll('.screen,#scActivacion,#scActivado').forEach(s=>s.classList.remove('active'));
-  document.getElementById('scBloqueado').classList.add('active');
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); ['scActivacion','scActivado','scBloqueado'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  document.getElementById('scBloqueado').style.display='flex';
 }
 
 async function licInit(){
   if(!licIsActivated()){
-    document.getElementById('scActivacion').classList.add('active');
+    document.getElementById('scActivacion').style.display='flex';
     return false;
   }
   await licCheckPeriodico();
@@ -4704,11 +4867,11 @@ async function doActivar(){
     licShowError(res.error); return;
   }
   licGuardar(res);
-  document.getElementById('scActivacion').classList.remove('active');
+  document.getElementById('scActivacion').style.display='none';
   document.getElementById('activadoPlan').textContent='Plan '+res.plan;
   document.getElementById('activadoSub').textContent='Licencia activa hasta '+res.vence+'. Bienvenido.';
   document.getElementById('activadoNegocio').value='';
-  document.getElementById('scActivado').classList.add('active');
+  document.getElementById('scActivado').style.display='flex';
 }
 
 function licShowError(msg){
@@ -4716,12 +4879,16 @@ function licShowError(msg){
   el.textContent=msg; el.classList.add('show');
 }
 
-function doEntrar(){
-  const negocio=document.getElementById('activadoNegocio').value.trim();
+async function doEntrar(){
+  const negocio  = document.getElementById('activadoNegocio').value.trim();
+  const terminal = document.getElementById('activadoTerminal').value.trim() || 'Terminal 1';
   if(negocio) licSetNegocio(negocio);
-  document.getElementById('scActivado').classList.remove('active');
-  renderP(PRODS);
-  goTo('scClosed');
+  // Guardar nombre de terminal
+  localStorage.setItem('pos_terminal', terminal);
+  if(db) await dbSaveConfig('terminal', terminal);
+  if(typeof configData !== 'undefined') configData.terminal = terminal;
+  document.getElementById('scActivado').style.display='none';
+  await iniciarApp();
 }
 
 async function doReintentar(){
@@ -4731,8 +4898,8 @@ async function doReintentar(){
       localStorage.setItem(SK.fallos,'0');
       localStorage.setItem(SK.activated,'1');
       localStorage.setItem(SK.nextCheck,String(Date.now()+24*60*60*1000));
-      document.getElementById('scBloqueado').classList.remove('active');
-      renderP(PRODS); goTo('scClosed');
+      document.getElementById('scBloqueado').style.display='none';
+      await iniciarApp();
     } else { licMostrarBloqueo('SUSPENDIDA'); }
   } catch(e){ licMostrarBloqueo('SIN_CONEXION'); }
 }
@@ -4745,14 +4912,30 @@ function doContactarSoporte(){
 function doDesactivar(){
   if(!confirm('Desactivar esta licencia en este dispositivo?')) return;
   Object.values(SK).forEach(k=>localStorage.removeItem(k));
-  document.getElementById('scBloqueado').classList.remove('active');
-  document.getElementById('scActivacion').classList.add('active');
+  document.getElementById('scBloqueado').style.display='none';
+  document.getElementById('scActivacion').style.display='flex';
+}
+
+// ── FUNCIÓN CENTRAL DE INICIO ─────────────────────────────
+async function iniciarApp(){
+  renderP(PRODS);
+  goTo('scClosed');
+  // Sincronizar en background
+  setTimeout(syncConSupabase, 3000);
 }
 
 // ── ARRANQUE ──────────────────────────────────────────────
 (async function(){
-  const ok=await licInit();
-  if(ok){ renderP(PRODS); goTo('scClosed'); }
+  try {
+    await initDB();
+    await dbLoadCategorias();
+    await dbLoadProductos();
+  } catch(e){
+    console.log('[DB] Error al iniciar:', e.message);
+  }
+
+  const ok = await licInit();
+  if(ok) await iniciarApp();
 })();
 </script>
 </body>
