@@ -139,6 +139,10 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
       Terminales
     </div>
+    <div class="nav-item" onclick="showPage('sucursales',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Sucursales
+    </div>
     <div class="nav-item" onclick="showPage('reportes',this)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       Reportes
@@ -196,8 +200,21 @@
       </div>
       <div class="card">
         <table>
-          <thead><tr><th>Terminal</th><th>Negocio</th><th>Email</th><th>Device ID</th><th>Última consulta</th><th>Estado</th></tr></thead>
+          <thead><tr><th>Terminal</th><th>Sucursal</th><th>Negocio / Email</th><th>Última consulta</th><th>Estado</th><th>Acción</th></tr></thead>
           <tbody id="terminalesBody"><tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted);">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PAGE: SUCURSALES -->
+    <div id="pageSucursales" style="display:none;">
+      <div class="page-header">
+        <div><div class="page-title">Sucursales y Depósitos</div><div class="page-sub">Estructura de locales y almacenes por cliente</div></div>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Cliente</th><th>Sucursal</th><th>Depósito</th><th>Terminales</th><th>Estado</th></tr></thead>
+          <tbody id="sucursalesBody"><tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted);">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -309,7 +326,7 @@ function doSaLogout(){
 // ── NAVEGACIÓN ────────────────────────────────────────────
 function showPage(page, navEl){
   currentPage = page;
-  ['licencias','clientes','terminales','reportes'].forEach(p=>{
+  ['licencias','clientes','terminales','sucursales','reportes'].forEach(p=>{
     document.getElementById('page'+p.charAt(0).toUpperCase()+p.slice(1)).style.display = p===page?'block':'none';
   });
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -353,6 +370,7 @@ async function cargarPagina(page){
   if(page==='licencias')  await cargarLicencias();
   if(page==='clientes')   await cargarClientes();
   if(page==='terminales') await cargarTerminales();
+  if(page==='sucursales') await cargarSucursales();
   if(page==='reportes')   await cargarReportes();
 }
 
@@ -557,12 +575,12 @@ async function cargarTerminales(){
       const horas = ultima ? (hoy-ultima)/(1000*60*60) : 999;
       const online = horas < 25;
       return `<tr>
-        <td style="font-weight:700;">${t.nombre_negocio||'—'}</td>
-        <td>${t.email}</td>
-        <td style="font-family:monospace;font-size:12px;color:var(--muted);">${t.device_id?.substring(0,20)}...</td>
+        <td style="font-weight:700;">${t.nombre_terminal||'Terminal'}</td>
+        <td><span style="background:rgba(76,175,80,.1);border:1px solid rgba(76,175,80,.2);border-radius:10px;color:#4caf50;font-size:11px;padding:2px 8px;font-weight:700;">${t.sucursal||'Principal'}</span></td>
+        <td>${t.nombre_negocio||'—'}<br><small style="color:var(--muted)">${t.email}</small></td>
         <td>${fmt(t.ultima_consulta)}</td>
         <td>${online?'<span class="badge badge-ok"><span class="dot"></span>Online</span>':'<span class="badge badge-off">Offline</span>'}</td>
-        <td><button class="btn btn-sm btn-outline" onclick="suspenderTerminal(${t.id})">Suspender</button></td>
+        <td><button class="btn btn-sm btn-outline" onclick="suspenderTerminal(${t.id})" style="color:#ef5350;border-color:#c62828;">Suspender</button></td>
       </tr>`;
     }).join('');
   } catch(e){
@@ -574,6 +592,39 @@ async function suspenderTerminal(id){
   if(!confirm('¿Suspender esta terminal?')) return;
   try { await supaPatch('activaciones',id,{activa:false}); toast('Terminal suspendida'); await cargarTerminales(); }
   catch(e){ toast('Error: '+e.message); }
+}
+
+// ── SUCURSALES ────────────────────────────────────────────
+async function cargarSucursales(){
+  try {
+    const suc = await supaGet('sucursales','select=*,licencias(nombre_cliente,email_cliente),depositos(nombre,es_principal)&order=created_at.desc');
+    const acts = await supaGet('activaciones','select=sucursal,licencia_id&activa=eq.true');
+
+    // Contar terminales por sucursal
+    const termsBySuc = {};
+    acts.forEach(a => {
+      const k = a.licencia_id+'|'+(a.sucursal||'Principal');
+      termsBySuc[k] = (termsBySuc[k]||0) + 1;
+    });
+
+    document.getElementById('sucursalesBody').innerHTML = suc.map(s => {
+      const email  = s.licencias?.email_cliente || '—';
+      const nombre = s.licencias?.nombre_cliente || '—';
+      const deps   = Array.isArray(s.depositos) ? s.depositos : [s.depositos].filter(Boolean);
+      const depStr = deps.map(d => (d.es_principal ? '⭐ ' : '') + d.nombre).join(', ') || '—';
+      const key    = s.licencia_id+'|'+s.nombre;
+      const terms  = termsBySuc[key] || 0;
+      return `<tr>
+        <td>${nombre}<br><small style="color:var(--muted)">${email}</small></td>
+        <td style="font-weight:700;">${s.nombre}</td>
+        <td><span style="color:var(--muted);font-size:13px;">${depStr}</span></td>
+        <td>${terms} terminal${terms!==1?'es':''}</td>
+        <td><span class="badge ${s.activa?'badge-ok':'badge-off'}">${s.activa?'Activa':'Inactiva'}</span></td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted);">Sin sucursales registradas</td></tr>';
+  } catch(e){
+    document.getElementById('sucursalesBody').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted);">Sin datos o sin conexión</td></tr>';
+  }
 }
 
 // ── REPORTES ──────────────────────────────────────────────

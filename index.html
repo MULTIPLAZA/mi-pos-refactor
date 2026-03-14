@@ -2109,8 +2109,21 @@
         onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#444'">
     </div>
     <div style="display:flex;flex-direction:column;gap:6px;">
+      <span style="font-size:11px;color:#888;letter-spacing:.8px;text-transform:uppercase;font-weight:700;font-family:'Barlow',sans-serif;">SUCURSAL</span>
+      <input id="activadoSucursal" type="text" placeholder="Ej: Casa Central, Sucursal Norte..."
+        style="background:#2a2a2a;border:1.5px solid #444;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;padding:13px 14px;outline:none;width:100%;box-sizing:border-box;"
+        onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#444'">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <span style="font-size:11px;color:#888;letter-spacing:.8px;text-transform:uppercase;font-weight:700;font-family:'Barlow',sans-serif;">DEPÓSITO</span>
+      <input id="activadoDeposito" type="text" placeholder="Depósito Principal" value="Depósito Principal"
+        style="background:#2a2a2a;border:1.5px solid #444;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;padding:13px 14px;outline:none;width:100%;box-sizing:border-box;"
+        onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#444'">
+      <span style="font-size:11px;color:#555;font-family:'Barlow',sans-serif;">Nombre del depósito asociado a esta sucursal</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
       <span style="font-size:11px;color:#888;letter-spacing:.8px;text-transform:uppercase;font-weight:700;font-family:'Barlow',sans-serif;">NOMBRE DE ESTA TERMINAL</span>
-      <input id="activadoTerminal" type="text" placeholder="Ej: Caja Local, Delivery, Barra..."
+      <input id="activadoTerminal" type="text" placeholder="Ej: Caja 1, Delivery, Barra..."
         style="background:#2a2a2a;border:1.5px solid #444;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;padding:13px 14px;outline:none;width:100%;box-sizing:border-box;"
         onfocus="this.style.borderColor='#4caf50'" onblur="this.style.borderColor='#444'">
     </div>
@@ -4378,11 +4391,16 @@ function cerrarPreviewCierre(){
 
 // ── CONFIGURACIÓN ────────────────────────────────────────────────────────────
 let configData = {
-  negocio: 'MI NEGOCIO',
-  direccion: 'ASUNCION',
-  telefono: '',
-  ruc: '',
-  email: 'usuario@email.com',
+  negocio:      'MI NEGOCIO',
+  direccion:    'ASUNCION',
+  telefono:     '',
+  ruc:          '',
+  email:        'usuario@email.com',
+  terminal:     localStorage.getItem('pos_terminal')  || 'Terminal 1',
+  sucursal:     localStorage.getItem('pos_sucursal')  || 'Principal',
+  deposito:     localStorage.getItem('pos_deposito')  || 'Depósito Principal',
+  sucursal_id:  localStorage.getItem('pos_sucursal_id') || null,
+  deposito_id:  localStorage.getItem('pos_deposito_id') || null,
 };
 
 let printers = {
@@ -4999,11 +5017,65 @@ function licShowError(msg){
 async function doEntrar(){
   const negocio  = document.getElementById('activadoNegocio').value.trim();
   const terminal = document.getElementById('activadoTerminal').value.trim() || 'Terminal 1';
-  if(negocio) licSetNegocio(negocio);
-  // Guardar nombre de terminal
+  const sucursal = document.getElementById('activadoSucursal').value.trim() || 'Principal';
+  const deposito = document.getElementById('activadoDeposito').value.trim() || 'Depósito Principal';
+
+  if(!negocio){ alert('Ingresá el nombre del negocio'); return; }
+  if(!sucursal){ alert('Ingresá el nombre de la sucursal'); return; }
+
+  licSetNegocio(negocio);
+
+  // Guardar todo localmente
   localStorage.setItem('pos_terminal', terminal);
-  if(db) await dbSaveConfig('terminal', terminal);
-  if(typeof configData !== 'undefined') configData.terminal = terminal;
+  localStorage.setItem('pos_sucursal', sucursal);
+  localStorage.setItem('pos_deposito', deposito);
+  if(db){
+    await dbSaveConfig('terminal', terminal);
+    await dbSaveConfig('sucursal', sucursal);
+    await dbSaveConfig('deposito', deposito);
+  }
+  if(typeof configData !== 'undefined'){
+    configData.terminal = terminal;
+    configData.sucursal = sucursal;
+    configData.deposito = deposito;
+  }
+
+  // Crear sucursal + depósito en Supabase
+  if(!USAR_DEMO){
+    try {
+      // Primero actualizar activación
+      await supaRPC('actualizar_activacion', {
+        p_device_id: licGetDeviceId(),
+        p_email:     localStorage.getItem(SK.email),
+        p_negocio:   negocio,
+        p_terminal:  terminal,
+        p_sucursal:  sucursal,
+      });
+      // Obtener licencia_id desde activaciones
+      const activ = await supaFetch('GET', 'activaciones?device_id=eq.'+licGetDeviceId()+'&select=licencia_id');
+      const activData = await activ.json();
+      if(activData && activData[0]){
+        const licId = activData[0].licencia_id;
+        // Crear sucursal y depósito (si no existe ya)
+        const result = await supaRPC('crear_sucursal', {
+          p_licencia_id: licId,
+          p_nombre:      sucursal,
+          p_direccion:   '',
+          p_deposito:    deposito,
+        });
+        if(result && result.sucursal_id){
+          localStorage.setItem('pos_sucursal_id', result.sucursal_id);
+          localStorage.setItem('pos_deposito_id', result.deposito_id);
+          if(db){
+            await dbSaveConfig('sucursal_id', String(result.sucursal_id));
+            await dbSaveConfig('deposito_id', String(result.deposito_id));
+          }
+          console.log('[Setup] Sucursal ID:', result.sucursal_id, '| Depósito ID:', result.deposito_id);
+        }
+      }
+    } catch(e){ console.log('Setup Supabase:', e.message); }
+  }
+
   document.getElementById('scActivado').style.display='none';
   await iniciarApp();
 }
@@ -5035,7 +5107,14 @@ function doDesactivar(){
 
 // ── FUNCIÓN CENTRAL DE INICIO ─────────────────────────────
 async function iniciarApp(){
+  // Restaurar terminal/sucursal desde localStorage
+  const terminal = localStorage.getItem('pos_terminal');
+  const sucursal = localStorage.getItem('pos_sucursal');
+  if(terminal && typeof configData !== 'undefined') configData.terminal = terminal;
+  if(sucursal && typeof configData !== 'undefined') configData.sucursal = sucursal;
+
   renderP(PRODS);
+  // SIEMPRE arrancar en turno cerrado
   goTo('scClosed');
   // Sincronizar en background
   setTimeout(syncConSupabase, 3000);
