@@ -125,6 +125,58 @@ tr:hover td{background:rgba(255,255,255,.015);}
 .loading{text-align:center;padding:36px;color:var(--muted);font-size:14px;}
 .sp{display:inline-block;width:18px;height:18px;border:2px solid #333;border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;margin-right:8px;vertical-align:middle;}
 @keyframes sp{to{transform:rotate(360deg);}}
+.admin-tab{
+  background:var(--card2);border:1px solid var(--border);border-radius:8px;
+  color:var(--muted);font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;
+  padding:9px 16px;cursor:pointer;transition:all .15s;
+}
+.admin-tab.active{background:var(--green2);border-color:var(--green);color:var(--green);}
+.admin-tab:active{filter:brightness(.9);}
+
+.timbrado-card{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  margin-bottom:12px;overflow:hidden;
+}
+.timbrado-head{
+  display:flex;align-items:center;gap:12px;padding:14px 16px;
+  cursor:pointer;transition:background .15s;
+}
+.timbrado-head:active{background:rgba(255,255,255,.03);}
+.timbrado-icon{
+  width:40px;height:40px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.timbrado-info{flex:1;min-width:0;}
+.timbrado-nro{font-size:15px;font-weight:800;letter-spacing:.5px;}
+.timbrado-meta{font-size:12px;color:var(--muted);margin-top:2px;}
+.timbrado-body{
+  display:none;padding:0 16px 14px;border-top:1px solid var(--border);
+}
+.timbrado-body.open{display:block;}
+.timbrado-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 0;border-bottom:1px solid #1e1e1e;font-size:13px;
+}
+.timbrado-row:last-child{border-bottom:none;}
+.timbrado-row-label{color:var(--muted);}
+.timbrado-row-value{font-weight:600;text-align:right;}
+.timbrado-actions{display:flex;gap:8px;margin-top:12px;}
+.btn-tim-edit{
+  background:var(--b2);border:1px solid var(--blue);border-radius:6px;
+  color:var(--blue);font-family:'Barlow',sans-serif;font-size:12px;font-weight:700;
+  padding:7px 14px;cursor:pointer;
+}
+.btn-tim-del{
+  background:var(--r2);border:1px solid var(--red);border-radius:6px;
+  color:var(--red);font-family:'Barlow',sans-serif;font-size:12px;font-weight:700;
+  padding:7px 14px;cursor:pointer;
+}
+.btn-tim-sel{
+  background:var(--g2);border:1px solid var(--green);border-radius:6px;
+  color:var(--green);font-family:'Barlow',sans-serif;font-size:12px;font-weight:800;
+  padding:7px 14px;cursor:pointer;
+}
+
 .empty{text-align:center;padding:48px 24px;}
 .empty-ico{font-size:38px;margin-bottom:12px;}
 .empty-t{font-size:16px;font-weight:700;color:#ccc;margin-bottom:6px;}
@@ -197,6 +249,9 @@ tr:hover td{background:rgba(255,255,255,.015);}
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>Productos
       </div>
       <div class="nav-sec">Sistema</div>
+      <div class="nav-i" onclick="nav('admin',this,'Administración')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>Administración
+      </div>
       <div class="nav-i" onclick="nav('config',this,'Configuración')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M16.24 7.76a6 6 0 0 1 0 8.49M6.34 17.66a6 6 0 0 1 0-8.49M4.93 19.07a10 10 0 0 1 0-14.14"/></svg>Configuración
       </div>
@@ -288,6 +343,37 @@ tr:hover td{background:rgba(255,255,255,.015);}
         <div class="card-h"><span class="card-t" id="pCount">—</span><input class="c-srch" placeholder="Buscar..." oninput="filtrP(this.value)"></div>
         <table><thead><tr><th>Producto</th><th>Categoría</th><th>IVA</th><th style="text-align:right">Precio</th></tr></thead>
         <tbody id="pBody"><tr><td colspan="4" class="loading"><span class="sp"></span></td></tr></tbody>
+      </div>
+    </div>
+
+    <!-- ADMINISTRACIÓN -->
+    <div class="page" id="pageAdmin">
+      <div class="ph">
+        <div><div class="pt">Administración</div><div class="ps">Configuración avanzada del sistema</div></div>
+      </div>
+
+      <!-- Sub-menú de administración -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:14px;">
+        <button class="admin-tab active" onclick="showAdminTab('timbrado',this)">📄 Puntos de Expedición</button>
+        <button class="admin-tab" onclick="showAdminTab('sucursales',this)">🏢 Sucursales</button>
+      </div>
+
+      <!-- TAB: TIMBRADOS / PUNTOS DE EXPEDICIÓN -->
+      <div id="tabTimbrado">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-size:15px;font-weight:700;">Puntos de Expedición</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">Timbrados habilitados para facturación</div>
+          </div>
+          <button onclick="abrirModalTimbrado()" style="background:var(--green);border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;padding:10px 16px;cursor:pointer;">+ NUEVO</button>
+        </div>
+        <div id="timbradoLista"><div class="loading"><span class="sp"></span>Cargando...</div></div>
+      </div>
+
+      <!-- TAB: SUCURSALES -->
+      <div id="tabSucursales" style="display:none;">
+        <div style="font-size:15px;font-weight:700;margin-bottom:14px;">Sucursales registradas</div>
+        <div id="sucursalesAdminLista"><div class="loading"><span class="sp"></span>Cargando...</div></div>
       </div>
     </div>
 
@@ -536,11 +622,377 @@ const DCJS=[
   {id:2,terminal:'Delivery',sucursal:'Casa Central',estado:'cerrado',fecha_apertura:new Date(Date.now()-28800000).toISOString(),fecha_cierre:new Date(Date.now()-7200000).toISOString(),efectivo_inicial:50000,total_vendido:280000,total_contado:278000,diferencia:-2000},
 ];
 
+// ══════════════════════════════════════════════════════
+// ADMINISTRACIÓN — PUNTOS DE EXPEDICIÓN (TIMBRADOS)
+// ══════════════════════════════════════════════════════
+
+const TIM_KEY = 'pos_timbrados';  // localStorage key
+let timbrados = [];
+let timEditId = null;
+
+function loadTimbradosAdmin(){
+  try {
+    const raw = localStorage.getItem(TIM_KEY);
+    timbrados = raw ? JSON.parse(raw) : [];
+  } catch(e){ timbrados=[]; }
+  renderTimbrados();
+}
+
+function saveTimbrados(){
+  localStorage.setItem(TIM_KEY, JSON.stringify(timbrados));
+  // También subir a Supabase si está conectado
+  if(sessionEmail){
+    supaGet('pos_config','licencia_email=eq.'+encodeURIComponent(sessionEmail)+'&clave=eq.timbrados').then(rows=>{
+      const data={licencia_email:sessionEmail, clave:'timbrados', valor:JSON.stringify(timbrados)};
+      if(rows&&rows.length>0){
+        fetch(SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(sessionEmail)+'&clave=eq.timbrados',{
+          method:'PATCH',headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json'},
+          body:JSON.stringify(data)
+        }).catch(()=>{});
+      } else {
+        fetch(SUPA_URL+'/rest/v1/pos_config',{
+          method:'POST',headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:JSON.stringify(data)
+        }).catch(()=>{});
+      }
+    }).catch(()=>{});
+  }
+}
+
+function renderTimbrados(){
+  const cont = document.getElementById('timbradoLista');
+  if(!cont) return;
+  if(!timbrados.length){
+    cont.innerHTML='<div class="empty"><div style="font-size:36px;margin-bottom:10px;">📄</div><div style="font-size:15px;font-weight:700;color:#ccc;margin-bottom:6px;">Sin puntos de expedición</div><div style="font-size:13px;color:var(--muted);">Agregá el timbrado habilitado por SET/DNIT</div></div>';
+    return;
+  }
+  const pad=n=>String(n).padStart(3,'0');
+  const padN=n=>String(n).padStart(8,'0');
+  const fmt=f=>{if(!f)return'—';const d=new Date(f+'T00:00:00');const p=n=>String(n).padStart(2,'0');return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear();};
+  const hoy=new Date();
+  cont.innerHTML=timbrados.map((t,i)=>{
+    const fin=new Date(t.vig_fin+'T00:00:00');
+    const activo=fin>=hoy;
+    const diasRest=Math.ceil((fin-hoy)/(1000*60*60*24));
+    const badge=activo
+      ? (diasRest<60?`<span class="tag tag-o">${diasRest}d restantes</span>`:'<span class="tag tag-g">Vigente</span>')
+      : '<span class="tag tag-r">Vencido</span>';
+    const iconBg=activo?'var(--g2)':'var(--r2)';
+    const iconColor=activo?'var(--green)':'var(--red)';
+    const pctUso=Math.round(((t.nro_actual||t.desde)-t.desde)/(t.hasta-t.desde)*100)||0;
+    return `<div class="timbrado-card">
+      <div class="timbrado-head" onclick="toggleTim(${i})">
+        <div class="timbrado-icon" style="background:${iconBg};">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <div class="timbrado-info">
+          <div class="timbrado-nro">Timbrado ${t.nro}</div>
+          <div class="timbrado-meta">${pad(t.sucursal)}-${pad(t.punto_exp)} · ${t.nombre_suc||''} · ${t.tipo==='electronico'?'📱 Electrónico':'🖨️ Autoimpresor'}</div>
+          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">${badge}</div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="timbrado-body" id="timBody${i}">
+        <div class="timbrado-row"><span class="timbrado-row-label">Timbrado</span><span class="timbrado-row-value" style="font-family:monospace;font-size:15px;">${t.nro}</span></div>
+        <div class="timbrado-row"><span class="timbrado-row-label">Tipo</span><span class="timbrado-row-value">${t.tipo==='electronico'?'📱 Electrónico':'🖨️ Autoimpresor'}</span></div>
+        <div class="timbrado-row"><span class="timbrado-row-label">Inicio de vigencia</span><span class="timbrado-row-value">${fmt(t.vig_ini)}</span></div>
+        <div class="timbrado-row"><span class="timbrado-row-label">Fin de vigencia</span><span class="timbrado-row-value">${fmt(t.vig_fin)}</span></div>
+        <div class="timbrado-row"><span class="timbrado-row-label">Sucursal</span><span class="timbrado-row-value" style="font-family:monospace;">${pad(t.sucursal)}</span></div>
+        <div class="timbrado-row"><span class="timbrado-row-label">Punto de expedición</span><span class="timbrado-row-value" style="font-family:monospace;">${pad(t.punto_exp)}</span></div>
+        <div class="timbrado-row"><span class="timbrado-row-label">Numeración</span><span class="timbrado-row-value">${padN(t.desde)} al ${padN(t.hasta)}</span></div>
+        <div class="timbrado-row"><span class="timbrado-row-label">Siguiente nro</span><span class="timbrado-row-value" style="color:var(--green);">${padN(t.nro_actual||t.desde)}</span></div>
+        <div class="timbrado-row"><span class="timbrado-row-label">Referencia</span><span class="timbrado-row-value">${t.nombre_suc||'—'}</span></div>
+        <!-- Barra de uso -->
+        <div style="margin:10px 0 6px;">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px;"><span>Uso de numeración</span><span>${pctUso}%</span></div>
+          <div style="background:#1e1e1e;border-radius:4px;height:6px;overflow:hidden;">
+            <div style="height:100%;width:${pctUso}%;background:${pctUso>80?'var(--red)':pctUso>60?'var(--orange)':'var(--green)'};border-radius:4px;transition:width .3s;"></div>
+          </div>
+        </div>
+        <!-- Acciones -->
+        <div class="timbrado-actions">
+          <button class="btn-tim-sel" onclick="seleccionarTimbrado(${i})">✓ USAR EN VENTAS</button>
+          <button class="btn-tim-edit" onclick="editarTimbrado(${i})">EDITAR</button>
+          <button class="btn-tim-del" onclick="eliminarTimbrado(${i})">ELIMINAR</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Mostrar el activo seleccionado
+  const activo = timbrados.find(t=>t.seleccionado);
+  if(activo){
+    const infoEl = document.getElementById('timbradoActivo');
+    if(infoEl) infoEl.textContent = 'Activo: '+activo.nro+' ('+String(activo.sucursal).padStart(3,'0')+'-'+String(activo.punto_exp).padStart(3,'0')+')';
+  }
+}
+
+function toggleTim(i){
+  const body = document.getElementById('timBody'+i);
+  if(body) body.classList.toggle('open');
+}
+
+function seleccionarTimbrado(i){
+  timbrados.forEach((t,j)=>t.seleccionado=(j===i));
+  saveTimbrados();
+  renderTimbrados();
+  // Guardar en localStorage para uso en POS
+  localStorage.setItem('pos_timbrado_activo', JSON.stringify(timbrados[i]));
+  alert('✓ Timbrado '+timbrados[i].nro+' seleccionado para facturación');
+}
+
+function eliminarTimbrado(i){
+  if(!confirm('¿Eliminar este punto de expedición?')) return;
+  timbrados.splice(i,1);
+  saveTimbrados();
+  renderTimbrados();
+}
+
+function editarTimbrado(i){
+  timEditId = i;
+  const t = timbrados[i];
+  document.getElementById('timModalTitle').textContent='Editar Punto de Expedición';
+  document.getElementById('timNro').value = t.nro||'';
+  document.getElementById('timVigIni').value = t.vig_ini||'';
+  document.getElementById('timVigFin').value = t.vig_fin||'';
+  document.getElementById('timSuc').value = t.sucursal||'';
+  document.getElementById('timPEx').value = t.punto_exp||'';
+  document.getElementById('timDesde').value = t.desde||'';
+  document.getElementById('timHasta').value = t.hasta||'';
+  document.getElementById('timNomSuc').value = t.nombre_suc||'';
+  document.getElementById('timTipo').value = t.tipo||'autoimpresor';
+  selTipoTim(t.tipo||'autoimpresor');
+  actualizarPreviewTim();
+  document.getElementById('modalTimOv').style.display='flex';
+}
+
+function abrirModalTimbrado(){
+  timEditId = null;
+  document.getElementById('timModalTitle').textContent='Nuevo Punto de Expedición';
+  document.getElementById('timNro').value='';
+  document.getElementById('timVigIni').value='';
+  document.getElementById('timVigFin').value='';
+  document.getElementById('timSuc').value='001';
+  document.getElementById('timPEx').value='001';
+  document.getElementById('timDesde').value='1';
+  document.getElementById('timHasta').value='5000';
+  document.getElementById('timNomSuc').value='';
+  selTipoTim('autoimpresor');
+  actualizarPreviewTim();
+  document.getElementById('modalTimOv').style.display='flex';
+}
+
+function cerrarModalTimbrado(){
+  document.getElementById('modalTimOv').style.display='none';
+}
+
+function selTipoTim(tipo){
+  document.getElementById('timTipo').value=tipo;
+  const btnA=document.getElementById('btnTipoAuto');
+  const btnE=document.getElementById('btnTipoElec');
+  if(tipo==='autoimpresor'){
+    btnA.style.background='var(--g2)'; btnA.style.borderColor='var(--green)'; btnA.style.color='var(--green)';
+    btnE.style.background='#1e1e1e'; btnE.style.borderColor='#333'; btnE.style.color='var(--muted)';
+  } else {
+    btnE.style.background='var(--b2)'; btnE.style.borderColor='var(--blue)'; btnE.style.color='var(--blue)';
+    btnA.style.background='#1e1e1e'; btnA.style.borderColor='#333'; btnA.style.color='var(--muted)';
+  }
+  actualizarPreviewTim();
+}
+
+function actualizarPreviewTim(){
+  const nro    = document.getElementById('timNro')?.value||'________';
+  const ini    = document.getElementById('timVigIni')?.value||'';
+  const fin    = document.getElementById('timVigFin')?.value||'';
+  const suc    = (document.getElementById('timSuc')?.value||'001').padStart(3,'0');
+  const pex    = (document.getElementById('timPEx')?.value||'001').padStart(3,'0');
+  const desde  = String(document.getElementById('timDesde')?.value||'1').padStart(7,'0');
+  const hasta  = String(document.getElementById('timHasta')?.value||'5000').padStart(7,'0');
+  const nomSuc = document.getElementById('timNomSuc')?.value||'';
+  const tipo   = document.getElementById('timTipo')?.value||'autoimpresor';
+  const fmtD   = d=>{if(!d)return'—';const x=new Date(d+'T00:00:00');const p=n=>String(n).padStart(2,'0');return p(x.getDate())+'/'+p(x.getMonth()+1)+'/'+x.getFullYear();};
+  const prev = document.getElementById('timPreview');
+  if(prev) prev.innerHTML =
+    '<div style="color:#666;margin-bottom:6px;font-size:10px;">── DATOS DEL TIMBRADO ──</div>'+
+    '<div><span style="color:#777;">TIMBRADO:         </span><span style="color:#4caf50;font-weight:700;">'+nro+'</span></div>'+
+    '<div><span style="color:#777;">Tipo:             </span><span style="color:#ccc;">'+( tipo==='electronico'?'Electrónico':'Autoimpresor')+'</span></div>'+
+    '<div><span style="color:#777;">Inicio vigencia:  </span><span style="color:#ccc;">'+fmtD(ini)+'</span></div>'+
+    '<div><span style="color:#777;">Fin vigencia:     </span><span style="color:#ccc;">'+fmtD(fin)+'</span></div>'+
+    '<div><span style="color:#777;">Sucursal:         </span><span style="color:#ccc;">'+suc+(nomSuc?' ('+nomSuc+')':'')+'</span></div>'+
+    '<div><span style="color:#777;">Punto expedición: </span><span style="color:#ccc;">'+pex+'</span></div>'+
+    '<div><span style="color:#777;">Numeración:       </span><span style="color:#ccc;">'+desde+' al '+hasta+'</span></div>'+
+    '<div style="margin-top:6px;color:#666;font-size:10px;">── EJEMPLO DE FACTURA ──</div>'+
+    '<div style="color:#aaa;">Factura N° '+suc+'-'+pex+'-<span style="color:#4caf50;">0000001</span></div>';
+}
+
+// Actualizar preview al escribir
+document.addEventListener('input', function(e){
+  if(['timNro','timVigIni','timVigFin','timSuc','timPEx','timDesde','timHasta','timNomSuc'].includes(e.target?.id)){
+    actualizarPreviewTim();
+  }
+});
+
+function guardarTimbrado(){
+  const nro    = document.getElementById('timNro').value.trim();
+  const vigIni = document.getElementById('timVigIni').value;
+  const vigFin = document.getElementById('timVigFin').value;
+  const suc    = document.getElementById('timSuc').value.trim().padStart(3,'0');
+  const pex    = document.getElementById('timPEx').value.trim().padStart(3,'0');
+  const desde  = parseInt(document.getElementById('timDesde').value)||1;
+  const hasta  = parseInt(document.getElementById('timHasta').value)||5000;
+  const nomSuc = document.getElementById('timNomSuc').value.trim();
+  const tipo   = document.getElementById('timTipo').value;
+
+  if(!nro){ alert('Ingresá el número de timbrado'); return; }
+  if(nro.length!==8){ alert('El timbrado debe tener 8 dígitos'); return; }
+  if(!vigIni||!vigFin){ alert('Ingresá las fechas de vigencia'); return; }
+  if(!suc||!pex){ alert('Ingresá sucursal y punto de expedición'); return; }
+  if(desde>=hasta){ alert('El número desde debe ser menor al hasta'); return; }
+
+  const data = { nro, tipo, vig_ini:vigIni, vig_fin:vigFin, sucursal:suc, punto_exp:pex, desde, hasta, nombre_suc:nomSuc, nro_actual:desde, seleccionado:false };
+
+  if(timEditId !== null){
+    data.nro_actual = timbrados[timEditId].nro_actual || desde;
+    data.seleccionado = timbrados[timEditId].seleccionado || false;
+    timbrados[timEditId] = data;
+  } else {
+    timbrados.push(data);
+  }
+
+  saveTimbrados();
+  renderTimbrados();
+  cerrarModalTimbrado();
+}
+
+function showAdminTab(tab, btn){
+  document.querySelectorAll('.admin-tab').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  document.getElementById('tabTimbrado').style.display  = tab==='timbrado'  ? 'block':'none';
+  document.getElementById('tabSucursales').style.display = tab==='sucursales'? 'block':'none';
+  if(tab==='timbrado')   loadTimbradosAdmin();
+  if(tab==='sucursales') loadSucursalesAdmin();
+}
+
+async function loadSucursalesAdmin(){
+  const cont=document.getElementById('sucursalesAdminLista');
+  if(!cont)return;
+  try{
+    const {d,h}=getFD('mes');
+    const v=await sg('pos_ventas','licencia_email=eq.'+encodeURIComponent(SE)+'&fecha=gte.'+d+'&fecha=lte.'+h+'&select=sucursal,total&limit=500');
+    const m={};
+    v.forEach(x=>{const s=x.sucursal||'Principal';if(!m[s])m[s]={total:0,ops:0};m[s].total+=x.total||0;m[s].ops++;});
+    cont.innerHTML=Object.entries(m).length?Object.entries(m).map(([s,d])=>`
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;">
+        <div style="width:36px;height:36px;border-radius:9px;background:var(--g2);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--green);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:700;">${s}</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">${d.ops} ventas este mes</div></div>
+        <div style="text-align:right;"><div style="font-size:15px;font-weight:700;color:var(--green);">${gs(d.total)}</div></div>
+      </div>`).join('')
+    :'<div class="empty"><div style="font-size:32px;">🏢</div><div style="font-size:14px;font-weight:700;color:#ccc;margin:8px 0 4px;">Sin sucursales</div><div style="font-size:13px;color:var(--muted);">Se crean al activar terminales</div></div>';
+  }catch(e){cont.innerHTML='<div class="loading">Sin datos</div>';}
+}
+
 // AUTO LOGIN
 (function(){
   const e=localStorage.getItem('ae'),p=localStorage.getItem('ap'),v=localStorage.getItem('av');
   if(e&&p){SE=e;SP=p;SV=v;showApp();}
 })();
 </script>
+
+<!-- ══ MODAL TIMBRADO ══ -->
+<div id="modalTimOv" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)cerrarModalTimbrado()">
+  <div style="background:#1a1a1a;border-radius:18px 18px 0 0;width:100%;max-width:520px;padding:20px 18px 40px;max-height:92vh;overflow-y:auto;">
+    <div style="width:36px;height:4px;background:#333;border-radius:2px;margin:0 auto 16px;"></div>
+    <div style="font-size:17px;font-weight:800;margin-bottom:18px;" id="timModalTitle">Nuevo Punto de Expedición</div>
+
+    <!-- Tipo de timbrado -->
+    <div style="margin-bottom:13px;">
+      <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Tipo de timbrado</label>
+      <div style="display:flex;gap:8px;">
+        <button id="btnTipoAuto" onclick="selTipoTim('autoimpresor')"
+          style="flex:1;background:var(--g2);border:1.5px solid var(--green);border-radius:8px;color:var(--green);font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;padding:11px;cursor:pointer;">
+          🖨️ Autoimpresor
+        </button>
+        <button id="btnTipoElec" onclick="selTipoTim('electronico')"
+          style="flex:1;background:#1e1e1e;border:1.5px solid #333;border-radius:8px;color:var(--muted);font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;padding:11px;cursor:pointer;">
+          📱 Electrónico
+        </button>
+      </div>
+      <input type="hidden" id="timTipo" value="autoimpresor">
+    </div>
+
+    <!-- Nro Timbrado -->
+    <div style="margin-bottom:13px;">
+      <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Número de timbrado *</label>
+      <input id="timNro" type="text" placeholder="Ej: 12345678" maxlength="8"
+        oninput="this.value=this.value.replace(/\D/g,'')"
+        style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:16px;font-weight:700;letter-spacing:2px;padding:11px 14px;outline:none;">
+    </div>
+
+    <!-- Vigencia -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:13px;">
+      <div>
+        <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Inicio de vigencia *</label>
+        <input id="timVigIni" type="date"
+          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:11px 14px;outline:none;">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Fin de vigencia *</label>
+        <input id="timVigFin" type="date"
+          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:11px 14px;outline:none;">
+      </div>
+    </div>
+
+    <!-- Sucursal y Punto de expedición -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:13px;">
+      <div>
+        <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">N° Sucursal *</label>
+        <input id="timSuc" type="text" placeholder="001" maxlength="3"
+          oninput="this.value=this.value.replace(/\D/g,'').padStart(this.value.length,'0')"
+          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:16px;font-weight:700;letter-spacing:2px;padding:11px 14px;outline:none;text-align:center;">
+        <div style="font-size:10px;color:#444;margin-top:3px;">3 dígitos (ej: 001)</div>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Punto de Expedición *</label>
+        <input id="timPEx" type="text" placeholder="001" maxlength="3"
+          oninput="this.value=this.value.replace(/\D/g,'')"
+          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:16px;font-weight:700;letter-spacing:2px;padding:11px 14px;outline:none;text-align:center;">
+        <div style="font-size:10px;color:#444;margin-top:3px;">3 dígitos (ej: 001)</div>
+      </div>
+    </div>
+
+    <!-- Numeración -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:13px;">
+      <div>
+        <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Nro desde *</label>
+        <input id="timDesde" type="number" placeholder="1" min="1"
+          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;font-weight:700;padding:11px 14px;outline:none;">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Nro hasta *</label>
+        <input id="timHasta" type="number" placeholder="5000" min="1"
+          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;font-weight:700;padding:11px 14px;outline:none;">
+      </div>
+    </div>
+
+    <!-- Nombre de sucursal (referencia) -->
+    <div style="margin-bottom:20px;">
+      <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Nombre de sucursal (referencia)</label>
+      <input id="timNomSuc" type="text" placeholder="Ej: Casa Central, Sucursal Norte..."
+        style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:11px 14px;outline:none;">
+    </div>
+
+    <!-- Vista previa -->
+    <div id="timPreview" style="background:#0a0a0a;border:1px solid #2a2a2a;border-radius:8px;padding:14px;margin-bottom:18px;font-family:'Courier New',monospace;font-size:12px;color:#aaa;line-height:1.8;">
+      <div style="text-align:center;color:#666;font-size:11px;">Vista previa</div>
+    </div>
+
+    <div style="display:flex;gap:10px;">
+      <button onclick="cerrarModalTimbrado()" style="flex:1;background:#2a2a2a;border:none;border-radius:8px;color:#aaa;font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;padding:14px;cursor:pointer;">CANCELAR</button>
+      <button onclick="guardarTimbrado()" style="flex:2;background:var(--green);border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;padding:14px;cursor:pointer;letter-spacing:.5px;">GUARDAR</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
