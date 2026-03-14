@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Super Admin — POS</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#0a0a0a;--card:#141414;--card2:#1a1a1a;
+  --green:#4caf50;--green2:rgba(76,175,80,.15);
+  --red:#ef5350;--red2:rgba(239,83,80,.15);
+  --orange:#ff9800;--orange2:rgba(255,152,0,.15);
+  --blue:#42a5f5;--blue2:rgba(66,165,245,.15);
+  --border:#222;--text:#fff;--muted:#666;
+}
+body{font-family:'Barlow',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* ── LOGIN ── */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.login-box{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:32px 28px;width:100%;max-width:360px;}
+.login-logo{width:56px;height:56px;border-radius:16px;background:var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;}
+.login-title{font-size:20px;font-weight:800;text-align:center;margin-bottom:4px;}
+.login-sub{font-size:13px;color:var(--muted);text-align:center;margin-bottom:24px;}
+.fi{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;}
+.fi label{font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;}
+.fi input{background:#1e1e1e;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:15px;padding:11px 14px;outline:none;transition:border-color .2s;}
+.fi input:focus{border-color:var(--green);}
+.btn-p{width:100%;background:var(--green);border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;padding:13px;cursor:pointer;margin-top:4px;}
+.btn-p:active{background:#43a047;}
+.l-err{color:var(--red);font-size:12px;text-align:center;margin-top:8px;display:none;}
+
+/* ── APP ── */
+.app{display:none;min-height:100vh;}
+
+/* Topbar */
+.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:0 16px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20;}
+.topbar-left{display:flex;align-items:center;gap:12px;}
+.topbar-brand{font-size:16px;font-weight:800;color:var(--green);}
+.topbar-right{display:flex;align-items:center;gap:8px;}
+.btn-icon{background:none;border:none;color:var(--muted);cursor:pointer;padding:6px;border-radius:6px;transition:background .15s;}
+.btn-icon:active{background:#1e1e1e;}
+
+/* Bottom nav (mobile first) */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;
+  background:var(--card);border-top:1px solid var(--border);
+  display:flex;z-index:20;
+}
+.bn-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  padding:10px 4px 8px;cursor:pointer;font-size:10px;font-weight:700;
+  color:var(--muted);letter-spacing:.3px;gap:4px;transition:color .15s;
+  text-transform:uppercase;
+}
+.bn-item.active{color:var(--green);}
+.bn-item svg{flex-shrink:0;}
+
+/* Main content */
+.main{padding:16px 14px 80px;}
+
+/* Pages */
+.page{display:none;}.page.active{display:block;}
+.ph{margin-bottom:18px;}
+.ph-title{font-size:20px;font-weight:800;}
+.ph-sub{font-size:13px;color:var(--muted);margin-top:2px;}
+
+/* KPI row */
+.krow{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:18px;}
+.krow.k4{grid-template-columns:repeat(2,1fr);}
+.kcard{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;}
+.kcard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--kc,#333);}
+.kc-l{font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;font-weight:700;margin-bottom:6px;}
+.kc-v{font-size:22px;font-weight:800;color:var(--kc,#fff);}
+.kc-s{font-size:11px;color:var(--muted);margin-top:3px;}
+
+/* Search bar */
+.search-bar{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:14px;}
+.search-bar input{flex:1;background:transparent;border:none;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;outline:none;}
+.search-bar input::placeholder{color:#444;}
+
+/* ── LICENSE CARDS ── */
+.lic-card{background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden;transition:border-color .15s;}
+.lic-card:active{border-color:#333;}
+.lic-card-head{padding:14px 16px;display:flex;align-items:flex-start;gap:12px;}
+.lic-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+.lic-dot.active{background:var(--green);}
+.lic-dot.inactive{background:#333;}
+.lic-main{flex:1;min-width:0;}
+.lic-clave{font-size:15px;font-weight:800;color:#fff;letter-spacing:.5px;font-family:'Barlow',sans-serif;}
+.lic-nombre{font-size:13px;color:#aaa;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lic-email{font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lic-meta{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;}
+.lic-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+.lic-badge.plan-1{background:var(--green2);color:var(--green);}
+.lic-badge.plan-2{background:var(--blue2);color:var(--blue);}
+.lic-badge.plan-3{background:var(--orange2);color:var(--orange);}
+.lic-badge.rubro{background:#2a2a2a;color:#aaa;}
+.lic-badge.vence-ok{background:var(--green2);color:var(--green);}
+.lic-badge.vence-pronto{background:var(--orange2);color:var(--orange);}
+.lic-badge.vence-ya{background:var(--red2);color:var(--red);}
+.lic-actions{display:flex;border-top:1px solid var(--border);}
+.lic-action{flex:1;padding:11px 8px;background:none;border:none;font-family:'Barlow',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:background .15s;letter-spacing:.3px;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:5px;}
+.lic-action:not(:last-child){border-right:1px solid var(--border);}
+.lic-action.copy{color:#aaa;}
+.lic-action.copy:active{background:#1e1e1e;}
+.lic-action.suspend{color:var(--red);}
+.lic-action.suspend:active{background:var(--red2);}
+.lic-action.activate{color:var(--green);}
+.lic-action.activate:active{background:var(--green2);}
+.lic-action.edit{color:var(--blue);}
+.lic-action.edit:active{background:var(--blue2);}
+
+/* ── MODAL ── */
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:flex-end;justify-content:center;}
+.modal-ov.open{display:flex;}
+.modal{background:var(--card2);border-radius:18px 18px 0 0;width:100%;max-width:520px;padding:20px 18px 32px;max-height:90vh;overflow-y:auto;}
+.modal-handle{width:36px;height:4px;background:#333;border-radius:2px;margin:0 auto 16px;}
+.modal-title{font-size:18px;font-weight:800;margin-bottom:18px;}
+.mfi{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;}
+.mfi label{font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;}
+.mfi input, .mfi select{background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:11px 14px;outline:none;width:100%;transition:border-color .2s;}
+.mfi input:focus, .mfi select:focus{border-color:var(--green);}
+.mfi select option{background:#1a1a1a;}
+.mfi .note{font-size:11px;color:#444;margin-top:4px;}
+.gen-btn{background:var(--green);border:none;border-radius:6px;color:#fff;font-family:'Barlow',sans-serif;font-size:12px;font-weight:800;padding:9px 14px;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+.modal-btns{display:flex;gap:10px;margin-top:18px;}
+.btn-sec{flex:1;background:#2a2a2a;border:none;border-radius:8px;color:#aaa;font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;padding:13px;cursor:pointer;}
+.btn-pri{flex:2;background:var(--green);border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;padding:13px;cursor:pointer;letter-spacing:.5px;}
+.btn-pri:active{background:#43a047;}
+
+/* Clientes / Terminales rows */
+.list-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;}
+.li-icon{width:38px;height:38px;border-radius:10px;background:#1e1e1e;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#aaa;}
+.li-info{flex:1;min-width:0;}
+.li-title{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.li-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.li-right{text-align:right;flex-shrink:0;}
+.li-value{font-size:14px;font-weight:700;}
+.li-sub2{font-size:11px;color:var(--muted);margin-top:2px;}
+
+/* Toast */
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:#2a2a2a;color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;transition:all .3s;z-index:999;white-space:nowrap;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* Misc */
+.empty{text-align:center;padding:48px 16px;}
+.empty-ico{font-size:36px;margin-bottom:10px;}
+.empty-t{font-size:16px;font-weight:700;color:#ccc;margin-bottom:6px;}
+.empty-s{font-size:13px;color:var(--muted);}
+.sp{display:inline-block;width:16px;height:16px;border:2px solid #333;border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;vertical-align:middle;margin-right:6px;}
+@keyframes sp{to{transform:rotate(360deg);}}
+.loading{text-align:center;padding:32px;color:var(--muted);font-size:14px;}
+
+/* Desktop adjustments */
+@media(min-width:640px){
+  .main{padding:24px 24px 80px;max-width:700px;margin:0 auto;}
+  .krow.k4{grid-template-columns:repeat(4,1fr);}
+}
+@media(min-width:900px){
+  .bottom-nav{display:none;}
+  .app{display:grid;grid-template-columns:220px 1fr;min-height:100vh;}
+  .topbar{display:none;}
+  .desktop-sidebar{display:flex;flex-direction:column;background:var(--card);border-right:1px solid var(--border);position:sticky;top:0;height:100vh;}
+  .ds-head{padding:20px 16px;border-bottom:1px solid var(--border);}
+  .ds-brand{font-size:16px;font-weight:800;color:var(--green);}
+  .ds-sub{font-size:11px;color:var(--muted);}
+  .ds-nav{flex:1;padding:8px 0;overflow-y:auto;}
+  .ds-item{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);margin:2px 8px;border-radius:7px;transition:all .15s;}
+  .ds-item:hover{background:rgba(255,255,255,.04);color:#ccc;}
+  .ds-item.active{color:var(--green);background:var(--green2);}
+  .ds-foot{padding:14px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+  .main{padding:24px;max-width:none;}
+}
+@media(max-width:899px){
+  .desktop-sidebar{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-box">
+    <div class="login-logo"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>
+    <div class="login-title">Super Admin</div>
+    <div class="login-sub">Panel de administración</div>
+    <div class="fi"><label>Usuario</label><input type="text" id="saUser" placeholder="admin" onkeydown="if(event.key==='Enter')saLogin()"></div>
+    <div class="fi"><label>Contraseña</label><input type="password" id="saPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')saLogin()"></div>
+    <button class="btn-p" onclick="saLogin()">INGRESAR</button>
+    <div class="l-err" id="saErr"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+
+  <!-- Desktop sidebar -->
+  <div class="desktop-sidebar">
+    <div class="ds-head">
+      <div class="ds-brand">⚡ POS Admin</div>
+      <div class="ds-sub">Super Administrador</div>
+    </div>
+    <div class="ds-nav">
+      <div class="ds-item active" onclick="nav('licencias',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>Licencias</div>
+      <div class="ds-item" onclick="nav('clientes',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Clientes</div>
+      <div class="ds-item" onclick="nav('terminales',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Terminales</div>
+      <div class="ds-item" onclick="nav('reportes',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reportes</div>
+    </div>
+    <div class="ds-foot">
+      <div style="flex:1;font-size:12px;color:var(--muted);">admin</div>
+      <button style="background:none;border:none;color:var(--muted);cursor:pointer;" onclick="saLogout()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div>
+    <!-- Topbar mobile -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <span class="topbar-brand">⚡ POS Admin</span>
+      </div>
+      <div class="topbar-right">
+        <span style="font-size:12px;color:var(--muted);" id="topPage">Licencias</span>
+        <button class="btn-icon" onclick="saLogout()" title="Salir"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+      </div>
+    </div>
+
+    <div class="main">
+
+      <!-- ── LICENCIAS ── -->
+      <div class="page active" id="pageLicencias">
+        <div class="ph" style="display:flex;align-items:center;justify-content:space-between;">
+          <div><div class="ph-title">Licencias</div><div class="ph-sub" id="licCount">—</div></div>
+          <button onclick="openModal()" style="background:var(--green);border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;padding:10px 16px;cursor:pointer;letter-spacing:.3px;">+ NUEVA</button>
+        </div>
+        <div class="search-bar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="licSearch" placeholder="Buscar por clave, cliente, email..." oninput="filtrLic(this.value)">
+        </div>
+        <div id="licLista"><div class="loading"><span class="sp"></span>Cargando...</div></div>
+      </div>
+
+      <!-- ── CLIENTES ── -->
+      <div class="page" id="pageClientes">
+        <div class="ph"><div class="ph-title">Clientes</div><div class="ph-sub">Negocios registrados</div></div>
+        <div id="clientesLista"><div class="loading"><span class="sp"></span>Cargando...</div></div>
+      </div>
+
+      <!-- ── TERMINALES ── -->
+      <div class="page" id="pageTerminales">
+        <div class="ph"><div class="ph-title">Terminales</div><div class="ph-sub">Dispositivos activados</div></div>
+        <div id="termLista"><div class="loading"><span class="sp"></span>Cargando...</div></div>
+      </div>
+
+      <!-- ── REPORTES ── -->
+      <div class="page" id="pageReportes">
+        <div class="ph"><div class="ph-title">Reportes</div><div class="ph-sub">Visión global de todos los clientes</div></div>
+        <div class="krow k4" id="repKPIs">
+          <div class="kcard" style="--kc:var(--green)"><div class="kc-l">Lic. activas</div><div class="kc-v" id="rLicA">—</div></div>
+          <div class="kcard" style="--kc:var(--blue)"><div class="kc-l">Terminales</div><div class="kc-v" id="rTerm">—</div></div>
+          <div class="kcard" style="--kc:var(--orange)"><div class="kc-l">Vencen pronto</div><div class="kc-v" id="rVence">—</div></div>
+          <div class="kcard" style="--kc:var(--red)"><div class="kc-l">Suspendidas</div><div class="kc-v" id="rSusp">—</div></div>
+        </div>
+        <div id="repLista"><div class="loading"><span class="sp"></span>Cargando...</div></div>
+      </div>
+
+    </div>
+
+    <!-- Bottom nav mobile -->
+    <div class="bottom-nav">
+      <div class="bn-item active" onclick="nav('licencias',this)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        Licencias
+      </div>
+      <div class="bn-item" onclick="nav('clientes',this)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        Clientes
+      </div>
+      <div class="bn-item" onclick="nav('terminales',this)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Terminales
+      </div>
+      <div class="bn-item" onclick="nav('reportes',this)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Reportes
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL NUEVA / EDITAR LICENCIA ── -->
+<div class="modal-ov" id="modalOv" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modalTitle">Nueva licencia</div>
+
+    <div class="mfi">
+      <label>Clave de licencia</label>
+      <div style="display:flex;gap:8px;">
+        <input id="mClave" placeholder="PRO-2025-XXXX" style="flex:1;text-transform:uppercase;font-weight:700;letter-spacing:1px;" oninput="this.value=this.value.toUpperCase()">
+        <button class="gen-btn" onclick="generarClave()">🎲 GENERAR</button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="mfi">
+        <label>Plan</label>
+        <select id="mPlan" onchange="generarClave()">
+          <option value="1">Básico — 1 disp.</option>
+          <option value="2" selected>Pro — 3 disp.</option>
+          <option value="3">Completo — ilim.</option>
+        </select>
+      </div>
+      <div class="mfi">
+        <label>Tipo / Rubro</label>
+        <select id="mRubro">
+          <option value="">General</option>
+          <option value="gastronomia">Gastronomía</option>
+          <option value="kiosco">Kiosco / Almacén</option>
+          <option value="ropa">Ropa / Indumentaria</option>
+          <option value="farmacia">Farmacia</option>
+          <option value="ferreteria">Ferretería</option>
+          <option value="electronica">Electrónica</option>
+          <option value="supermercado">Supermercado</option>
+          <option value="delivery">Delivery</option>
+          <option value="servicios">Servicios</option>
+          <option value="otro">Otro</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="mfi">
+      <label>Nombre del cliente</label>
+      <input id="mNombre" placeholder="Ej: Pizzería Express">
+    </div>
+    <div class="mfi">
+      <label>Email del cliente</label>
+      <input id="mEmail" type="email" placeholder="cliente@email.com">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="mfi">
+        <label>Fecha de vencimiento</label>
+        <input id="mVence" type="date">
+      </div>
+      <div class="mfi">
+        <label>Notas</label>
+        <input id="mNotas" placeholder="Pago anual, etc.">
+      </div>
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn-sec" onclick="closeModal()">CANCELAR</button>
+      <button class="btn-pri" onclick="guardarLic()">GUARDAR LICENCIA</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPA_URL  = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
+const SUPA_ANON = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
+const SA_PASS   = 'admin2025'; // cambiar en producción
+
+let allLics = [];
+let editLicId = null;
+
+// ── UTILS ─────────────────────────────────────────────────
+function toast(m, dur=2200){
+  const t=document.getElementById('toast');
+  t.textContent=m; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), dur);
+}
+const pad=n=>String(n).padStart(2,'0');
+const fmt=f=>{if(!f)return'—';const d=new Date(f);return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();};
+const gs=n=>'₲'+Math.round(n||0).toLocaleString('es-PY');
+
+// ── SUPABASE ──────────────────────────────────────────────
+async function sg(tabla, qs){
+  const r=await fetch(SUPA_URL+'/rest/v1/'+tabla+(qs?'?'+qs:''),{
+    headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Accept':'application/json'}
+  });
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const d=await r.json();
+  return Array.isArray(d)?d:[];
+}
+async function sp(tabla, body){
+  const r=await fetch(SUPA_URL+'/rest/v1/'+tabla,{
+    method:'POST',
+    headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=representation'},
+    body:JSON.stringify(body)
+  });
+  if(!r.ok) throw new Error(await r.text());
+  return await r.json();
+}
+async function spatch(tabla, id, body){
+  const r=await fetch(SUPA_URL+'/rest/v1/'+tabla+'?id=eq.'+id,{
+    method:'PATCH',
+    headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  if(!r.ok) throw new Error(await r.text());
+}
+
+// ── LOGIN ─────────────────────────────────────────────────
+function saLogin(){
+  const u=document.getElementById('saUser').value.trim();
+  const p=document.getElementById('saPass').value;
+  const e=document.getElementById('saErr');
+  if(u==='admin'&&p===SA_PASS){
+    localStorage.setItem('sa_ok','1');
+    document.getElementById('loginWrap').style.display='none';
+    document.getElementById('app').style.display='grid';
+    cargarTodo();
+  } else { e.textContent='Usuario o contraseña incorrectos'; e.style.display='block'; }
+}
+function saLogout(){
+  localStorage.removeItem('sa_ok');
+  document.getElementById('app').style.display='none';
+  document.getElementById('loginWrap').style.display='flex';
+}
+
+// ── NAV ───────────────────────────────────────────────────
+function nav(p, el){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.bn-item,.ds-item').forEach(x=>x.classList.remove('active'));
+  document.getElementById('page'+p.charAt(0).toUpperCase()+p.slice(1)).classList.add('active');
+  // Activate in both navbars
+  document.querySelectorAll('.bn-item,.ds-item').forEach(x=>{ if(x===el||x.textContent.trim().toLowerCase().startsWith(p.substring(0,4))) x.classList.add('active'); });
+  document.getElementById('topPage').textContent=p.charAt(0).toUpperCase()+p.slice(1);
+  if(p==='licencias') loadLics();
+  if(p==='clientes')  loadClientes();
+  if(p==='terminales')loadTerminales();
+  if(p==='reportes')  loadReportes();
+}
+
+// ── CARGAR TODO ───────────────────────────────────────────
+async function cargarTodo(){
+  await loadLics();
+  loadReportes();
+}
+
+// ── LICENCIAS ─────────────────────────────────────────────
+const PLANES = {1:'Básico',2:'Pro',3:'Completo'};
+const RUBROS = {
+  '':'General','gastronomia':'Gastronomía','kiosco':'Kiosco/Almacén',
+  'ropa':'Ropa','farmacia':'Farmacia','ferreteria':'Ferretería',
+  'electronica':'Electrónica','supermercado':'Supermercado',
+  'delivery':'Delivery','servicios':'Servicios','otro':'Otro'
+};
+
+async function loadLics(){
+  try {
+    allLics = await sg('licencias','select=*,planes(nombre)&order=created_at.desc');
+  } catch(e) {
+    allLics = DEMO_LICS;
+  }
+  renderLics(allLics);
+}
+
+function renderLics(lista){
+  document.getElementById('licCount').textContent = lista.length+' licencias';
+  const cont = document.getElementById('licLista');
+  if(!lista.length){
+    cont.innerHTML='<div class="empty"><div class="empty-ico">🔑</div><div class="empty-t">Sin licencias</div><div class="empty-s">Creá la primera licencia</div></div>';
+    return;
+  }
+  const hoy = new Date();
+  cont.innerHTML = lista.map(l=>{
+    const vence  = l.fecha_vence ? new Date(l.fecha_vence) : null;
+    const dias   = vence ? Math.ceil((vence-hoy)/(1000*60*60*24)) : null;
+    const planNom = l.planes?.nombre || PLANES[l.plan_id] || 'Básico';
+    const planCls = l.plan_id===1?'plan-1':l.plan_id===2?'plan-2':'plan-3';
+    const rubro   = l.rubro ? RUBROS[l.rubro]||l.rubro : '';
+    let venceBadge='';
+    if(dias!==null){
+      if(dias<0)      venceBadge=`<span class="lic-badge vence-ya">VENCIDA</span>`;
+      else if(dias<30)venceBadge=`<span class="lic-badge vence-pronto">${dias}d</span>`;
+      else            venceBadge=`<span class="lic-badge vence-ok">${fmt(l.fecha_vence)}</span>`;
+    }
+    return `<div class="lic-card">
+      <div class="lic-card-head">
+        <div class="lic-dot ${l.activa?'active':'inactive'}"></div>
+        <div class="lic-main">
+          <div class="lic-clave">${l.clave}</div>
+          <div class="lic-nombre">${l.nombre_cliente||'Sin nombre'}</div>
+          <div class="lic-email">${l.email_cliente||'—'}</div>
+          <div class="lic-meta">
+            <span class="lic-badge ${planCls}">${planNom}</span>
+            ${rubro?`<span class="lic-badge rubro">📦 ${rubro}</span>`:''}
+            ${venceBadge}
+            ${!l.activa?'<span class="lic-badge" style="background:var(--red2);color:var(--red);">SUSPENDIDA</span>':''}
+          </div>
+        </div>
+      </div>
+      <div class="lic-actions">
+        <button class="lic-action copy" onclick="copiar('${l.clave}')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          COPIAR
+        </button>
+        <button class="lic-action edit" onclick="editarLic(${l.id})">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          EDITAR
+        </button>
+        ${l.activa
+          ? `<button class="lic-action suspend" onclick="suspender(${l.id})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>SUSPENDER</button>`
+          : `<button class="lic-action activate" onclick="activar(${l.id})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>ACTIVAR</button>`
+        }
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filtrLic(q){
+  if(!q){renderLics(allLics);return;}
+  const f=q.toLowerCase();
+  renderLics(allLics.filter(l=>
+    (l.clave||'').toLowerCase().includes(f)||
+    (l.nombre_cliente||'').toLowerCase().includes(f)||
+    (l.email_cliente||'').toLowerCase().includes(f)||
+    (l.rubro||'').toLowerCase().includes(f)
+  ));
+}
+
+async function copiar(clave){
+  try{ await navigator.clipboard.writeText(clave); toast('✓ Clave copiada: '+clave); }
+  catch(e){ toast(clave); }
+}
+
+async function suspender(id){
+  if(!confirm('¿Suspender esta licencia? El cliente perderá acceso en la próxima verificación.')) return;
+  try {
+    await spatch('licencias',id,{activa:false});
+    toast('Licencia suspendida');
+    await loadLics();
+  } catch(e){ toast('Error: '+e.message); }
+}
+
+async function activar(id){
+  try {
+    await spatch('licencias',id,{activa:true});
+    toast('✓ Licencia reactivada');
+    await loadLics();
+  } catch(e){ toast('Error: '+e.message); }
+}
+
+// ── MODAL ─────────────────────────────────────────────────
+function openModal(){
+  editLicId = null;
+  document.getElementById('modalTitle').textContent = 'Nueva licencia';
+  document.getElementById('mNombre').value='';
+  document.getElementById('mEmail').value='';
+  document.getElementById('mNotas').value='';
+  document.getElementById('mRubro').value='';
+  document.getElementById('mPlan').value='2';
+  const hoy=new Date(); hoy.setFullYear(hoy.getFullYear()+1);
+  document.getElementById('mVence').value=hoy.getFullYear()+'-'+pad(hoy.getMonth()+1)+'-'+pad(hoy.getDate());
+  document.getElementById('modalOv').classList.add('open');
+  setTimeout(generarClave, 50);
+}
+
+function editarLic(id){
+  const l = allLics.find(x=>x.id===id);
+  if(!l) return;
+  editLicId = id;
+  document.getElementById('modalTitle').textContent = 'Editar licencia';
+  document.getElementById('mClave').value = l.clave;
+  document.getElementById('mNombre').value = l.nombre_cliente||'';
+  document.getElementById('mEmail').value = l.email_cliente||'';
+  document.getElementById('mNotas').value = l.notas||'';
+  document.getElementById('mPlan').value = l.plan_id||2;
+  document.getElementById('mRubro').value = l.rubro||'';
+  document.getElementById('mVence').value = l.fecha_vence||'';
+  document.getElementById('modalOv').classList.add('open');
+}
+
+function closeModal(){ document.getElementById('modalOv').classList.remove('open'); }
+
+function generarClave(){
+  const planVal = parseInt(document.getElementById('mPlan').value)||2;
+  const prefijos = {1:'BASIC',2:'PRO',3:'FULL'};
+  const prefix = prefijos[planVal]||'PRO';
+  const year = new Date().getFullYear();
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let rand='';
+  for(let i=0;i<4;i++) rand+=chars[Math.floor(Math.random()*chars.length)];
+  document.getElementById('mClave').value = prefix+'-'+year+'-'+rand;
+}
+
+async function guardarLic(){
+  const clave  = document.getElementById('mClave').value.trim().toUpperCase();
+  const planId = parseInt(document.getElementById('mPlan').value);
+  const nombre = document.getElementById('mNombre').value.trim();
+  const email  = document.getElementById('mEmail').value.trim();
+  const vence  = document.getElementById('mVence').value;
+  const notas  = document.getElementById('mNotas').value.trim();
+  const rubro  = document.getElementById('mRubro').value;
+  if(!clave){ toast('Generá o ingresá una clave'); return; }
+  if(!vence){ toast('Seleccioná la fecha de vencimiento'); return; }
+
+  try {
+    if(editLicId){
+      // Editar existente
+      await spatch('licencias', editLicId, {clave,plan_id:planId,nombre_cliente:nombre||null,email_cliente:email||null,fecha_vence:vence,notas:notas||null,rubro:rubro||null});
+      toast('✓ Licencia actualizada');
+    } else {
+      // Nueva
+      await sp('licencias',{clave,plan_id:planId,nombre_cliente:nombre||null,email_cliente:email||null,fecha_vence:vence,notas:notas||null,rubro:rubro||null,activa:true});
+      try{ await navigator.clipboard.writeText(clave); toast('✓ Licencia creada y copiada: '+clave, 3000); }
+      catch(e){ toast('✓ Licencia creada: '+clave, 3000); }
+    }
+    closeModal();
+    await loadLics();
+  } catch(e){
+    // Demo mode
+    toast('DEMO — Clave: '+clave+' (sin Supabase configurado)');
+    closeModal();
+  }
+}
+
+// ── CLIENTES ──────────────────────────────────────────────
+async function loadClientes(){
+  try {
+    const acts = await sg('activaciones','select=*,licencias(clave,rubro,planes(nombre))&order=fecha_activacion.desc');
+    const byEmail={};
+    acts.forEach(a=>{
+      if(!byEmail[a.email])byEmail[a.email]={email:a.email,negocio:a.nombre_negocio,plan:a.licencias?.planes?.nombre||'—',rubro:a.licencias?.rubro||'',terms:0,ultima:null};
+      byEmail[a.email].terms++;
+      if(!byEmail[a.email].ultima||a.ultima_consulta>byEmail[a.email].ultima)byEmail[a.email].ultima=a.ultima_consulta;
+    });
+    const lista = Object.values(byEmail);
+    document.getElementById('clientesLista').innerHTML = lista.length ? lista.map(c=>`
+      <div class="list-item">
+        <div class="li-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+        <div class="li-info">
+          <div class="li-title">${c.negocio||'Sin nombre'}</div>
+          <div class="li-sub">${c.email} · ${c.plan}${c.rubro?' · '+RUBROS[c.rubro]||c.rubro:''}</div>
+        </div>
+        <div class="li-right">
+          <div class="li-value" style="color:var(--green)">${c.terms}</div>
+          <div class="li-sub2">terminales</div>
+        </div>
+      </div>`).join('')
+    : '<div class="empty"><div class="empty-ico">👥</div><div class="empty-t">Sin clientes</div><div class="empty-s">Las activaciones aparecerán aquí</div></div>';
+  } catch(e){
+    document.getElementById('clientesLista').innerHTML='<div class="loading">Sin datos o sin conexión</div>';
+  }
+}
+
+// ── TERMINALES ────────────────────────────────────────────
+async function loadTerminales(){
+  try {
+    const terms = await sg('activaciones','select=*,licencias(clave)&order=ultima_consulta.desc');
+    const hoy=new Date();
+    document.getElementById('termLista').innerHTML = terms.length ? terms.map(t=>{
+      const ul=t.ultima_consulta?new Date(t.ultima_consulta):null;
+      const online=ul&&(hoy-ul)<25*3600000;
+      return `<div class="list-item">
+        <div class="li-icon" style="background:${online?'var(--green2)':'#1e1e1e'};color:${online?'var(--green)':'#444'}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <div class="li-info">
+          <div class="li-title">${t.nombre_terminal||t.nombre_negocio||'Terminal'}</div>
+          <div class="li-sub">${t.sucursal||'—'} · ${t.email}</div>
+        </div>
+        <div class="li-right">
+          <span class="lic-badge ${online?'vence-ok':''}${!online?'" style="background:#1e1e1e;color:var(--muted)"':'"'}>${online?'Online':'Offline'}</span>
+          <div class="li-sub2" style="margin-top:4px;">${t.ultima_consulta?fmt(t.ultima_consulta):'—'}</div>
+        </div>
+      </div>`;
+    }).join('')
+    :'<div class="empty"><div class="empty-ico">💻</div><div class="empty-t">Sin terminales</div><div class="empty-s">Se muestran al activar la app POS</div></div>';
+  } catch(e){
+    document.getElementById('termLista').innerHTML='<div class="loading">Sin datos</div>';
+  }
+}
+
+// ── REPORTES ──────────────────────────────────────────────
+async function loadReportes(){
+  try {
+    const lics  = await sg('licencias','select=id,activa,fecha_vence,rubro');
+    const terms = await sg('activaciones','select=id,activa');
+    const hoy=new Date(),fin=new Date(hoy.getFullYear(),hoy.getMonth()+1,0);
+    const activas   = lics.filter(l=>l.activa).length;
+    const suspendidas = lics.filter(l=>!l.activa).length;
+    const vencen    = lics.filter(l=>{const v=new Date(l.fecha_vence);return l.activa&&v>=hoy&&v<=fin;}).length;
+    document.getElementById('rLicA').textContent  = activas;
+    document.getElementById('rTerm').textContent  = terms.filter(t=>t.activa).length;
+    document.getElementById('rVence').textContent = vencen;
+    document.getElementById('rSusp').textContent  = suspendidas;
+    // Por rubro
+    const porRubro={};
+    lics.forEach(l=>{ const r=l.rubro||'general'; if(!porRubro[r])porRubro[r]=0; porRubro[r]++; });
+    document.getElementById('repLista').innerHTML =
+      '<div style="margin-top:16px;"><div style="font-size:12px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;font-weight:700;margin-bottom:12px;">Por rubro</div>'+
+      Object.entries(porRubro).sort((a,b)=>b[1]-a[1]).map(([r,c])=>`
+        <div class="list-item">
+          <div class="li-info"><div class="li-title">${RUBROS[r]||r.charAt(0).toUpperCase()+r.slice(1)}</div></div>
+          <div class="li-right"><div class="li-value" style="color:var(--green)">${c}</div><div class="li-sub2">licencias</div></div>
+        </div>`).join('')+'</div>';
+  } catch(e){
+    document.getElementById('rLicA').textContent='—';
+  }
+}
+
+// ── DEMO DATA ─────────────────────────────────────────────
+const DEMO_LICS=[
+  {id:1,clave:'DEMO-2025-XXXX',nombre_cliente:'Cliente Demo',email_cliente:'demo@test.com',plan_id:1,fecha_vence:'2026-12-31',activa:true,rubro:'gastronomia',planes:{nombre:'Básico'}},
+  {id:2,clave:'PRO-2025-ABCD', nombre_cliente:'Pizzería Express',email_cliente:'pizza@test.com',plan_id:2,fecha_vence:'2025-06-30',activa:true,rubro:'gastronomia',planes:{nombre:'Pro'}},
+  {id:3,clave:'FULL-2025-ZZZZ',nombre_cliente:'Cadena Burguer',email_cliente:'burguer@test.com',plan_id:3,fecha_vence:'2025-12-31',activa:false,rubro:'otro',planes:{nombre:'Completo'}},
+];
+
+// ── AUTO LOGIN ────────────────────────────────────────────
+if(localStorage.getItem('sa_ok')){
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('app').style.display='grid';
+  cargarTodo();
+}
+</script>
+</body>
+</html>
