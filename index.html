@@ -2564,7 +2564,31 @@ function doOpenShift(){
   turnoData.ventas = [];
   turnoData.egresos = [];
   turnoData.ingresos = [];
+  // Guardar apertura en Supabase
+  supaInsertTurno('abierto', v);
+  if(db) dbAbrirTurno(v);
   goTo('scSale'); renderP(PRODS); toast('Turno abierto ✓');
+}
+
+function supaInsertTurno(estado, efectivoInicial){
+  const email = localStorage.getItem('lic_email');
+  if(!email) return;
+  const data = {
+    fecha_apertura:   new Date().toISOString(),
+    efectivo_inicial: efectivoInicial || 0,
+    estado:           estado,
+    terminal:         localStorage.getItem('pos_terminal') || 'Terminal 1',
+    sucursal:         localStorage.getItem('pos_sucursal') || 'Principal',
+    licencia_email:   email,
+    total_vendido:    0,
+  };
+  fetch(SUPA_URL+'/rest/v1/pos_turno',{
+    method:'POST',
+    headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=representation'},
+    body: JSON.stringify(data)
+  }).then(r=>r.json()).then(rows=>{
+    if(rows&&rows[0]) turnoData.supaId = rows[0].id;
+  }).catch(e=>console.warn('[Turno] Error Supabase:', e.message));
 }
 function goCobrar(){
   const t=calcTotal(); if(!t){toast('Agregá productos primero');return;}
@@ -3526,14 +3550,107 @@ let turnoData = {
 // Registrar venta en el turno al confirmar pago
 function registrarVentaEnTurno(data){
   turnoData.ventas.push({
-    items: data.items,
-    total: data.total,
-    metodo: data.metodo,
+    items:       data.items,
+    total:       data.total,
+    metodo:      data.metodo,
     comprobante: data.comprobante,
-    factura: data.factura,
-    fecha: data.fecha,
-    nroTicket: data.nroTicket,
+    factura:     data.factura,
+    fecha:       data.fecha,
+    nroTicket:   data.nroTicket,
   });
+  // Guardar en Supabase en background
+  supaInsertVenta(data);
+}
+
+// Insertar venta en Supabase (en background, no bloquea la UI)
+function supaInsertVenta(data){
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+
+  const venta = {
+    fecha:          (data.fecha || new Date()).toISOString(),
+    turno_id:       turnoData.dbId || null,
+    terminal:       licGetTerminal(),
+    sucursal:       localStorage.getItem('pos_sucursal') || 'Principal',
+    licencia_email: email,
+    total:          data.total || 0,
+    metodo_pago:    (data.metodo || 'EFECTIVO').toUpperCase(),
+    comprobante:    data.comprobante || '',
+    items:          JSON.stringify((data.items||[]).map(i=>({
+                      id:     i.id,
+                      nombre: i.name,
+                      qty:    i.qty,
+                      precio: i.price,
+                      obs:    i.obs||''
+                    }))),
+    tiene_factura:  !!(data.factura && data.factura.ruc),
+    factura_ruc:    data.factura ? (data.factura.ruc||'')   : '',
+    factura_nombre: data.factura ? (data.factura.nombre||'') : '',
+  };
+
+  // También guardar en IndexedDB local
+  if(db) dbSaveVenta({
+    ...data,
+    turnoId: turnoData.dbId,
+  });
+
+  // Enviar a Supabase
+  if(USAR_DEMO || !navigator.onLine){
+    // Sin conexión — encolar para sync posterior
+    if(db) dbQueueSync('ventas','insert', venta);
+    return;
+  }
+
+  fetch(SUPA_URL+'/rest/v1/pos_ventas', {
+    method:  'POST',
+    headers: {
+      'apikey':          SUPA_ANON,
+      'Authorization':   'Bearer '+SUPA_ANON,
+      'Content-Type':    'application/json',
+      'Prefer':          'return=minimal',
+    },
+    body: JSON.stringify(venta)
+  })
+  .then(r => {
+    if(!r.ok) return r.text().then(t => { throw new Error(t); });
+    console.log('[Venta] Guardada en Supabase OK');
+  })
+  .catch(e => {
+    console.warn('[Venta] Error Supabase, encolando:', e.message);
+    if(db) dbQueueSync('ventas','insert', venta);
+  });
+}
+
+// Sincronizar ventas pendientes de la cola
+async function syncVentasPendientes(){
+  if(!db || !navigator.onLine || USAR_DEMO) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+  try {
+    const pending = await db.sync_queue
+      .where('sincronizado').equals(0)
+      .filter(r => r.tabla === 'ventas')
+      .limit(20)
+      .toArray();
+
+    for(const item of pending){
+      try {
+        const datos = JSON.parse(item.datos);
+        datos.licencia_email = email;
+        const res = await fetch(SUPA_URL+'/rest/v1/pos_ventas', {
+          method:  'POST',
+          headers: {
+            'apikey':        SUPA_ANON,
+            'Authorization': 'Bearer '+SUPA_ANON,
+            'Content-Type':  'application/json',
+            'Prefer':        'return=minimal',
+          },
+          body: JSON.stringify(datos)
+        });
+        if(res.ok) await db.sync_queue.update(item.id, { sincronizado: 1 });
+      } catch(e){ break; } // sin internet, parar
+    }
+  } catch(e){ console.warn('[Sync ventas]', e.message); }
 }
 
 function renderTurno(){
@@ -5150,9 +5267,12 @@ async function supaFetch(method, tabla, body, params){
 
 // Sincronizar cada 2 minutos cuando hay internet
 setInterval(syncConSupabase, 2 * 60 * 1000);
+// También sync ventas pendientes cada 5 minutos
+setInterval(syncVentasPendientes, 5 * 60 * 1000);
 window.addEventListener('online', () => {
   console.log('[Sync] Conexion detectada, sincronizando...');
   setTimeout(syncConSupabase, 2000);
+  setTimeout(syncVentasPendientes, 4000);
 });
 
 // ══════════════════════════════════════════════════════════
@@ -5447,6 +5567,7 @@ async function iniciarApp(){
 
   // Sincronizar en background
   setTimeout(syncConSupabase, 5000);
+  setTimeout(syncVentasPendientes, 8000);
 }
 
 // ── ARRANQUE ──────────────────────────────────────────────
