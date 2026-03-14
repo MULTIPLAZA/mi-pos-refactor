@@ -224,10 +224,16 @@
     <div class="modal-title">Nueva licencia</div>
     <div class="form-group">
       <label class="form-label">Clave de licencia</label>
-      <div style="display:flex;gap:8px;">
-        <input class="form-input" id="mClave" placeholder="PRO-2025-XXXX" style="flex:1;text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
-        <button class="btn btn-outline btn-sm" onclick="generarClave()" style="white-space:nowrap;">GENERAR</button>
+      <div style="display:flex;gap:8px;margin-bottom:6px;">
+        <input class="form-input" id="mClave" placeholder="Presioná GENERAR →"
+          style="flex:1;text-transform:uppercase;font-weight:700;letter-spacing:1px;font-size:15px;"
+          oninput="this.value=this.value.toUpperCase()">
+        <button onclick="generarClave()"
+          style="background:#4caf50;border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:12px;font-weight:800;letter-spacing:.5px;padding:10px 16px;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+          🎲 GENERAR
+        </button>
       </div>
+      <div style="font-size:11px;color:#555;">La clave se copia automáticamente al guardar</div>
     </div>
     <div class="form-group">
       <label class="form-label">Plan</label>
@@ -448,24 +454,36 @@ async function reactivarLicencia(id){
 
 // ── NUEVA LICENCIA ────────────────────────────────────────
 function openModalNuevaLicencia(){
-  generarClave();
+  // Limpiar campos primero
+  document.getElementById('mNombre').value='';
+  document.getElementById('mEmail').value='';
+  document.getElementById('mNotas').value='';
+  document.getElementById('mClave').value='';
+  // Fecha de vencimiento: 1 año desde hoy
   const hoy = new Date();
   hoy.setFullYear(hoy.getFullYear()+1);
   const pad = n=>String(n).padStart(2,'0');
   document.getElementById('mVence').value = hoy.getFullYear()+'-'+pad(hoy.getMonth()+1)+'-'+pad(hoy.getDate());
-  document.getElementById('mNombre').value='';
-  document.getElementById('mEmail').value='';
-  document.getElementById('mNotas').value='';
+  // Abrir modal primero para que los elementos existan
   document.getElementById('modalLicencia').classList.add('open');
+  // Generar clave después de que el modal esté visible
+  setTimeout(()=>generarClave(), 50);
 }
 
 function generarClave(){
-  const planes = ['BASIC','PRO','FULL'];
-  const plan = document.getElementById('mPlan');
-  const prefix = plan ? planes[parseInt(plan.value)-1] : 'PRO';
+  const planEl = document.getElementById('mPlan');
+  const planVal = planEl ? parseInt(planEl.value) : 2;
+  const prefijos = {1:'BASIC', 2:'PRO', 3:'FULL'};
+  const prefix = prefijos[planVal] || 'PRO';
   const year = new Date().getFullYear();
-  const rand = Math.random().toString(36).toUpperCase().slice(2,6);
-  document.getElementById('mClave').value = prefix+'-'+year+'-'+rand;
+  // Generar 4 caracteres aleatorios alfanuméricos
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let rand = '';
+  for(let i=0;i<4;i++) rand += chars[Math.floor(Math.random()*chars.length)];
+  const clave = prefix+'-'+year+'-'+rand;
+  const input = document.getElementById('mClave');
+  if(input){ input.value = clave; input.style.borderColor='#4caf50'; }
+  return clave;
 }
 
 async function guardarLicencia(){
@@ -475,14 +493,30 @@ async function guardarLicencia(){
   const email  = document.getElementById('mEmail').value.trim();
   const vence  = document.getElementById('mVence').value;
   const notas  = document.getElementById('mNotas').value.trim();
-  if(!clave||!vence){ toast('Completá clave y fecha'); return; }
+  if(!clave){ toast('Generá o ingresá una clave'); return; }
+  if(!vence){ toast('Seleccioná la fecha de vencimiento'); return; }
+
   try {
-    await supaPost('licencias',{clave,plan_id:planId,nombre_cliente:nombre,email_cliente:email,fecha_vence:vence,notas,activa:true});
+    await supaPost('licencias',{
+      clave, plan_id:planId,
+      nombre_cliente:nombre||'Sin nombre',
+      email_cliente:email||'',
+      fecha_vence:vence,
+      notas, activa:true
+    });
     document.getElementById('modalLicencia').classList.remove('open');
-    toast('✓ Licencia creada: '+clave);
+    // Copiar clave al portapapeles automáticamente
+    try { await navigator.clipboard.writeText(clave); } catch(e){}
+    toast('✓ Licencia creada y copiada: '+clave);
     await cargarLicencias();
     await cargarKPIs();
-  } catch(e){ toast('Error: '+e.message); }
+  } catch(e){
+    // Modo demo: solo mostrar la clave generada
+    const msg = 'DEMO — Clave generada: '+clave+'\n\nCuando conectes Supabase se guardará automáticamente.';
+    alert(msg);
+    try { await navigator.clipboard.writeText(clave); toast('Clave copiada: '+clave); } catch(ex){}
+    document.getElementById('modalLicencia').classList.remove('open');
+  }
 }
 
 // ── CLIENTES ──────────────────────────────────────────────
