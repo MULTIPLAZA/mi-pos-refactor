@@ -314,6 +314,21 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:var(--text);min-
         </select>
       </div>
       <div class="mfi">
+        <label>Tipo de pago</label>
+        <select id="mTipoPago">
+          <option value="anual">🔁 Anual (recurrente)</option>
+          <option value="mensual">📅 Mensual (recurrente)</option>
+          <option value="unico">💰 Pago único</option>
+          <option value="trial">🎁 Trial / Prueba</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="mfi">
+        <label>Monto cobrado (₲)</label>
+        <input id="mMonto" type="number" placeholder="0" min="0">
+      </div>
+      <div class="mfi">
         <label>Tipo / Rubro</label>
         <select id="mRubro">
           <option value="">General</option>
@@ -329,6 +344,7 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:var(--text);min-
           <option value="otro">Otro</option>
         </select>
       </div>
+    </div>
     </div>
 
     <div class="mfi">
@@ -491,6 +507,7 @@ function renderLics(lista){
           <div class="lic-meta">
             <span class="lic-badge ${planCls}">${planNom}</span>
             ${rubro?`<span class="lic-badge rubro">📦 ${rubro}</span>`:''}
+            ${l.tipo_pago?`<span class="lic-badge" style="background:#1e1e1e;color:#777;">${l.tipo_pago==='mensual'?'📅 Mensual':l.tipo_pago==='unico'?'💰 Único':l.tipo_pago==='trial'?'🎁 Trial':'🔁 Anual'}</span>`:''}
             ${venceBadge}
             ${!l.activa?'<span class="lic-badge" style="background:var(--red2);color:var(--red);">SUSPENDIDA</span>':''}
           </div>
@@ -507,7 +524,7 @@ function renderLics(lista){
         </button>
         ${l.activa
           ? `<button class="lic-action suspend" onclick="suspender(${l.id})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>SUSPENDER</button>`
-          : `<button class="lic-action activate" onclick="activar(${l.id})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>ACTIVAR</button>`
+          : `<button class="lic-action activate" onclick="activar(${l.id})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>RENOVAR</button>`
         }
       </div>
     </div>`;
@@ -540,12 +557,19 @@ async function suspender(id){
 }
 
 async function activar(id){
-  try {
-    await spatch('licencias',id,{activa:true});
-    toast('✓ Licencia reactivada');
-    await loadLics();
-  } catch(e){ toast('Error: '+e.message); }
+  // Abrir modal de renovación para actualizar fecha y reactivar
+  editarLic(id, true);
 }
+
+async function confirmarReactivar(){
+  // guardarLic ya maneja la actualización + reactivar
+  // Solo asegurar que activa=true se incluye en el patch
+  reactivarEnGuardar = true;
+  await guardarLic();
+  reactivarEnGuardar = false;
+}
+
+let reactivarEnGuardar = false;
 
 // ── MODAL ─────────────────────────────────────────────────
 function openModal(){
@@ -556,24 +580,39 @@ function openModal(){
   document.getElementById('mNotas').value='';
   document.getElementById('mRubro').value='';
   document.getElementById('mPlan').value='2';
+  document.getElementById('mTipoPago').value='anual';
+  document.getElementById('mMonto').value='';
   const hoy=new Date(); hoy.setFullYear(hoy.getFullYear()+1);
   document.getElementById('mVence').value=hoy.getFullYear()+'-'+pad(hoy.getMonth()+1)+'-'+pad(hoy.getDate());
   document.getElementById('modalOv').classList.add('open');
   setTimeout(generarClave, 50);
 }
 
-function editarLic(id){
+function editarLic(id, renovar){
   const l = allLics.find(x=>x.id===id);
   if(!l) return;
   editLicId = id;
-  document.getElementById('modalTitle').textContent = 'Editar licencia';
+  document.getElementById('modalTitle').textContent = renovar ? '🔄 Renovar licencia' : 'Editar licencia';
   document.getElementById('mClave').value = l.clave;
   document.getElementById('mNombre').value = l.nombre_cliente||'';
   document.getElementById('mEmail').value = l.email_cliente||'';
   document.getElementById('mNotas').value = l.notas||'';
   document.getElementById('mPlan').value = l.plan_id||2;
   document.getElementById('mRubro').value = l.rubro||'';
-  document.getElementById('mVence').value = l.fecha_vence||'';
+  document.getElementById('mTipoPago').value = l.tipo_pago||'anual';
+  document.getElementById('mMonto').value = l.monto||'';
+
+  // Si es renovación, calcular nueva fecha según tipo de pago
+  if(renovar){
+    const hoy = new Date();
+    const tp = l.tipo_pago||'anual';
+    if(tp==='mensual') hoy.setMonth(hoy.getMonth()+1);
+    else if(tp==='anual') hoy.setFullYear(hoy.getFullYear()+1);
+    else hoy.setFullYear(hoy.getFullYear()+1);
+    document.getElementById('mVence').value = hoy.getFullYear()+'-'+pad(hoy.getMonth()+1)+'-'+pad(hoy.getDate());
+  } else {
+    document.getElementById('mVence').value = l.fecha_vence||'';
+  }
   document.getElementById('modalOv').classList.add('open');
 }
 
@@ -591,32 +630,45 @@ function generarClave(){
 }
 
 async function guardarLic(){
-  const clave  = document.getElementById('mClave').value.trim().toUpperCase();
-  const planId = parseInt(document.getElementById('mPlan').value);
-  const nombre = document.getElementById('mNombre').value.trim();
-  const email  = document.getElementById('mEmail').value.trim();
-  const vence  = document.getElementById('mVence').value;
-  const notas  = document.getElementById('mNotas').value.trim();
-  const rubro  = document.getElementById('mRubro').value;
+  const clave     = document.getElementById('mClave').value.trim().toUpperCase();
+  const planId    = parseInt(document.getElementById('mPlan').value);
+  const nombre    = document.getElementById('mNombre').value.trim();
+  const email     = document.getElementById('mEmail').value.trim();
+  const vence     = document.getElementById('mVence').value;
+  const notas     = document.getElementById('mNotas').value.trim();
+  const rubro     = document.getElementById('mRubro').value;
+  const tipoPago  = document.getElementById('mTipoPago').value;
+  const monto     = parseInt(document.getElementById('mMonto').value)||0;
   if(!clave){ toast('Generá o ingresá una clave'); return; }
   if(!vence){ toast('Seleccioná la fecha de vencimiento'); return; }
 
+  const data = {
+    clave, plan_id:planId,
+    nombre_cliente: nombre||null,
+    email_cliente:  email||null,
+    fecha_vence:    vence,
+    notas:          notas||null,
+    rubro:          rubro||null,
+    tipo_pago:      tipoPago,
+    monto:          monto||null,
+  };
+
   try {
     if(editLicId){
-      // Editar existente
-      await spatch('licencias', editLicId, {clave,plan_id:planId,nombre_cliente:nombre||null,email_cliente:email||null,fecha_vence:vence,notas:notas||null,rubro:rubro||null});
-      toast('✓ Licencia actualizada');
+      if(reactivarEnGuardar) data.activa = true;
+      await spatch('licencias', editLicId, data);
+      toast(reactivarEnGuardar ? '✓ Licencia renovada y reactivada' : '✓ Licencia actualizada');
     } else {
-      // Nueva
-      await sp('licencias',{clave,plan_id:planId,nombre_cliente:nombre||null,email_cliente:email||null,fecha_vence:vence,notas:notas||null,rubro:rubro||null,activa:true});
-      try{ await navigator.clipboard.writeText(clave); toast('✓ Licencia creada y copiada: '+clave, 3000); }
+      data.activa = true;
+      await sp('licencias', data);
+      try{ await navigator.clipboard.writeText(clave); toast('✓ Creada y copiada: '+clave, 3000); }
       catch(e){ toast('✓ Licencia creada: '+clave, 3000); }
     }
     closeModal();
     await loadLics();
+    if(reactivarEnGuardar) loadReportes();
   } catch(e){
-    // Demo mode
-    toast('DEMO — Clave: '+clave+' (sin Supabase configurado)');
+    toast('DEMO — Clave: '+clave);
     closeModal();
   }
 }
@@ -691,11 +743,29 @@ async function loadReportes(){
     document.getElementById('rTerm').textContent  = terms.filter(t=>t.activa).length;
     document.getElementById('rVence').textContent = vencen;
     document.getElementById('rSusp').textContent  = suspendidas;
+    // Por tipo de pago
+    const porTipo={unico:0,mensual:0,anual:0,trial:0};
+    const montoTipo={unico:0,mensual:0,anual:0};
+    lics.forEach(l=>{
+      const t=l.tipo_pago||'anual';
+      if(porTipo[t]!==undefined) porTipo[t]++;
+      if(l.monto && montoTipo[t]!==undefined) montoTipo[t]+=l.monto;
+    });
+
     // Por rubro
     const porRubro={};
     lics.forEach(l=>{ const r=l.rubro||'general'; if(!porRubro[r])porRubro[r]=0; porRubro[r]++; });
+
     document.getElementById('repLista').innerHTML =
-      '<div style="margin-top:16px;"><div style="font-size:12px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;font-weight:700;margin-bottom:12px;">Por rubro</div>'+
+      '<div style="margin-bottom:20px;">'+
+      '<div style="font-size:12px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;font-weight:700;margin-bottom:12px;">Por tipo de pago</div>'+
+      `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:8px;">
+        <div class="kcard" style="--kc:var(--green)"><div class="kc-l">Anual</div><div class="kc-v">${porTipo.anual}</div><div class="kc-s">${gs(montoTipo.anual)}/año</div></div>
+        <div class="kcard" style="--kc:var(--blue)"><div class="kc-l">Mensual</div><div class="kc-v">${porTipo.mensual}</div><div class="kc-s">${gs(montoTipo.mensual)}/mes</div></div>
+        <div class="kcard" style="--kc:var(--orange)"><div class="kc-l">Pago único</div><div class="kc-v">${porTipo.unico}</div><div class="kc-s">${gs(montoTipo.unico)} total</div></div>
+        <div class="kcard" style="--kc:#666"><div class="kc-l">Trial</div><div class="kc-v">${porTipo.trial}</div><div class="kc-s">Sin cobro</div></div>
+      </div>`+
+      '<div style="font-size:12px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;font-weight:700;margin:16px 0 12px;">Por rubro</div>'+
       Object.entries(porRubro).sort((a,b)=>b[1]-a[1]).map(([r,c])=>`
         <div class="list-item">
           <div class="li-info"><div class="li-title">${RUBROS[r]||r.charAt(0).toUpperCase()+r.slice(1)}</div></div>

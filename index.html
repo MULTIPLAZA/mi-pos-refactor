@@ -2557,8 +2557,18 @@ let cart=[], curCat='Todos los artículos', showTkt=false, npCtx='', npVal='';
 
 // NAV
 function goTo(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
-function doOpenShift(){
+async function doOpenShift(){
   const v = parseInt(document.getElementById('shiftDisp').textContent.replace(/[₲.,]/g,''))||0;
+
+  // Verificar licencia antes de abrir turno (si hay internet)
+  if(navigator.onLine){
+    const btn = document.querySelector('#scShift .shift-open-btn') || document.querySelector('[onclick="doOpenShift()"]');
+    if(btn){ btn.textContent='Verificando...'; btn.disabled=true; }
+    const ok = await licVerificarAhora();
+    if(btn){ btn.textContent='ABRIR EL TURNO'; btn.disabled=false; }
+    if(!ok) return; // licMostrarBloqueo ya fue llamado
+  }
+
   turnoData.fechaApertura = new Date();
   turnoData.efectivoInicial = v;
   turnoData.ventas = [];
@@ -5267,6 +5277,10 @@ async function supaFetch(method, tabla, body, params){
 
 // Sincronizar cada 2 minutos cuando hay internet
 setInterval(syncConSupabase, 2 * 60 * 1000);
+// Verificar licencia cada 30 minutos en background
+setInterval(function(){
+  if(navigator.onLine && licIsActivated()) licVerificarAhora();
+}, 30 * 60 * 1000);
 // También sync ventas pendientes cada 5 minutos
 setInterval(syncVentasPendientes, 5 * 60 * 1000);
 window.addEventListener('online', () => {
@@ -5375,15 +5389,31 @@ async function licCheckPeriodico(){
   if(!licIsActivated()) return;
   const next=parseInt(localStorage.getItem(SK.nextCheck)||'0');
   if(Date.now()<next) return;
+  await licVerificarAhora();
+}
+
+// Verificación forzada — llama al servidor sin importar el timer
+async function licVerificarAhora(){
+  if(!licIsActivated()) return false;
+  if(!navigator.onLine) return true; // sin internet, tolerar
   try {
     const activa=await licVerificarServidor();
-    if(!activa){ localStorage.removeItem(SK.activated); licMostrarBloqueo('SUSPENDIDA'); return; }
-    localStorage.setItem(SK.nextCheck,String(Date.now()+24*60*60*1000));
+    if(!activa){
+      localStorage.removeItem(SK.activated);
+      licMostrarBloqueo('SUSPENDIDA');
+      return false;
+    }
+    // Verificación exitosa: resetear timer y fallos
+    localStorage.setItem(SK.nextCheck, String(Date.now()+24*60*60*1000));
     localStorage.setItem(SK.fallos,'0');
+    return true;
   } catch(e){
+    // Error de red — tolerar hasta 3 intentos fallidos consecutivos
     const fallos=parseInt(localStorage.getItem(SK.fallos)||'0')+1;
     localStorage.setItem(SK.fallos,String(fallos));
+    console.warn('[Licencia] Fallo #'+fallos+': '+e.message);
     if(fallos>=3) licMostrarBloqueo('SIN_CONEXION');
+    return true; // tolerar si no hay internet
   }
 }
 
@@ -5406,7 +5436,15 @@ async function licInit(){
     document.getElementById('scActivacion').style.display='flex';
     return false;
   }
-  await licCheckPeriodico();
+  // Siempre verificar al abrir si hay internet
+  // No esperar el timer de 24hs para detectar suspensión inmediata
+  if(navigator.onLine){
+    const ok = await licVerificarAhora();
+    if(!ok) return false;
+  } else {
+    // Sin internet: verificar si el timer expiró (tolerancia offline)
+    await licCheckPeriodico();
+  }
   const neg=localStorage.getItem(SK.negocio);
   if(neg&&typeof configData!=='undefined') configData.negocio=neg;
   return true;
