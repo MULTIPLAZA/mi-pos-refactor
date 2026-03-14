@@ -2574,6 +2574,9 @@ async function doOpenShift(){
   turnoData.ventas = [];
   turnoData.egresos = [];
   turnoData.ingresos = [];
+  turnoData.supaId = null;
+  // Persistir apertura en localStorage
+  turnoGuardar();
   // Guardar apertura en Supabase
   supaInsertTurno('abierto', v);
   if(db) dbAbrirTurno(v);
@@ -2876,6 +2879,7 @@ function doGuardar(){
     currentTicketNro = null;
     updUI();
     updBtnGuardar();
+    try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){}
     goTo('scSale');
     toast('✓ Ticket #' + String(nro).padStart(4,'0') + ' guardado');
   }
@@ -2942,6 +2946,7 @@ function cargarTicket(i){
 }
 
 function nuevaVenta(){
+  try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){}
   const totalActual = calcTotal();
   if(totalActual > 0){
     // guardar la venta actual automáticamente
@@ -3173,6 +3178,7 @@ function confirmarPago(){
     if(idx >= 0) pendientes.splice(idx, 1);
     currentTicketNro = null;
   }
+  try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){}
   cart=[];
   updUI();
   updBtnGuardar();
@@ -3558,6 +3564,41 @@ let turnoData = {
 };
 
 // Registrar venta en el turno al confirmar pago
+// ══════════════════════════════════════════════════════
+// PERSISTENCIA DE TURNO EN localStorage
+// ══════════════════════════════════════════════════════
+const TURNO_KEY = 'pos_turno_activo';
+
+function turnoGuardar(){
+  try {
+    localStorage.setItem(TURNO_KEY, JSON.stringify(turnoData));
+  } catch(e){ console.warn('[Turno] Error guardando:', e.message); }
+}
+
+function turnoRestaurar(){
+  try {
+    const raw = localStorage.getItem(TURNO_KEY);
+    if(!raw) return false;
+    const data = JSON.parse(raw);
+    if(!data || !data.fechaApertura) return false;
+    // Restaurar fechas como objetos Date
+    if(data.fechaApertura) data.fechaApertura = new Date(data.fechaApertura);
+    if(data.ventas) data.ventas.forEach(v=>{ if(v.fecha) v.fecha = new Date(v.fecha); });
+    if(data.egresos) data.egresos.forEach(e=>{ if(e.fecha) e.fecha = new Date(e.fecha); });
+    Object.assign(turnoData, data);
+    console.log('[Turno] Restaurado — '+turnoData.ventas.length+' ventas, abierto: '+turnoData.fechaApertura);
+    return true;
+  } catch(e){
+    console.warn('[Turno] Error restaurando:', e.message);
+    localStorage.removeItem(TURNO_KEY);
+    return false;
+  }
+}
+
+function turnoBorrar(){
+  localStorage.removeItem(TURNO_KEY);
+}
+
 function registrarVentaEnTurno(data){
   turnoData.ventas.push({
     items:       data.items,
@@ -3568,6 +3609,8 @@ function registrarVentaEnTurno(data){
     fecha:       data.fecha,
     nroTicket:   data.nroTicket,
   });
+  // Persistir en localStorage (sobrevive al cerrar la app)
+  turnoGuardar();
   // Guardar en Supabase en background
   supaInsertVenta(data);
 }
@@ -3780,6 +3823,7 @@ function guardarEgreso(){
   if(!desc){ toast('Ingresá la descripción'); return; }
   if(!monto){ toast('Ingresá el monto'); return; }
   turnoData.egresos.push({ desc, monto, fecha: new Date() });
+  turnoGuardar(); // persistir
   document.getElementById('egresoModal').classList.remove('open');
   renderTurno();
   toast('✓ Egreso registrado');
@@ -4550,6 +4594,7 @@ function buildCierreTicket(){
 function confirmarCierre(){
   buildCierreTicket();
   document.getElementById('previewPapel').innerHTML = cierreTicketHTML;
+  turnoBorrar();
   turnoData = { fechaApertura: null, efectivoInicial: 0, ventas: [], egresos: [], ingresos: [] };
   cierreMetodos = {};
   goTo('scPreviewCierre');
@@ -5601,6 +5646,21 @@ async function iniciarApp(){
     await dbLoadCategorias();
     await dbLoadProductos();
     renderP(PRODS);
+  }
+
+  // Restaurar tickets pendientes
+  try {
+    const rp=localStorage.getItem('pos_pendientes');
+    if(rp){ const sp=JSON.parse(rp); if(Array.isArray(sp)&&sp.length>0){ pendientes=sp; const mx=sp.reduce((m,p)=>Math.max(m,p.nro||0),0); if(mx>=ticketCounter)ticketCounter=mx+1; console.log('[App] '+sp.length+' pendientes restaurados'); }}
+  } catch(e){}
+
+  // Restaurar turno activo
+  const turnoOk = turnoRestaurar();
+  if(turnoOk){
+    goTo('scSale');
+    toast('Sesión restaurada — '+turnoData.ventas.length+' venta'+(turnoData.ventas.length!==1?'s':''));
+  } else {
+    goTo('scClosed');
   }
 
   // Sincronizar en background
