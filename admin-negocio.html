@@ -668,13 +668,34 @@ async function cargarTimbradosDesdeSupabase(){
     // Aplicar datos descargados
     rows.forEach(row => {
       try {
-        const val = JSON.parse(row.valor||'[]');
+        // Parse safely - handle both single and double-stringified JSON
+      let val;
+      try {
+        val = JSON.parse(row.valor||'[]');
+        // If val is still a string, parse again (double-stringify case)
+        if(typeof val === 'string') val = JSON.parse(val);
+      } catch(e) {
+        console.warn('[Carga] Parse error for', row.clave, e.message);
+        val = [];
+      }
         if(row.clave === 'timbrados_config'){
-          timbrados = Array.isArray(val) ? val : [];
+          // Handle double-stringified JSON
+          let parsed = val;
+          if(typeof parsed === 'string'){
+            try{ parsed = JSON.parse(parsed); }catch(e){}
+          }
+          timbrados = Array.isArray(parsed) ? parsed : [];
           localStorage.setItem(TIM_KEY, JSON.stringify(timbrados));
+          console.log('[Carga] timbrados_config OK:', timbrados.length, 'items');
+          if(timbrados[0]) console.log('[Carga] primer timbrado asignaciones:', JSON.stringify(timbrados[0].asignaciones));
         }
         if(row.clave === 'timbrados_mapa'){
-          localStorage.setItem('pos_timbrados_mapa', JSON.stringify(val));
+          let parsed = val;
+          if(typeof parsed === 'string'){
+            try{ parsed = JSON.parse(parsed); }catch(e){}
+          }
+          localStorage.setItem('pos_timbrados_mapa', JSON.stringify(parsed));
+          console.log('[Carga] timbrados_mapa OK:', JSON.stringify(parsed));
         }
       } catch(e){ console.warn('[Carga]', row.clave, e.message); }
     });
@@ -778,7 +799,9 @@ async function saveTims(){
   if(!SE) return;
 
   // 3. Guardar cada clave con PATCH o POST
-  console.log('[saveTims] Guardando', timbrados.length, 'timbrados, mapa:', JSON.stringify(mapa));
+  // Pass objects directly - supaUpsertConfig handles stringification
+  console.log('[saveTims] Guardando', timbrados.length, 'timbrados');
+  console.log('[saveTims] Asignaciones:', JSON.stringify(timbrados.map(t=>({nro:t.nro,a:t.asignaciones||[]}))));
   const ok1 = await supaUpsertConfig('timbrados_config', timbrados);
   const ok2 = await supaUpsertConfig('timbrados_mapa',   mapa);
   if(ok1 && ok2){
@@ -789,8 +812,15 @@ async function saveTims(){
 }
 
 async function supaUpsertConfig(clave, valor){
-  // Usar RPC upsert_config — más confiable que PATCH/POST manual
-  const valStr = typeof valor === 'string' ? valor : JSON.stringify(valor);
+  // Guardar como string JSON simple (no double-stringify)
+  let valStr;
+  if(typeof valor === 'string'){
+    // Already a string — verify it's valid JSON, if not wrap it
+    try { JSON.parse(valor); valStr = valor; }
+    catch(e){ valStr = JSON.stringify(valor); }
+  } else {
+    valStr = JSON.stringify(valor);
+  }
   try {
     const r = await fetch(SUPA_URL+'/rest/v1/rpc/upsert_config', {
       method: 'POST',
