@@ -2763,16 +2763,23 @@ function filterP(){
     return;
   }
 
-  // Productos normales — excluir inactivos y descuentos
+  // Productos normales — excluir inactivos, descuentos y ítem libre (excepto si se busca)
   let l = (curCat==='Todos los artículos' ? PRODS : PRODS.filter(p=>p.cat===curCat))
-           .filter(p=>!p.esDescuento && p.activo!==false);
+           .filter(p=>!p.esDescuento && p.cat!=='Descuentos' && !p.itemLibre && p.activo!==false);
   if(q) l = l.filter(p=>p.name.toLowerCase().includes(q));
   renderP(l);
 }
 
 function renderDescuentosTiles(){
   const g = document.getElementById('pgrid');
-  const descs = DESCUENTOS.filter(d=>d.activo!==false);
+  const descIds2 = new Set(DESCUENTOS.map(d=>String(d.id)));
+  const prodsDesc2 = PRODS.filter(p=>
+    p.cat==='Descuentos' && p.activo!==false && !descIds2.has(String(p.id))
+  );
+  const descs = [
+    ...DESCUENTOS.filter(d=>d.activo!==false),
+    ...prodsDesc2.map(p=>({id:p.id,name:p.name,tipo:p.descTipo||'%',valor:p.descValor||null}))
+  ];
   if(!descs.length){
     g.innerHTML = '<div style="grid-column:span 3;padding:40px;text-align:center;color:#555;font-size:14px;">Sin descuentos — creá uno en Artículos → Descuentos</div>';
     return;
@@ -2868,7 +2875,9 @@ function openCat(){
     html += '<div class="cat-item ' + (curCat===c.nombre?'sel':'') + '" onclick="pickCat(this)">' + c.nombre + '</div>';
   });
   // Agregar Descuentos si hay alguno creado
-  if(DESCUENTOS.filter(d=>d.activo!==false).length){
+  const hasDescs = DESCUENTOS.filter(d=>d.activo!==false).length ||
+    PRODS.filter(p=>p.cat==='Descuentos'&&p.activo!==false).length;
+  if(hasDescs){
     html += '<div class="cat-item ' + (curCat==='Descuentos'?'sel':'') +
       '" onclick="pickCat(this)" style="color:#ef5350;border-left:3px solid #ef5350;">🏷️ Descuentos</div>';
   }
@@ -5240,8 +5249,19 @@ function renderDescList(){
   const list = document.getElementById('descList');
   if(!list) return;
 
-  // Leer descuentos directo de PRODS (cat=Descuentos)
-  const descs = DESCUENTOS.filter(d=>d.activo!==false);
+  // Combinar DESCUENTOS[] + productos de Supabase con cat='Descuentos'
+  const descIds = new Set(DESCUENTOS.map(d=>String(d.id)));
+  const prodsDesc = PRODS.filter(p=>
+    p.cat==='Descuentos' && p.activo!==false && !descIds.has(String(p.id))
+  );
+  const descs = [
+    ...DESCUENTOS.filter(d=>d.activo!==false),
+    ...prodsDesc.map(p=>({
+      id:p.id, name:p.name,
+      tipo:p.descTipo||'%', valor:p.descValor||null,
+      color:'#e53935', activo:true
+    }))
+  ];
 
   if(!descs.length){
     list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:14px;">'+
@@ -5354,7 +5374,7 @@ function guardarDescuentosConfig(){
   // Guardar en localStorage
   localStorage.setItem('pos_descuentos', JSON.stringify(DESCUENTOS));
   // Guardar en Supabase pos_config
-  const email = localStorage.getItem('pos_email')||localStorage.getItem('pos_licencia_email');
+  const email = localStorage.getItem('lic_email');
   if(!email || USAR_DEMO) return;
   fetch(SUPA_URL+'/rest/v1/pos_config?on_conflict=licencia_email,clave',{
     method:'POST',
@@ -5374,7 +5394,7 @@ function guardarDescuentosConfig(){
 async function cargarDescuentosConfig(){
   // 1. Intentar desde Supabase
   try {
-    const email = localStorage.getItem('pos_email')||localStorage.getItem('pos_licencia_email');
+    const email = localStorage.getItem('lic_email');
     if(email && !USAR_DEMO){
       const r = await fetch(
         SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+
@@ -5516,6 +5536,7 @@ function renderArtList(filter){
   let items = PRODS.filter(p =>
     !p.itemLibre &&
     !p.esDescuento &&
+    p.cat !== 'Descuentos' &&
     (!filter ||
       p.name.toLowerCase().includes(filter.toLowerCase()) ||
       (p.codigo && p.codigo.includes(filter)))
@@ -6470,6 +6491,8 @@ async function supaLoadProductos(){
     nextProdId  = maxId + 1;
     console.log('[Supabase] Productos cargados:', PRODS.length-1);
     filterP();
+    // Cargar descuentos después de productos
+    cargarDescuentosConfig();
   } catch(e){
     if(!e.message?.includes('Failed to fetch'))
       console.warn('[Supabase] Productos:', e.message);
@@ -6486,12 +6509,12 @@ async function supaLoadCategorias(){
       'licencia_email=eq.'+encodeURIComponent(email)+'&order=nombre.asc&select=*'
     );
     if(!data || !data.length) return;
+    // Build temp array first — safe pattern
+    const newCats = data.map(c => ({ id:c.id, nombre:c.nombre, color:c.color||'#546e7a' }));
     CATEGORIAS.length = 0;
-    data.forEach(c => CATEGORIAS.push({ id:c.id, nombre:c.nombre, color:c.color }));
+    newCats.forEach(c => CATEGORIAS.push(c));
     const maxId = Math.max(...CATEGORIAS.map(c=>c.id), 0);
     nextCatId = maxId + 1;
-    CATEGORIAS_DEFAULT.length = 0;
-    CATEGORIAS.forEach(c => CATEGORIAS_DEFAULT.push(c.nombre));
     console.log('[Supabase] Categorías cargadas:', CATEGORIAS.length);
   } catch(e){
     if(!e.message.includes('Failed to fetch'))
