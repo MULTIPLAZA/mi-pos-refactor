@@ -3563,37 +3563,99 @@ function onRucInput(){
 }
 
 async function consultarRuc(){
-  const rucRaw = document.getElementById('factRuc').value.trim();
-  const ruc = rucRaw.replace(/-/g,'').replace(/\./g,'');
-  if(!ruc){ setRucStatus('Ingresá un RUC o CI válido', 'error'); return; }
+  const rucRaw   = document.getElementById('factRuc').value.trim();
+  const rucLimpio = rucRaw.replace(/[-\.\s]/g,'');
+
+  if(!rucLimpio || rucLimpio.length < 6){
+    setRucStatus('Ingresá un RUC o CI válido', 'error');
+    return;
+  }
 
   setRucStatus('Consultando...', 'loading');
-  document.getElementById('btnBuscarRuc').disabled = true;
+  const btn = document.getElementById('btnBuscarRuc');
+  if(btn) btn.disabled = true;
 
   try {
-    // Intentar API real primero (cuando esté disponible en backend)
-    // Por ahora usar datos demo
-    await new Promise(r => setTimeout(r, 700)); // simular delay de red
+    // Buscar en tabla contribuyentes:
+    // 1. RUC exacto (ej: 1000001)
+    // 2. RUC sin dígito verificador (ej: 100000 → busca 1000001, 1000009, etc.)
+    // 3. RUC con dígito (ej: 1000001-1)
 
-    // Buscar en demo data
-    const data = RUC_DEMO[ruc] || RUC_DEMO[ruc.slice(0,-1)];
+    let encontrado = false;
 
-    if(data){
-      document.getElementById('factNombre').value = data.nombre;
-      if(data.direccion && !document.getElementById('factDireccion').value){
-        document.getElementById('factDireccion').value = data.direccion;
+    // Query: buscar por RUC exacto O por RUC que empiece con el número ingresado
+    const query = rucLimpio.length >= 7
+      ? 'ruc=eq.'+encodeURIComponent(rucLimpio)
+          +'&limit=1'
+      : 'ruc=like.'+encodeURIComponent(rucLimpio+'%')
+          +'&estado=eq.ACTIVO&limit=1';
+
+    const r = await fetch(
+      SUPA_URL+'/rest/v1/contribuyentes?'+query+'&select=ruc,razon_social,dv,estado',
+      {
+        headers:{
+          'apikey':        SUPA_ANON,
+          'Authorization': 'Bearer '+SUPA_ANON,
+          'Accept':        'application/json'
+        }
       }
-      setRucStatus('✓ Contribuyente encontrado', 'ok');
-    } else {
-      // Si no está en demo, dejar campos para ingreso manual
+    );
+
+    if(r.ok){
+      const data = await r.json();
+      if(data && data.length > 0){
+        const c = data[0];
+        document.getElementById('factNombre').value = c.razon_social;
+        // Completar el RUC con dígito verificador si no lo tiene
+        const rucCompleto = c.ruc + (c.dv ? '-'+c.dv : '');
+        document.getElementById('factRuc').value = rucCompleto;
+        const estadoColor = c.estado==='ACTIVO' ? 'ok' : 'warn';
+        setRucStatus('✓ '+c.razon_social+(c.estado!=='ACTIVO'?' ('+c.estado+')':''), estadoColor);
+        encontrado = true;
+      }
+    }
+
+    // Si no encontró con RUC exacto, intentar sin el último dígito
+    if(!encontrado && rucLimpio.length >= 7){
+      const sinDv = rucLimpio.slice(0,-1);
+      const r2 = await fetch(
+        SUPA_URL+'/rest/v1/contribuyentes?ruc=eq.'+encodeURIComponent(sinDv)
+          +'&select=ruc,razon_social,dv,estado&limit=1',
+        { headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'} }
+      );
+      if(r2.ok){
+        const data2 = await r2.json();
+        if(data2 && data2.length > 0){
+          const c = data2[0];
+          document.getElementById('factNombre').value = c.razon_social;
+          document.getElementById('factRuc').value = c.ruc+(c.dv?'-'+c.dv:'');
+          setRucStatus('✓ '+c.razon_social+(c.estado!=='ACTIVO'?' ('+c.estado+')':''), c.estado==='ACTIVO'?'ok':'warn');
+          encontrado = true;
+        }
+      }
+    }
+
+    // Fallback demo si no hay internet o no encontró
+    if(!encontrado){
+      const demo = RUC_DEMO[rucLimpio] || RUC_DEMO[rucLimpio.slice(0,-1)];
+      if(demo){
+        document.getElementById('factNombre').value = demo.nombre;
+        setRucStatus('✓ '+demo.nombre, 'ok');
+        encontrado = true;
+      }
+    }
+
+    if(!encontrado){
       setRucStatus('No encontrado — ingresá los datos manualmente', 'warn');
       document.getElementById('factNombre').focus();
     }
-  } catch(e) {
-    setRucStatus('Error de conexión — ingresá los datos manualmente', 'error');
-  } finally {
-    document.getElementById('btnBuscarRuc').disabled = false;
+
+  } catch(e){
+    console.warn('[RUC]', e.message);
+    setRucStatus('Error de conexión — ingresá manualmente', 'error');
   }
+
+  if(btn) btn.disabled = false;
 }
 
 function setRucStatus(msg, type){
