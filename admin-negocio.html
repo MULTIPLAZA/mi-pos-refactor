@@ -761,56 +761,66 @@ function buildTimLista(){
 
 function togTim(i){const b=document.getElementById('tB'+i);if(b)b.classList.toggle('open');}
 
-function saveTims(){
+// Guardar timbrados: localStorage + Supabase
+async function saveTims(){
+  // 1. Guardar local inmediatamente
   localStorage.setItem(TIM_KEY, JSON.stringify(timbrados));
-  // También sincronizar con Supabase para que el POS lo descargue
-  sincronizarTimbrados();
+
+  // 2. Reconstruir mapa desde asignaciones
+  const mapa = {};
+  timbrados.forEach((t, timIdx) => {
+    (t.asignaciones||[]).forEach((a, asigIdx) => {
+      mapa[a.terminal] = { timIdx, asigIdx };
+    });
+  });
+  localStorage.setItem('pos_timbrados_mapa', JSON.stringify(mapa));
+
+  if(!SE) return;
+
+  // 3. Guardar cada clave con PATCH o POST
+  await supaUpsertConfig('timbrados_config', timbrados);
+  await supaUpsertConfig('timbrados_mapa',   mapa);
+  console.log('[Timbrados] Guardado en Supabase OK');
 }
 
-async function sincronizarMapa(mapa){
-  if(!SE) return;
-  const payload = {
-    licencia_email: SE,
-    clave: 'timbrados_mapa',
-    valor: JSON.stringify(mapa),
-    updated_at: new Date().toISOString()
-  };
-  try {
-    const existing = await sg('pos_config','licencia_email=eq.'+encodeURIComponent(SE)+'&clave=eq.timbrados_mapa');
-    const method = (existing && existing.length > 0) ? 'PATCH' : 'POST';
-    const url = method === 'PATCH'
-      ? SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(SE)+'&clave=eq.timbrados_mapa'
-      : SUPA_URL+'/rest/v1/pos_config';
-    await fetch(url, {
-      method,
-      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body: JSON.stringify(payload)
-    });
-    console.log('[Mapa] Sincronizado en Supabase');
-  } catch(e){ console.warn('[Mapa] Sin conexión'); }
-}
+async function supaUpsertConfig(clave, valor){
+  const valStr = JSON.stringify(valor);
+  // Intentar PATCH (update si existe)
+  const patchUrl = SUPA_URL+'/rest/v1/pos_config'
+    +'?licencia_email=eq.'+encodeURIComponent(SE)
+    +'&clave=eq.'+clave;
+  const patch = await fetch(patchUrl, {
+    method: 'PATCH',
+    headers: {
+      'apikey':          SUPA_ANON,
+      'Authorization':   'Bearer '+SUPA_ANON,
+      'Content-Type':    'application/json',
+      'Prefer':          'return=representation'
+    },
+    body: JSON.stringify({ valor: valStr })
+  });
 
-async function sincronizarTimbrados(){
-  if(!SE) return;
-  const payload = {
-    licencia_email: SE,
-    clave: 'timbrados_config',
-    valor: JSON.stringify(timbrados),
-    updated_at: new Date().toISOString()
-  };
-  try {
-    const existing = await sg('pos_config','licencia_email=eq.'+encodeURIComponent(SE)+'&clave=eq.timbrados_config');
-    const method = (existing && existing.length > 0) ? 'PATCH' : 'POST';
-    const url = method === 'PATCH'
-      ? SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(SE)+'&clave=eq.timbrados_config'
-      : SUPA_URL+'/rest/v1/pos_config';
-    await fetch(url, {
-      method,
-      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body: JSON.stringify(payload)
+  const patchData = await patch.json().catch(()=>[]);
+  // Si el PATCH no actualizó nada → INSERT
+  if(!Array.isArray(patchData) || patchData.length === 0){
+    const post = await fetch(SUPA_URL+'/rest/v1/pos_config', {
+      method: 'POST',
+      headers: {
+        'apikey':        SUPA_ANON,
+        'Authorization': 'Bearer '+SUPA_ANON,
+        'Content-Type':  'application/json',
+        'Prefer':        'return=minimal'
+      },
+      body: JSON.stringify({ licencia_email: SE, clave, valor: valStr })
     });
-    console.log('[Timbrados] Sincronizado en Supabase');
-  } catch(e){ console.warn('[Timbrados] Sin conexión, guardado solo local'); }
+    if(!post.ok){
+      const err = await post.text();
+      throw new Error('INSERT error: '+err);
+    }
+    console.log('[Config] INSERT OK:', clave);
+  } else {
+    console.log('[Config] PATCH OK:', clave, '— registros:', patchData.length);
+  }
 }
 function refreshTimLista(){
   const el=document.getElementById('timLista');
@@ -898,14 +908,15 @@ function abrirModalAsignar(timIdx){
   modal.style.display = 'flex';
 }
 
-function elimAsig(j){
+async function elimAsig(j){
   const timIdx = parseInt(document.getElementById('mAsignarOv').dataset.timIdx);
   timbrados[timIdx].asignaciones.splice(j,1);
-  saveTims();
+  await saveTims();
+  toast('✓ Terminal eliminada');
   abrirModalAsignar(timIdx);
 }
 
-function agregarAsig(){
+async function agregarAsig(){
   const timIdx  = parseInt(document.getElementById('mAsignarOv').dataset.timIdx);
   const terminal= document.getElementById('asigTerminal').value.trim();
   const ptoExp  = document.getElementById('asigPtoExp').value.trim().padStart(3,'0');
@@ -922,17 +933,18 @@ function agregarAsig(){
   timbrados[timIdx].asignaciones.push({ terminal, punto_exp:ptoExp, nro_actual:desde });
   timbrados[timIdx].seleccionado = true;
 
-  // Guardar mapa terminal → { timIdx, asigIdx }
-  const mapa = JSON.parse(localStorage.getItem('pos_timbrados_mapa')||'{}');
-  mapa[terminal] = { timIdx, asigIdx: timbrados[timIdx].asignaciones.length-1 };
-  localStorage.setItem('pos_timbrados_mapa', JSON.stringify(mapa));
+  // Mostrar progreso
+  const btn = document.querySelector('[onclick="agregarAsig()"]');
+  if(btn){ btn.disabled=true; btn.textContent='Guardando...'; }
+  toast('Guardando en la nube...');
 
-  saveTims();
-  // También sincronizar el mapa
-  sincronizarMapa(mapa);
-  // Cerrar modal y reabrir con datos frescos
-  setTimeout(()=> abrirModalAsignar(timIdx), 800);
-  toast('✓ Terminal "'+terminal+'" asignada y guardada en la nube');
+  await saveTims();
+
+  if(btn){ btn.disabled=false; btn.textContent='AGREGAR'; }
+  toast('✓ Terminal "'+terminal+'" guardada correctamente');
+
+  // Reabrir modal con datos frescos
+  abrirModalAsignar(timIdx);
 }
 
 function cerrarModalAsignar(){
@@ -1068,7 +1080,7 @@ function updPrev(){
     `<div style="color:#aaa">Factura N° ${suc}-${pex}-<span style="color:#4caf50">0000001</span></div>`+
     certAlert;
 }
-function guardarTim(){
+async function guardarTim(){
   const nro=document.getElementById('mNro').value.trim();
   const vigIni=document.getElementById('mVigIni').value;
   const vigFin=document.getElementById('mVigFin').value;
@@ -1087,12 +1099,10 @@ function guardarTim(){
   const data={nro,tipo,vig_ini:vigIni,vig_fin:vigFin,sucursal:suc,punto_exp:pex,desde,hasta,nombre_suc:nomSuc,nro_actual:desde,seleccionado:false,cert_venc:certVenc,cert_emis:certEmis};
   if(timEditIdx!==null){data.nro_actual=timbrados[timEditIdx].nro_actual||desde;data.seleccionado=timbrados[timEditIdx].seleccionado||false;timbrados[timEditIdx]=data;}
   else timbrados.push(data);
-  saveTims();
+  await saveTims();
   closeMTim();
-  // Reload from server to confirm save
-  refreshTimListaFromServer().then(()=>{
-    toast(timEditIdx!==null?'✓ Timbrado actualizado':'✓ Timbrado guardado');
-  });
+  await refreshTimListaFromServer();
+  toast(timEditIdx!==null?'✓ Timbrado actualizado':'✓ Timbrado guardado');
 }
 
 // ── CONFIG ────────────────────────────────────────────────
@@ -1238,7 +1248,7 @@ function elimAsig(j){
   abrirModalAsignar(timIdx); // refrescar
 }
 
-function agregarAsig(){
+async function agregarAsig(){
   const timIdx  = parseInt(document.getElementById('mAsignarOv').dataset.timIdx);
   const t       = timbrados[timIdx];
   const terminal= document.getElementById('asigTerminal').value.trim();
