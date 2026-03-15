@@ -631,12 +631,12 @@ function goAdminTab(t){
   if(btn) btn.classList.add('on');
   const tc=document.getElementById('adminTabContent');
   if(!tc) return;
-  if(t==='timbrado') renderTimbradosTab(tc);
+  if(t==='timbrado')   renderTimbradosTab(tc);   // async
   if(t==='sucursales') renderSucursalesTab(tc);
 }
 
-function renderTimbradosTab(tc){
-  try{const r=localStorage.getItem(TIM_KEY);timbrados=r?JSON.parse(r):[];}catch(e){timbrados=[];}
+async function renderTimbradosTab(tc){
+  // Mostrar skeleton mientras carga
   tc.innerHTML=`
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
     <div>
@@ -645,7 +645,50 @@ function renderTimbradosTab(tc){
     </div>
     <button class="btn-nueva" onclick="abrirMTim()">+ NUEVO</button>
   </div>
-  <div id="timLista">${buildTimLista()}</div>`;
+  <div id="timLista"><div class="loading"><span class="sp"></span>Cargando...</div></div>`;
+
+  // Cargar desde Supabase primero
+  await cargarTimbradosDesdeSupabase();
+
+  // Renderizar lista
+  const lista = document.getElementById('timLista');
+  if(lista) lista.innerHTML = buildTimLista();
+}
+
+async function cargarTimbradosDesdeSupabase(){
+  if(!SE) {
+    // Sin sesión → usar localStorage
+    try{ const r=localStorage.getItem(TIM_KEY); timbrados=r?JSON.parse(r):[]; }catch(e){ timbrados=[]; }
+    return;
+  }
+  try {
+    const rows = await sg('pos_config',
+      'licencia_email=eq.'+encodeURIComponent(SE)+'&clave=in.(timbrados_config,timbrados_mapa)');
+
+    // Aplicar datos descargados
+    rows.forEach(row => {
+      try {
+        const val = JSON.parse(row.valor||'[]');
+        if(row.clave === 'timbrados_config'){
+          timbrados = Array.isArray(val) ? val : [];
+          localStorage.setItem(TIM_KEY, JSON.stringify(timbrados));
+        }
+        if(row.clave === 'timbrados_mapa'){
+          localStorage.setItem('pos_timbrados_mapa', JSON.stringify(val));
+        }
+      } catch(e){ console.warn('[Carga]', row.clave, e.message); }
+    });
+
+    // Si no había nada en Supabase, intentar localStorage
+    if(!rows.length){
+      try{ const r=localStorage.getItem(TIM_KEY); timbrados=r?JSON.parse(r):[]; }catch(e){ timbrados=[]; }
+    }
+
+    console.log('[Timbrados] Cargados desde Supabase:', timbrados.length);
+  } catch(e){
+    console.warn('[Timbrados] Error Supabase, usando localStorage:', e.message);
+    try{ const r=localStorage.getItem(TIM_KEY); timbrados=r?JSON.parse(r):[]; }catch(e2){ timbrados=[]; }
+  }
 }
 
 function buildTimLista(){
@@ -773,6 +816,12 @@ function refreshTimLista(){
   const el=document.getElementById('timLista');
   if(el) el.innerHTML=buildTimLista();
 }
+
+// Después de guardar, recargar desde Supabase para confirmar
+async function refreshTimListaFromServer(){
+  await cargarTimbradosDesdeSupabase();
+  refreshTimLista();
+}
 function usarTim(i){
   const t = timbrados[i];
   // Abrir modal de asignación de terminales
@@ -881,8 +930,9 @@ function agregarAsig(){
   saveTims();
   // También sincronizar el mapa
   sincronizarMapa(mapa);
-  abrirModalAsignar(timIdx);
-  toast('✓ Terminal "'+terminal+'" asignada y sincronizada');
+  // Cerrar modal y reabrir con datos frescos
+  setTimeout(()=> abrirModalAsignar(timIdx), 800);
+  toast('✓ Terminal "'+terminal+'" asignada y guardada en la nube');
 }
 
 function cerrarModalAsignar(){
@@ -1039,9 +1089,10 @@ function guardarTim(){
   else timbrados.push(data);
   saveTims();
   closeMTim();
-  // Refresh the list if we're on admin page
-  refreshTimLista();
-  toast(timEditIdx!==null?'✓ Timbrado actualizado':'✓ Timbrado guardado');
+  // Reload from server to confirm save
+  refreshTimListaFromServer().then(()=>{
+    toast(timEditIdx!==null?'✓ Timbrado actualizado':'✓ Timbrado guardado');
+  });
 }
 
 // ── CONFIG ────────────────────────────────────────────────
