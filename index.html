@@ -3914,6 +3914,7 @@ function resetFactura(){
 
 // RECIBO
 function generarRecibo(data){
+  ultimoReciboData = data; // guardar para reimprimir
   const fecha = data.fecha;
   const pad = n => String(n).padStart(2,'0');
   const fechaStr = pad(fecha.getDate())+'/'+pad(fecha.getMonth()+1)+'/'+fecha.getFullYear()+' '+pad(fecha.getHours())+':'+pad(fecha.getMinutes());
@@ -3985,27 +3986,292 @@ function generarRecibo(data){
     '</div>';
 }
 
+// ══════════════════════════════════════════════════════
+// IMPRESIÓN TÉRMICA — POS58 / POS80
+// ══════════════════════════════════════════════════════
+
+// Guardar último recibo para reimprimir
+let ultimoReciboData = null;
+
+// Obtener tamaño de papel configurado
+function getPaperSize(tipo){ return printers[tipo]?.size || localStorage.getItem('printerSize_'+tipo) || '58'; }
+
+// CSS base para impresión térmica
+function getCSSTermico(size){
+  const w = size==='58' ? '48mm' : '72mm';
+  const fs = size==='58' ? '10px' : '11px';
+  return `
+    @page { margin:0; size:${w} auto; }
+    *{ margin:0;padding:0;box-sizing:border-box; }
+    body{ font-family:"Courier New",Courier,monospace;font-size:${fs};width:${w};background:#fff;color:#000; }
+    .c{ text-align:center; }
+    .r{ text-align:right; }
+    .b{ font-weight:bold; }
+    .s{ font-size:${size==='58'?'8px':'9px'}; }
+    .l{ font-size:${size==='58'?'13px':'15px'};font-weight:bold; }
+    .hr{ border:none;border-top:1px dashed #000;margin:2px 0; }
+    .row{ display:flex;justify-content:space-between; }
+    .row .l1{ flex:1;padding-right:4px; }
+    .row .l2{ text-align:right;white-space:nowrap; }
+    .obs{ font-size:${size==='58'?'8px':'9px'};padding-left:8px; }
+    br{ display:block;margin:1px 0; }
+  `;
+}
+
+// Abrir ventana e imprimir
+function abrirVentanaImpresion(html, size){
+  const w = size==='58' ? 320 : 420;
+  const win = window.open('','_blank','width='+w+',height=700');
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(()=>{ win.print(); }, 400);
+}
+
+// Formatear número guaraní sin símbolo (para ticket)
+function gn(n){ return Math.round(n||0).toLocaleString('es-PY'); }
+
+// Padding derecho para columnas
+function padL(s,n){ s=String(s); return s.length>=n?s.substring(0,n):s+' '.repeat(n-s.length); }
+function padR(s,n){ s=String(s); return s.length>=n?s.substring(0,n):' '.repeat(n-s.length)+s; }
+function center(s,n){ s=String(s); const p=Math.max(0,n-s.length); const l=Math.floor(p/2); return ' '.repeat(l)+s+' '.repeat(p-l); }
+
+// ── TICKET (no factura) ───────────────────────────────────
+function generarHTMLTicket(data, size){
+  const cols = size==='58' ? 32 : 42;
+  const sep  = '-'.repeat(cols);
+  const neg  = configData.negocio || 'MI NEGOCIO';
+  const ruc  = configData.ruc     || '';
+  const dir  = configData.direccion || '';
+  const tel  = configData.telefono  || '';
+
+  const pad = n=>String(n).padStart(2,'0');
+  const d   = data.fecha;
+  const fecha = pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();
+  const hora  = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+
+  let lineas = '';
+
+  // Cabecera
+  lineas += '<p class="c b">'+neg+'</p>';
+  if(ruc)  lineas += '<p class="c s">RUC: '+ruc+'</p>';
+  if(dir)  lineas += '<p class="c s">'+dir+'</p>';
+  if(tel)  lineas += '<p class="c s">Tel: '+tel+'</p>';
+  lineas += '<p class="hr"></p>';
+
+  // Datos ticket
+  lineas += '<p class="s">TICKET NRO: '+String(data.nroTicket||0).padStart(6,'0')+'</p>';
+  lineas += '<p class="s">FECHA: '+fecha+' -HORA: '+hora+'</p>';
+  lineas += '<p class="s">CLIENTE: '+(data.factura?.nombre||'SIN NOMBRE')+'</p>';
+  if(data.obs) lineas += '<p class="s">OBS: '+data.obs+'</p>';
+  lineas += '<p class="hr"></p>';
+
+  // Encabezado columnas
+  const c1 = size==='58' ? 4 : 6;
+  const c2 = size==='58' ? 16: 22;
+  const c3 = size==='58' ? 6 : 8;
+  const c4 = size==='58' ? 6 : 8;
+  lineas += '<p class="s b">'+padL('COD.',c1)+' '+padL('DESCRIPCION',c2)+' '+padR('PR.UNIT',c3)+' '+padR('SUBTOT',c4)+'</p>';
+  lineas += '<p class="hr"></p>';
+
+  // Items
+  data.items.forEach(item => {
+    const subtot = item.desc>0 ? Math.round(item.price*item.qty*(1-item.desc/100)) : item.price*item.qty;
+    const cod    = padL(item.codigo||'',c1);
+    const nom    = padL(item.name, c2);
+    const prec   = padR(gn(item.price), c3);
+    const sub    = padR(gn(subtot), c4);
+    lineas += '<p class="s">'+cod+' '+nom+' '+prec+' '+sub+'</p>';
+    if(item.desc>0) lineas += '<p class="obs s">  Desc: '+item.desc+'%</p>';
+    if(item.obs)    lineas += '<p class="obs s">  '+item.obs+'</p>';
+  });
+  lineas += '<p class="hr"></p>';
+
+  // Totales
+  const subtotal = data.items.reduce((s,i)=>s+(i.desc>0?Math.round(i.price*i.qty*(1-i.desc/100)):i.price*i.qty),0);
+  if(data.descTicket>0){
+    lineas += '<p class="row s"><span class="l1">SUBTOTAL</span><span class="l2">'+gn(subtotal)+'</span></p>';
+    lineas += '<p class="row s"><span class="l1">DESCUENTO '+data.descTicket+'%</span><span class="l2">-'+gn(data.descMonto||0)+'</span></p>';
+  }
+  lineas += '<p class="row b l"><span class="l1">TOTAL:</span><span class="l2">'+gn(data.total)+'</span></p>';
+  lineas += '<p class="hr"></p>';
+
+  // Forma de pago
+  lineas += '<p class="row s"><span class="l1">FORMA DE PAGO</span><span class="l2">IMPORTE</span></p>';
+  lineas += '<p class="hr"></p>';
+  lineas += '<p class="row s"><span class="l1">'+data.metodo+':</span><span class="l2">'+gn(data.total)+'</span></p>';
+  if(data.vuelto) lineas += '<p class="row s"><span class="l1">VUELTO:</span><span class="l2">'+data.vuelto+'</span></p>';
+  lineas += '<p class="hr"></p>';
+
+  // Pie
+  lineas += '<p class="c s">Comprobante no válido para el IVA</p>';
+  if(configData.pie_recibo) lineas += '<p class="c s">'+configData.pie_recibo+'</p>';
+  lineas += '<p class="c s">*** GRACIAS POR SU PREFERENCIA ***</p>';
+  lineas += '<p class="hr"></p>';
+  lineas += '<br><br><br>';
+
+  return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
+}
+
+// ── FACTURA ───────────────────────────────────────────────
+function generarHTMLFactura(data, size){
+  const cols = size==='58' ? 32 : 42;
+  const neg  = configData.negocio   || 'MI NEGOCIO';
+  const ruc  = configData.ruc       || '';
+  const dir  = configData.direccion || '';
+  const tel  = configData.telefono  || '';
+  const f    = data.factura || {};
+  const tim  = f.timbrado   || '';
+  const nroF = f.nro_factura|| '';
+
+  const pad = n=>String(n).padStart(2,'0');
+  const d   = data.fecha;
+  const fecha = pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();
+  const hora  = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+
+  // Calcular IVA
+  let grav10=0, grav5=0, exento=0;
+  data.items.forEach(item=>{
+    const sub = item.desc>0 ? Math.round(item.price*item.qty*(1-item.desc/100)) : item.price*item.qty;
+    if(item.iva==='10')       grav10  += sub;
+    else if(item.iva==='5')   grav5   += sub;
+    else                       exento  += sub;
+  });
+  const iva10  = Math.round(grav10  * 10/110);
+  const iva5   = Math.round(grav5   * 5/105);
+  const total  = data.total;
+
+  let lineas = '';
+
+  // Cabecera
+  lineas += '<p class="c b">'+neg+'</p>';
+  if(ruc)  lineas += '<p class="c s">'+dir+'</p>';
+  if(ruc)  lineas += '<p class="c s">RUC: '+ruc+'</p>';
+  if(dir)  lineas += '<p class="c s">Avda. Mariscal Lopez</p>';
+  if(tel)  lineas += '<p class="c s">Tel:</p>';
+  lineas += '<p class="hr"></p>';
+
+  // Timbrado
+  lineas += '<p class="s">TIMBRADO Nro: '+tim+'</p>';
+  lineas += '<p class="s">INICIO:'+fecha+'</p>';
+  if(getTimbradoActivo()?.vig_fin && getTimbradoActivo()?.vig_fin!=='2999-12-31'){
+    lineas += '<p class="s">VTO:'+getTimbradoActivo().vig_fin.split('-').reverse().join('/')+'</p>';
+  }
+  lineas += '<p class="s b">FACTURA CONTADO NRO:'+nroF+'</p>';
+  lineas += '<p class="s">Fecha: '+fecha+' - Hora: '+hora+'</p>';
+  lineas += '<p class="hr"></p>';
+
+  // Encabezado items
+  const c1=size==='58'?5:6, c2=size==='58'?4:5, c3=size==='58'?6:7, c4=size==='58'?7:8, c5=size==='58'?4:5;
+  lineas += '<p class="s b">'+padL('DESCRIPCION',c1+c2+c3+c4+c5+4)+'</p>';
+  lineas += '<p class="s b">'+padL('COD.BAR.',c1)+' '+padR('CANT',c2)+' '+padR('PR.UNIT',c3)+' '+padR('IMPORTE',c4)+' '+padR('IVA',c5)+'</p>';
+  lineas += '<p class="hr"></p>';
+
+  // Items
+  data.items.forEach(item=>{
+    const sub = item.desc>0 ? Math.round(item.price*item.qty*(1-item.desc/100)) : item.price*item.qty;
+    lineas += '<p class="s">'+item.name+'</p>';
+    const cod  = padL(item.codigo||'',c1);
+    const cant = padR(item.qty,c2);
+    const pu   = padR(gn(item.price),c3);
+    const imp  = padR(gn(sub),c4);
+    const iv   = padR(item.iva==='exento'?'Exnt':(item.iva||'10')+'%',c5);
+    lineas += '<p class="s">'+cod+' '+cant+' '+pu+' '+imp+' '+iv+'</p>';
+    if(item.obs) lineas += '<p class="obs s">  '+item.obs+'</p>';
+  });
+  lineas += '<p class="hr"></p>';
+
+  // Total
+  lineas += '<p class="row b l"><span class="l1">TOTAL:</span><span class="l2">'+gn(total)+'</span></p>';
+  lineas += '<p class="hr"></p>';
+
+  // Sub totales IVA
+  lineas += '<p class="row s"><span class="l1">SUB TOTALES</span><span class="l2">LIQUIDACION</span><span style="margin-left:4px;" class="l2 s">IVA</span></p>';
+  lineas += '<p class="hr"></p>';
+  if(grav10>0)  lineas += '<p class="row s"><span class="l1">Gravado 10%</span><span class="l2">'+gn(grav10)+'</span><span style="margin-left:4px;" class="l2">'+gn(iva10)+'</span></p>';
+  if(grav5>0)   lineas += '<p class="row s"><span class="l1">Gravado 5%</span><span class="l2">'+gn(grav5)+'</span><span style="margin-left:4px;" class="l2">'+gn(iva5)+'</span></p>';
+  if(exento>0)  lineas += '<p class="row s"><span class="l1">Exento</span><span class="l2">'+gn(exento)+'</span><span style="margin-left:4px;" class="l2">0</span></p>';
+  lineas += '<p class="hr"></p>';
+
+  // Forma de pago
+  lineas += '<p class="row s"><span class="l1">FORMA DE PAGO</span><span class="l2">IMPORTE</span></p>';
+  lineas += '<p class="hr"></p>';
+  lineas += '<p class="row s"><span class="l1">'+data.metodo+':</span><span class="l2">'+gn(total)+'</span></p>';
+  if(data.vuelto) lineas += '<p class="row s"><span class="l1">VUELTO:</span><span class="l2">'+data.vuelto+'</span></p>';
+  lineas += '<p class="hr"></p>';
+
+  // Cliente
+  lineas += '<p class="s">Cliente: '+(f.nombre||'')+'</p>';
+  lineas += '<p class="s">RUC: '+(f.ruc||'')+'</p>';
+  lineas += '<p class="s">Dir:</p>';
+  lineas += '<p class="s">Tel:</p>';
+  lineas += '<p class="hr"></p>';
+
+  // Footer
+  lineas += '<p class="s">TICKET NRO: '+String(data.nroTicket||0).padStart(6,'0')+'</p>';
+  lineas += '<p class="s">NRO. TRANSACCION: '+String(data.nroTicket||0).padStart(3,'0')+'</p>';
+  lineas += '<p class="s">ATENDIDO POR: '+(configData.terminal||'admin')+'</p>';
+  lineas += '<p class="s">ORIGINAL: CLIENTE</p>';
+  lineas += '<p class="s">DUPLICADO: ARCHIVO TRIBUTARIO</p>';
+  lineas += '<p class="hr"></p>';
+  lineas += '<p class="s">LOS DATOS IMPRESOS REQUIEREN DE CUIDADOS ESPECIALES.</p>';
+  if(configData.pie_recibo) lineas += '<p class="c s">'+configData.pie_recibo+'</p>';
+  lineas += '<p class="c s b">*** GRACIAS POR SU PREFERENCIA ***</p>';
+  lineas += '<p class="hr"></p>';
+  lineas += '<br><br><br>';
+
+  return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
+}
+
+// ── COMANDA ───────────────────────────────────────────────
+function generarHTMLComanda(data, size){
+  const neg = configData.negocio || 'MI NEGOCIO';
+  const pad = n=>String(n).padStart(2,'0');
+  const d   = data.fecha;
+  const fecha = pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();
+  const hora  = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+
+  let lineas = '';
+
+  lineas += '<p class="c b">Orden #: '+String(data.nroTicket||0)+'</p>';
+  lineas += '<p class="c s">Fecha: '+fecha+'</p>';
+  lineas += '<p class="c l">'+hora+'</p>';
+  lineas += '<p class="c s">NRO_TICKET: '+String(data.nroTicket||0).padStart(3,'0')+'-'+String((data.nroTicket||0)+1)+'</p>';
+  lineas += '<p class="c s">CLIENTE: '+(data.factura?.nombre||'SIN NOMBRE')+'</p>';
+  lineas += '<p class="hr"></p>';
+
+  lineas += '<p class="row s"><span class="l1">Canc.</span><span class="l2">Descripcion</span></p>';
+  lineas += '<p class="hr"></p>';
+
+  data.items.forEach(item=>{
+    lineas += '<p class="s">'+item.qty+'    '+item.name+'</p>';
+    if(item.obs) lineas += '<p class="s">OBS: '+item.obs+'</p>';
+  });
+
+  lineas += '<p class="hr"></p>';
+  lineas += '<p class="s">OBS:</p>';
+  lineas += '<p class="hr"></p>';
+  lineas += '<br><br><br>';
+
+  return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
+}
+
+// ── IMPRIMIR RECIBO (ticket o factura según si tiene timbrado) ──
 function imprimirRecibo(){
-  const papel = document.getElementById('reciboPapel');
-  const w = window.open('','_blank','width=400,height=600');
-  w.document.write('<html><head><title>Recibo</title><style>'+
-    'body{margin:0;background:#fff;font-family:"Courier New",monospace;font-size:13px;}'+
-    '.rec-row{display:flex;justify-content:space-between;margin:3px 0;}'+
-    '.rec-center{text-align:center;margin-bottom:6px;}'+
-    '.rec-title{font-size:16px;font-weight:700;text-transform:uppercase;}'+
-    '.rec-sub{font-size:11px;color:#555;}'+
-    '.rec-divider{border:none;border-top:1px dashed #999;margin:8px 0;}'+
-    '.rec-row.total{font-size:15px;font-weight:700;border-top:1px dashed #999;padding-top:6px;margin-top:6px;}'+
-    '.rec-row.vuelto{color:#2e7d32;font-weight:700;}'+
-    '.rec-item-name{flex:1;margin-right:8px;}'+
-    '.rec-item-qty{color:#555;margin-right:8px;}'+
-    '.rec-obs{font-size:11px;color:#777;padding-left:8px;}'+
-    '.rec-footer-text{text-align:center;font-size:11px;color:#888;margin-top:8px;}'+
-    '.rec-nro{font-size:11px;color:#777;}'+
-    '</style></head><body>'+papel.innerHTML+'</body></html>');
-  w.document.close();
-  w.focus();
-  setTimeout(()=>w.print(), 400);
+  if(!ultimoReciboData){ toast('Sin datos para imprimir'); return; }
+  const size = getPaperSize('ticket');
+  const esFactura = ultimoReciboData.factura && ultimoReciboData.factura.timbrado;
+  const html = esFactura
+    ? generarHTMLFactura(ultimoReciboData, size)
+    : generarHTMLTicket(ultimoReciboData, size);
+  abrirVentanaImpresion(html, size);
+}
+
+// ── IMPRIMIR COMANDA ──────────────────────────────────────
+function imprimirComanda(data){
+  const size = getPaperSize('comanda');
+  const html = generarHTMLComanda(data, size);
+  abrirVentanaImpresion(html, size);
 }
 
 function finalizarRecibo(){
