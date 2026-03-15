@@ -2414,7 +2414,7 @@
       </button>
       <div class="factura-form" id="facturaForm">
         <!-- Timbrado info banner -->
-        <div id="timbradoInfo" style="display:none;flex-direction:column;gap:3px;background:rgba(255,255,255,.04);border:1px solid #2a2a2a;border-radius:8px;padding:10px 12px;margin-bottom:10px;"></div>
+        <div id="timbradoInfo" style="display:none;background:rgba(255,255,255,.04);border:1px solid #2a2a2a;border-radius:8px;padding:10px 12px;margin-bottom:10px;"></div>
         <div class="factura-field">
           <span class="factura-label">RUC / C.I.</span>
           <div style="display:flex;align-items:center;gap:8px;">
@@ -3176,7 +3176,8 @@ function confirmarPago(){
 
   // Avanzar nro factura si hubo factura
   if(facturaData && facturaData.timbrado){
-    avanzarNroFactura(getTimbradoActivo());
+    avanzarNroFactura(timbradoSeleccionado || getTimbradoActivo());
+    timbradoSeleccionado = null; // reset para próxima venta
     timbradoSession = getTimbradoActivo(); // refresh
   }
 
@@ -3295,55 +3296,148 @@ function setRucStatus(msg, type){
   el.style.color = type==='ok' ? '#4caf50' : type==='error' ? '#e53935' : type==='warn' ? '#ff9800' : '#888';
 }
 
+// Timbrado seleccionado para esta factura
+let timbradoSeleccionado = null;
+
 function toggleFactura(){
   facturaActiva = !facturaActiva;
-  const form    = document.getElementById('facturaForm');
-  const toggle  = document.getElementById('facturaToggle');
-  const badge   = document.getElementById('facturaBadge');
+  const form   = document.getElementById('facturaForm');
+  const toggle = document.getElementById('facturaToggle');
+  const badge  = document.getElementById('facturaBadge');
   form.classList.toggle('open', facturaActiva);
   toggle.classList.toggle('active', facturaActiva);
   badge.textContent = facturaActiva ? 'ACTIVA' : 'OPCIONAL';
-
   if(facturaActiva){
-    // Mostrar datos del timbrado activo
-    const tim = getTimbradoActivo();
-    const infoEl = document.getElementById('timbradoInfo');
-    if(infoEl){
-      if(tim){
-        const nro = getNroFactura(tim);
-        const vence = tim.vig_fin && tim.vig_fin !== '2999-12-31'
-          ? ' · Vence: '+tim.vig_fin.split('-').reverse().join('/')
-          : '';
-        const certAlert = (tim.tipo==='electronico' && tim.cert_venc) ? (() => {
-          const dias = Math.ceil((new Date(tim.cert_venc+' 00:00:00')-new Date())/(1000*60*60*24));
-          return dias <= 30 ? ' ⚠️ Cert. vence en '+dias+'d' : '';
-        })() : '';
-        infoEl.style.display = 'flex';
-        infoEl.innerHTML =
-          '<span style="font-size:10px;color:#888;">TIMBRADO</span>'+
-          '<span style="font-size:12px;font-weight:800;color:#fff;letter-spacing:.5px;font-family:monospace;">'+tim.nro+'</span>'+
-          '<span style="font-size:11px;color:var(--green);font-weight:700;">Factura N° '+nro+'</span>'+
-          (certAlert?'<span style="font-size:10px;color:var(--orange);">'+certAlert+'</span>':'')+
-          vence;
-      } else {
-        infoEl.style.display = 'flex';
-        infoEl.innerHTML = '<span style="font-size:12px;color:#ef5350;">⚠️ Sin timbrado configurado — ir al panel de Administración</span>';
-      }
-    }
-    setTimeout(()=>document.getElementById('factRuc').focus(), 200);
+    mostrarSelectorTimbrado();
+    setTimeout(()=>{ const r=document.getElementById('factRuc'); if(r)r.focus(); }, 300);
+  } else {
+    timbradoSeleccionado = null;
   }
+}
+
+function mostrarSelectorTimbrado(){
+  const infoEl = document.getElementById('timbradoInfo');
+  if(!infoEl) return;
+
+  // Cargar timbrados disponibles
+  let tims = [];
+  try { tims = JSON.parse(localStorage.getItem('pos_timbrados')||'[]'); } catch(e){}
+
+  // Filtrar vigentes
+  const hoy = new Date();
+  const vigentes = tims.filter(t=>{
+    if(t.tipo==='electronico') return true; // sin vencimiento
+    return t.vig_fin ? new Date(t.vig_fin+' 00:00:00') >= hoy : true;
+  });
+
+  if(!vigentes.length){
+    // Sin timbrados — mostrar aviso
+    infoEl.style.display = 'block';
+    infoEl.innerHTML =
+      '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">'+
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef5350" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'+
+      '<span style="font-size:13px;color:#ef5350;font-weight:700;">Sin timbrado configurado</span></div>'+
+      '<div style="font-size:12px;color:#666;margin-top:2px;">Configurá un punto de expedición en el <b style="color:#aaa">Panel Admin → Administración</b></div>';
+    timbradoSeleccionado = null;
+    return;
+  }
+
+  // Si solo hay uno o ya hay uno de la sucursal → usarlo directo
+  const sucursal = localStorage.getItem('pos_sucursal')||'Principal';
+  let autoTim = getTimbradoActivo();
+
+  // Si hay uno auto-asignado a esta sucursal, mostrarlo seleccionado
+  if(autoTim && vigentes.find(t=>t.nro===autoTim.nro)){
+    timbradoSeleccionado = autoTim;
+    renderTimbradoBanner(infoEl, autoTim, vigentes);
+    return;
+  }
+
+  // Si hay solo uno, seleccionar automáticamente
+  if(vigentes.length === 1){
+    timbradoSeleccionado = vigentes[0];
+    renderTimbradoBanner(infoEl, vigentes[0], vigentes);
+    return;
+  }
+
+  // Hay varios → mostrar selector
+  timbradoSeleccionado = null;
+  renderTimbradoBanner(infoEl, null, vigentes);
+}
+
+function renderTimbradoBanner(el, selected, todos){
+  const pad3 = n=>String(n).padStart(3,'0');
+  const padN = n=>String(n).padStart(7,'0');
+
+  // Opciones del selector
+  const opts = todos.map((t,i)=>{
+    const nro = pad3(t.sucursal)+'-'+pad3(t.punto_exp)+'-'+padN(t.nro_actual||t.desde);
+    const label = 'Timb. '+t.nro+' · '+nro+(t.nombre_suc?' ('+t.nombre_suc+')':'')+(t.asignado_a?' — '+t.asignado_a:'');
+    const sel = selected && selected.nro===t.nro ? 'selected' : '';
+    return '<option value="'+i+'" '+sel+'>'+label+'</option>';
+  }).join('');
+
+  let certAlert = '';
+  if(selected && selected.tipo==='electronico' && selected.cert_venc){
+    const dias = Math.ceil((new Date(selected.cert_venc+' 00:00:00')-new Date())/(1000*60*60*24));
+    if(dias <= 30) certAlert = '<div style="font-size:11px;color:var(--orange);margin-top:4px;">⚠️ Certificado vence en '+dias+' días</div>';
+  }
+
+  el.style.display = 'block';
+  el.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'+
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4caf50" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'+
+    '<span style="font-size:11px;font-weight:700;color:var(--green);">PUNTO DE EXPEDICIÓN</span>'+
+    '</div>'+
+    '<select id="selTimbrado" onchange="onSelTimbrado(this)"'+
+    ' style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;'+
+    'font-family:Barlow,sans-serif;font-size:13px;padding:10px 12px;outline:none;margin-bottom:4px;">'+
+    '<option value="">— Seleccioná un timbrado —</option>'+
+    opts+
+    '</select>'+
+    (selected ?
+      '<div style="font-size:12px;color:#aaa;display:flex;justify-content:space-between;align-items:center;">'+
+      '<span>Próx. factura: <b style="color:#fff;font-family:monospace;">'+
+        pad3(selected.sucursal)+'-'+pad3(selected.punto_exp)+'-'+padN(selected.nro_actual||selected.desde)+
+      '</b></span>'+
+      '<span style="color:#555;">Timb. '+selected.nro+'</span>'+
+      '</div>'+certAlert
+    : '<div style="font-size:12px;color:#ef5350;">Seleccioná un timbrado para facturar</div>');
+
+  // Guardar referencia a todos para el onchange
+  el._todos = todos;
+}
+
+function onSelTimbrado(sel){
+  const el = document.getElementById('timbradoInfo');
+  let tims = [];
+  try { tims = JSON.parse(localStorage.getItem('pos_timbrados')||'[]'); } catch(e){}
+  const hoy = new Date();
+  const vigentes = tims.filter(t=> t.tipo==='electronico' || (t.vig_fin ? new Date(t.vig_fin+' 00:00:00') >= hoy : true));
+  const idx = parseInt(sel.value);
+  if(isNaN(idx)||idx<0){ timbradoSeleccionado=null; return; }
+  timbradoSeleccionado = vigentes[idx];
+  // Guardar como activo para esta sucursal
+  localStorage.setItem('pos_timbrado_activo', JSON.stringify(timbradoSeleccionado));
+  renderTimbradoBanner(el, timbradoSeleccionado, vigentes);
 }
 
 function getFacturaData(){
   if(!facturaActiva) return null;
-  const tim = getTimbradoActivo();
+  // Usar el timbrado seleccionado en el formulario (o el activo si no hay selector)
+  const tim = timbradoSeleccionado || getTimbradoActivo();
+  const pad3 = n=>String(n).padStart(3,'0');
+  const padN = n=>String(n).padStart(7,'0');
+  const nroFact = tim ? pad3(tim.sucursal)+'-'+pad3(tim.punto_exp)+'-'+padN(tim.nro_actual||tim.desde) : '';
   return {
-    ruc:      document.getElementById('factRuc').value.trim(),
-    nombre:   document.getElementById('factNombre').value.trim(),
-    direccion:document.getElementById('factDireccion').value.trim(),
-    timbrado: tim ? tim.nro : '',
-    nro_factura: tim ? getNroFactura(tim) : '',
+    ruc:           document.getElementById('factRuc').value.trim(),
+    nombre:        document.getElementById('factNombre').value.trim(),
+    direccion:     document.getElementById('factDireccion').value.trim(),
+    timbrado:      tim ? tim.nro : '',
+    nro_factura:   nroFact,
     tipo_timbrado: tim ? tim.tipo : 'autoimpresor',
+    sucursal_nro:  tim ? pad3(tim.sucursal) : '',
+    punto_exp:     tim ? pad3(tim.punto_exp) : '',
   };
 }
 
