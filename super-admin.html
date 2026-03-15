@@ -851,18 +851,33 @@ async function habilitarTer(id){
 }
 
 async function eliminarTer(id, nombre, activa){
-  const msg = activa
-    ? '¿Eliminar "'+nombre+'"? El dispositivo perderá acceso inmediatamente.'
-    : '¿Eliminar "'+nombre+'"?';
-  if(!confirm(msg)) return;
+  // Mostrar opciones: desactivar (soft) o eliminar definitivo
+  const opc = activa
+    ? confirm('¿Qué querés hacer con "'+nombre+'"?\n\n✓ Aceptar = DESACTIVAR (el historial se conserva, el dispositivo pierde acceso)\n✗ Cancelar = No hacer nada')
+    : confirm('¿Desactivar "'+nombre+'"? Sus datos históricos se conservan.');
+  if(!opc) return;
   try{
-    // Eliminar la activación (no desactivar, eliminar del todo)
+    // Soft delete: marcar como inactiva, NO eliminar
+    const r = await fetch(SURL+'/rest/v1/activaciones?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'application/json'},
+      body: JSON.stringify({ activa: false, deleted_at: new Date().toISOString() })
+    });
+    if(!r.ok) throw new Error(await r.text());
+    toast('✓ Terminal desactivada — historial conservado');
+    await loadTer();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+async function eliminarTerDefinitivo(id, nombre){
+  if(!confirm('⚠️ ELIMINAR DEFINITIVAMENTE "'+nombre+'"?\nEsto NO se puede deshacer.\nSus ventas históricas se conservan en pos_ventas pero la activación desaparece.')) return;
+  try{
     const r = await fetch(SURL+'/rest/v1/activaciones?id=eq.'+id,{
       method:'DELETE',
       headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'application/json'}
     });
     if(!r.ok) throw new Error(await r.text());
-    toast('✓ Terminal eliminada');
+    toast('✓ Terminal eliminada definitivamente');
     await loadTer();
   }catch(e){ toast('Error: '+e.message); }
 }
