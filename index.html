@@ -1928,9 +1928,7 @@
     </div>
 
     <!-- Lista de descuentos -->
-    <div id="descList">
-      <div class="loading"><span class="sp"></span>Cargando...</div>
-    </div>
+    <div id="descList"></div>
 
   </div>
 
@@ -2406,6 +2404,7 @@
         <button class="fsearch" onclick="toggleSearch()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
       </div>
       <div class="search-bar" id="sbar"><input class="sinput" id="sinput" placeholder="Buscar producto..." oninput="filterP()"></div>
+      <div id="diagPanel" style="display:none;position:fixed;bottom:80px;left:8px;right:8px;background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;color:#aaa;z-index:999;max-height:200px;overflow-y:auto;"></div>
       <div class="products-grid" id="pgrid"></div>
     </div>
 
@@ -2681,7 +2680,7 @@ let cart=[], curCat='Todos los artículos', showTkt=false, npCtx='', npVal='';
 let ticketDescuento=0; // % descuento en ticket total
 
 // NAV
-function goTo(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); if(id==='scConfig') setTimeout(renderConfigInfo,50); if(id==='scConfigGeneral') setTimeout(renderGeneralInfo,50); }
+function goTo(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); if(id==='scConfig') setTimeout(renderConfigInfo,50); if(id==='scConfigGeneral') setTimeout(renderGeneralInfo,50); if(id==='scDescuentos') setTimeout(renderDescList,50); if(id==='scArticulosList') setTimeout(renderArtList,50); }
 async function doOpenShift(){
   const v = parseInt(document.getElementById('shiftDisp').textContent.replace(/[₲.,]/g,''))||0;
 
@@ -2749,8 +2748,21 @@ function goCobrar(){
 }
 
 // PRODUCTS
+function diag(msg){
+  const p = document.getElementById('diagPanel');
+  if(!p) return;
+  p.style.display = 'block';
+  p.innerHTML += '<div>'+new Date().toLocaleTimeString()+' '+msg+'</div>';
+  p.scrollTop = p.scrollHeight;
+  // Auto hide after 15s
+  clearTimeout(window._diagTimer);
+  window._diagTimer = setTimeout(()=>{ p.style.display='none'; p.innerHTML=''; }, 15000);
+}
+
 function renderP(list){
   const g=document.getElementById('pgrid');
+  // Detailed diag
+  diag('renderP:'+list.length+' | PRODS:'+PRODS.length+' | cat:'+curCat);
   if(!list.length){g.innerHTML='<div style="grid-column:span 3;padding:40px;text-align:center;color:#555;font-size:14px;">Sin resultados</div>';return;}
   g.innerHTML=list.map(p=>`<div class="ptile" style="background:${getProductColor(p)}" onclick="addCart(${p.id})"><span class="pname">${p.name}</span></div>`).join('');
 }
@@ -2763,9 +2775,20 @@ function filterP(){
     return;
   }
 
-  // Productos normales — excluir inactivos, descuentos y ítem libre (excepto si se busca)
+  // Si la categoría seleccionada ya no existe, resetear a Todos
+  if(curCat !== 'Todos los artículos'){
+    const catExiste = CATEGORIAS.some(c=>c.nombre===curCat);
+    if(!catExiste){
+      curCat = 'Todos los artículos';
+      const lbl = document.getElementById('catLbl');
+      if(lbl) lbl.textContent = 'Todos los artículos';
+    }
+  }
+
+  // Productos normales — excluir inactivos e ítem libre
+  // NO filtrar por cat=Descuentos ya que eso rompe productos mal categorizados
   let l = (curCat==='Todos los artículos' ? PRODS : PRODS.filter(p=>p.cat===curCat))
-           .filter(p=>!p.esDescuento && p.cat!=='Descuentos' && !p.itemLibre && p.activo!==false);
+           .filter(p=>!p.itemLibre && p.activo!==false && p.activo!==0);
   if(q) l = l.filter(p=>p.name.toLowerCase().includes(q));
   renderP(l);
 }
@@ -3132,43 +3155,45 @@ function goGuardar(){
   setTimeout(()=>document.getElementById('guardObs').focus(), 300);
 }
 
+function guardarPendientesLocal(){
+  try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){}
+}
+
 function doGuardar(){
   const obs = document.getElementById('guardObs').value.trim();
 
   if(currentTicketNro !== null){
-    // ticket existente → actualizar en la lista de pendientes
+    // Actualizar ticket existente
     const idx = pendientes.findIndex(t => t.nro === currentTicketNro);
     if(idx >= 0){
       pendientes[idx].cart  = JSON.parse(JSON.stringify(cart));
       pendientes[idx].total = calcTotal();
       pendientes[idx].obs   = obs || pendientes[idx].obs;
-      pendientes[idx].fecha = new Date();
+      pendientes[idx].fecha = new Date().toISOString();
     }
     const nro = currentTicketNro;
-    cart=[];
     currentTicketNro = null;
-    updUI();
-    updBtnGuardar();
+    cart = [];
+    updUI(); updBtnGuardar();
+    guardarPendientesLocal(); // ← SIEMPRE guardar
     goTo('scSale');
-    toast('✓ Ticket #' + String(nro).padStart(4,'0') + ' actualizado');
+    toast('✓ Ticket #'+String(nro).padStart(4,'0')+' actualizado');
   } else {
-    // ticket nuevo → crear
-    const nro = ticketCounter;
+    // Ticket nuevo
+    const nro = ticketCounter++;
     pendientes.push({
       nro,
-      obs: obs || '',
-      cart: JSON.parse(JSON.stringify(cart)),
+      obs:   obs || '',
+      cart:  JSON.parse(JSON.stringify(cart)),
       total: calcTotal(),
-      fecha: new Date()
+      fecha: new Date().toISOString()
     });
-    ticketCounter++;
-    cart=[];
     currentTicketNro = null;
-    updUI();
-    updBtnGuardar();
-    try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){}
+    cart = [];
+    updUI(); updBtnGuardar();
+    guardarPendientesLocal(); // ← SIEMPRE guardar
     goTo('scSale');
-    toast('✓ Ticket #' + String(nro).padStart(4,'0') + ' guardado');
+    toast('✓ Ticket #'+String(nro).padStart(4,'0')+' guardado');
   }
 }
 
@@ -4804,6 +4829,7 @@ function turnoRestaurar(){
     if(data.egresos) data.egresos.forEach(e=>{ if(e.fecha) e.fecha = new Date(e.fecha); });
     Object.assign(turnoData, data);
     console.log('[Turno] Restaurado — '+turnoData.ventas.length+' ventas, abierto: '+turnoData.fechaApertura);
+    diag('Turno restaurado: '+turnoData.ventas.length+' ventas');
     return true;
   } catch(e){
     console.warn('[Turno] Error restaurando:', e.message);
@@ -5535,8 +5561,6 @@ function renderArtList(filter){
   // Todos los productos (excluir ítem libre y descuentos — esos tienen su propia pantalla)
   let items = PRODS.filter(p =>
     !p.itemLibre &&
-    !p.esDescuento &&
-    p.cat !== 'Descuentos' &&
     (!filter ||
       p.name.toLowerCase().includes(filter.toLowerCase()) ||
       (p.codigo && p.codigo.includes(filter)))
@@ -5544,7 +5568,7 @@ function renderArtList(filter){
 
   // Separar activos e inactivos
   const activos   = items.filter(p => p.activo !== false);
-  const inactivos = items.filter(p => p.activo === false);
+  const inactivos = items.filter(p => p.activo === false || p.activo === 0);
 
   if(!activos.length && !inactivos.length){
     list.innerHTML = '<div class="art-empty"><p>No hay artículos</p></div>';
@@ -5624,21 +5648,34 @@ function mostrarOpcionesInactivo(prodIdx){
 }
 
 // Reactivar artículo
-function reactivarArticulo(prodIdx){
+async function reactivarArticulo(prodIdx){
   const p = PRODS[prodIdx];
   if(!p) return;
+
+  // 1. Marcar en memoria
   p.activo = true;
   delete p.deleted_at;
-  // Persistir
-  if(db) db.productos.update(p.id, { activo:true, updatedAt:new Date().toISOString() });
-  if(!USAR_DEMO){
-    fetch(SUPA_URL+'/rest/v1/pos_productos?id=eq.'+p.id,{
-      method:'PATCH',
-      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json'},
-      body:JSON.stringify({activo:true})
-    }).then(()=>console.log('[Producto] Reactivado:', p.name))
-      .catch(e=>console.warn('[Producto] Error reactivar:', e.message));
+
+  // 2. Dexie
+  if(db) await db.productos.update(p.id, {activo:true, updatedAt:new Date().toISOString()});
+
+  // 3. Supabase
+  const email = localStorage.getItem('lic_email');
+  if(email && !USAR_DEMO){
+    try {
+      const r = await fetch(
+        SUPA_URL+'/rest/v1/pos_productos?id=eq.'+p.id+'&licencia_email=eq.'+encodeURIComponent(email),
+        { method:'PATCH',
+          headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+            'Content-Type':'application/json','Prefer':'return=minimal'},
+          body: JSON.stringify({activo:true})
+        }
+      );
+      if(r.ok) console.log('[Producto] Reactivado OK:', p.name);
+      else { const t=await r.text(); console.warn('[Producto] Error reactivar:',t); }
+    } catch(e){ console.warn('[Producto] Sin conexión:', e.message); }
   }
+
   filterP();
   renderArtList();
   toast('✓ "'+p.name+'" reactivado');
@@ -5792,19 +5829,44 @@ function guardarArticulo(){
   goTo('scArticulosList');
 }
 
-function eliminarArticulo(){
+async function eliminarArticulo(){
   if(artEditIdx < 0) return;
   const prod = PRODS[artEditIdx];
-  if(!confirm('¿Desactivar "'+prod.name+'"?\nEl producto no aparecerá en ventas pero sus datos históricos se conservan.')) return;
-  // Soft delete: marcar como inactivo, NO borrar
+  if(!confirm('¿Desactivar "'+prod.name+'"? No aparecerá en ventas pero sus datos se conservan.')) return;
+
+  // 1. Marcar en memoria
   PRODS[artEditIdx].activo = false;
   PRODS[artEditIdx].deleted_at = new Date().toISOString();
-  // Persistir
-  if(db) dbDeleteProducto(prod.id);
-  supaDeleteProducto(prod.id);
-  filterP(); renderArtList();
+
+  // 2. Guardar en Dexie (local)
+  if(db) await db.productos.update(prod.id, { activo: false, updatedAt: new Date().toISOString() });
+
+  // 3. Guardar en Supabase
+  const email = localStorage.getItem('lic_email');
+  if(email && !USAR_DEMO){
+    try {
+      const r = await fetch(
+        SUPA_URL+'/rest/v1/pos_productos?id=eq.'+prod.id+'&licencia_email=eq.'+encodeURIComponent(email),
+        { method:'PATCH',
+          headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+            'Content-Type':'application/json','Prefer':'return=minimal'},
+          body: JSON.stringify({activo:false})
+        }
+      );
+      if(r.ok){
+        console.log('[Producto] Desactivado OK:', prod.name);
+      } else {
+        const t = await r.text();
+        console.warn('[Producto] Error desactivar:', t);
+        toast('⚠️ Error al guardar en servidor — intenta de nuevo');
+      }
+    } catch(e){ console.warn('[Producto] Sin conexión:', e.message); }
+  }
+
+  filterP();
+  renderArtList();
   goTo('scArticulosList');
-  toast('Producto desactivado: ' + prod.name.substring(0,20));
+  toast('Producto desactivado: '+prod.name.substring(0,20));
 }
 
 // ── PRECIO VARIABLE ──────────────────────────────────────────────────────────
@@ -6478,7 +6540,7 @@ async function supaLoadProductos(){
         inventario:     p.inventario || false,
         comanda:        p.comanda || false,
         itemLibre:      false,
-        activo:         p.activo !== false && p.activo !== 0,
+        activo:         p.activo !== false && p.activo !== 0, // null/undefined/true = active
       });
     });
 
@@ -6490,12 +6552,18 @@ async function supaLoadProductos(){
     const maxId = Math.max(...PRODS.filter(p=>!p.itemLibre).map(p=>p.id), 0);
     nextProdId  = maxId + 1;
     console.log('[Supabase] Productos cargados:', PRODS.length-1);
+    diag('Supabase OK: '+( PRODS.length-1)+' prods');
+    // Reset category to Todos after load to avoid stale filter
+    curCat = 'Todos los artículos';
+    const catLblEl = document.getElementById('catLbl');
+    if(catLblEl) catLblEl.textContent = 'Todos los artículos';
     filterP();
-    // Cargar descuentos después de productos
-    cargarDescuentosConfig();
+    // Cargar descuentos en background
+    try { await cargarDescuentosConfig(); } catch(ed){ console.warn('[Desc]', ed.message); }
   } catch(e){
     if(!e.message?.includes('Failed to fetch'))
       console.warn('[Supabase] Productos:', e.message);
+      diag('Supabase ERROR: '+e.message);
     // PRODS queda intacto — no se limpió
   }
 }
@@ -6582,18 +6650,28 @@ async function supaUpsertProducto(prod){
 
 async function supaDeleteProducto(id){
   if(USAR_DEMO) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
   try {
-    await fetch(SUPA_URL+'/rest/v1/pos_productos?id=eq.'+id, {
+    const r = await fetch(
+      SUPA_URL+'/rest/v1/pos_productos?id=eq.'+id+
+      '&licencia_email=eq.'+encodeURIComponent(email), {
       method:  'PATCH',
       headers: {
         'apikey':        SUPA_ANON,
         'Authorization': 'Bearer '+SUPA_ANON,
         'Content-Type':  'application/json',
+        'Prefer':        'return=minimal'
       },
       body: JSON.stringify({ activo: false })
     });
-    console.log('[Supabase] Producto eliminado ID:', id);
-  } catch(e){ console.warn('[Supabase] Error eliminando producto:', e.message); }
+    if(!r.ok){
+      const t = await r.text();
+      console.warn('[Supabase] Error desactivando producto:', t);
+    } else {
+      console.log('[Supabase] Producto desactivado ID:', id);
+    }
+  } catch(e){ console.warn('[Supabase] Error:', e.message); }
 }
 
 async function supaUpsertCategoria(cat){
@@ -6769,13 +6847,16 @@ async function dbLoadProductos(){
         inventario:     p.inventario,
         comanda:        p.comanda,
         itemLibre:      p.item_libre,
-        activo:         p.activo !== false && p.activo !== 0,
+        activo:         p.activo !== false && p.activo !== 0, // null/undefined/true = active
         esDescuento:    p.es_descuento || false,
         descTipo:       p.desc_tipo || null,
         descValor:      p.desc_valor != null ? p.desc_valor : null,
       });
     });
     console.log('[DB] Productos cargados:', PRODS.length);
+    curCat = 'Todos los artículos';
+    const lbl2 = document.getElementById('catLbl');
+    if(lbl2) lbl2.textContent = 'Todos los artículos';
   } catch(e){ console.log('[DB] Productos no disponibles aún'); }
 }
 
@@ -7239,40 +7320,31 @@ function doDesactivar(){
 
 // ── FUNCIÓN CENTRAL DE INICIO ─────────────────────────────
 async function iniciarApp(){
-  // Restaurar config desde localStorage
+  // ── PASO 1: Config local (sin red) ───────────────────────
   const terminal = localStorage.getItem('pos_terminal');
   const sucursal = localStorage.getItem('pos_sucursal');
   const deposito = localStorage.getItem('pos_deposito');
-  if(terminal && typeof configData !== 'undefined') configData.terminal = terminal;
-  if(sucursal && typeof configData !== 'undefined') configData.sucursal = sucursal;
-  if(deposito && typeof configData !== 'undefined') configData.deposito = deposito;
+  if(terminal) configData.terminal = terminal;
+  if(sucursal) configData.sucursal = sucursal;
+  if(deposito) configData.deposito = deposito;
+  cargarConfigLocal();
+  cargarTimbradoSesion();
 
-  // Mostrar pantalla de carga mientras trae datos
-  goTo('scClosed');
-  renderP(PRODS);
-
-  // Cargar categorías y productos desde Supabase
-  if(!USAR_DEMO && navigator.onLine){
-    try {
-      await supaLoadCategorias();
-      await supaLoadProductos();
-      renderP(PRODS);
-      filterP();
-    } catch(e){ console.warn('[App] Error cargando datos:', e.message); }
-  } else if(db){
-    // Si offline, cargar desde Dexie
-    await dbLoadCategorias();
-    await dbLoadProductos();
-    renderP(PRODS);
-  }
-
-  // Restaurar tickets pendientes
+  // ── PASO 2: Restaurar pendientes ──────────────────────────
   try {
-    const rp=localStorage.getItem('pos_pendientes');
-    if(rp){ const sp=JSON.parse(rp); if(Array.isArray(sp)&&sp.length>0){ pendientes=sp; const mx=sp.reduce((m,p)=>Math.max(m,p.nro||0),0); if(mx>=ticketCounter)ticketCounter=mx+1; console.log('[App] '+sp.length+' pendientes restaurados'); }}
-  } catch(e){}
+    const rp = localStorage.getItem('pos_pendientes');
+    if(rp){
+      const sp = JSON.parse(rp);
+      if(Array.isArray(sp) && sp.length > 0){
+        pendientes = sp;
+        const mx = sp.reduce((m,p)=>Math.max(m, p.nro||0), 0);
+        if(mx >= ticketCounter) ticketCounter = mx + 1;
+        console.log('[App] Pendientes restaurados:', sp.length);
+      }
+    }
+  } catch(e){ console.warn('[Pendientes]', e.message); }
 
-  // Restaurar turno activo
+  // ── PASO 3: Restaurar turno ── ANTES de cualquier await ──
   const turnoOk = turnoRestaurar();
   if(turnoOk){
     goTo('scSale');
@@ -7281,16 +7353,21 @@ async function iniciarApp(){
     goTo('scClosed');
   }
 
-  // Cargar config local primero (offline)
-  cargarConfigLocal();
+  // ── PASO 4: Cargar productos/categorías (background) ─────
+  if(!USAR_DEMO && navigator.onLine){
+    try {
+      await supaLoadCategorias();
+      await supaLoadProductos();
+    } catch(e){ console.warn('[App] Carga Supabase:', e.message); }
+  } else if(db){
+    try {
+      await dbLoadCategorias();
+      await dbLoadProductos();
+    } catch(e){ console.warn('[App] Carga DB:', e.message); }
+  }
 
-  // Cargar timbrado activo para esta sesión
-  cargarTimbradoSesion();
-
-  // Sincronizar config del negocio desde Supabase (en background)
+  // ── PASO 5: Sync background ───────────────────────────────
   setTimeout(sincronizarConfigNegocio, 3000);
-
-  // Sincronizar en background
   setTimeout(syncConSupabase, 5000);
   setTimeout(syncVentasPendientes, 8000);
 }
