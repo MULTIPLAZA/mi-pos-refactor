@@ -778,57 +778,81 @@ async function saveTims(){
   if(!SE) return;
 
   // 3. Guardar cada clave con PATCH o POST
-  await supaUpsertConfig('timbrados_config', timbrados);
-  await supaUpsertConfig('timbrados_mapa',   mapa);
-  console.log('[Timbrados] Guardado en Supabase OK');
+  console.log('[saveTims] Guardando', timbrados.length, 'timbrados, mapa:', JSON.stringify(mapa));
+  const ok1 = await supaUpsertConfig('timbrados_config', timbrados);
+  const ok2 = await supaUpsertConfig('timbrados_mapa',   mapa);
+  if(ok1 && ok2){
+    console.log('[Timbrados] ✅ Guardado en Supabase OK — asignaciones:', JSON.stringify(timbrados.map(t=>({nro:t.nro,asig:t.asignaciones||[]}))));
+  } else {
+    console.warn('[Timbrados] ⚠️ Guardado parcial — revisar consola');
+  }
 }
 
 async function supaUpsertConfig(clave, valor){
-  const valStr = JSON.stringify(valor);
-  // Intentar PATCH (update si existe)
-  const patchUrl = SUPA_URL+'/rest/v1/pos_config'
-    +'?licencia_email=eq.'+encodeURIComponent(SE)
-    +'&clave=eq.'+clave;
-  const patch = await fetch(patchUrl, {
-    method: 'PATCH',
-    headers: {
-      'apikey':          SUPA_ANON,
-      'Authorization':   'Bearer '+SUPA_ANON,
-      'Content-Type':    'application/json',
-      'Prefer':          'return=representation'
-    },
-    body: JSON.stringify({ valor: valStr })
-  });
-
-  const patchData = await patch.json().catch(()=>[]);
-  // Si el PATCH no actualizó nada → INSERT
-  if(!Array.isArray(patchData) || patchData.length === 0){
-    const post = await fetch(SUPA_URL+'/rest/v1/pos_config', {
+  // Usar RPC upsert_config — más confiable que PATCH/POST manual
+  const valStr = typeof valor === 'string' ? valor : JSON.stringify(valor);
+  try {
+    const r = await fetch(SUPA_URL+'/rest/v1/rpc/upsert_config', {
       method: 'POST',
       headers: {
         'apikey':        SUPA_ANON,
         'Authorization': 'Bearer '+SUPA_ANON,
-        'Content-Type':  'application/json',
-        'Prefer':        'return=minimal'
+        'Content-Type':  'application/json'
       },
-      body: JSON.stringify({ licencia_email: SE, clave, valor: valStr })
+      body: JSON.stringify({
+        p_email: SE,
+        p_clave: clave,
+        p_valor: valStr
+      })
     });
-    if(!post.ok){
-      const err = await post.text();
-      throw new Error('INSERT error: '+err);
+    const data = await r.json();
+    if(r.ok && data && data.ok){
+      console.log('[Config] Guardado OK:', clave);
+      return true;
+    } else {
+      console.warn('[Config] RPC error:', clave, data);
+      // Fallback: POST directo con ON CONFLICT
+      return await supaUpsertConfigDirect(clave, valStr);
     }
-    console.log('[Config] INSERT OK:', clave);
-  } else {
-    console.log('[Config] PATCH OK:', clave, '— registros:', patchData.length);
+  } catch(e){
+    console.warn('[Config] RPC exception:', e.message);
+    return await supaUpsertConfigDirect(clave, valStr);
   }
 }
+
+async function supaUpsertConfigDirect(clave, valStr){
+  // Fallback directo a la REST API
+  const r = await fetch(SUPA_URL+'/rest/v1/pos_config', {
+    method: 'POST',
+    headers: {
+      'apikey':        SUPA_ANON,
+      'Authorization': 'Bearer '+SUPA_ANON,
+      'Content-Type':  'application/json',
+      'Prefer':        'resolution=merge-duplicates,return=minimal'
+    },
+    body: JSON.stringify({
+      licencia_email: SE,
+      clave:          clave,
+      valor:          valStr,
+      updated_at:     new Date().toISOString()
+    })
+  });
+  if(r.ok){
+    console.log('[Config] Directo OK:', clave);
+    return true;
+  }
+  const err = await r.text();
+  console.error('[Config] Directo error:', clave, err);
+  return false;
+}
 function refreshTimLista(){
+  // Uses in-memory timbrados (already updated)
   const el=document.getElementById('timLista');
   if(el) el.innerHTML=buildTimLista();
 }
 
-// Después de guardar, recargar desde Supabase para confirmar
 async function refreshTimListaFromServer(){
+  // Only call this when explicitly needed (e.g. page load)
   await cargarTimbradosDesdeSupabase();
   refreshTimLista();
 }
@@ -933,23 +957,62 @@ async function agregarAsig(){
   timbrados[timIdx].asignaciones.push({ terminal, punto_exp:ptoExp, nro_actual:desde });
   timbrados[timIdx].seleccionado = true;
 
-  // Mostrar progreso
-  const btn = document.querySelector('[onclick="agregarAsig()"]');
-  if(btn){ btn.disabled=true; btn.textContent='Guardando...'; }
-  toast('Guardando en la nube...');
+  // Feedback visual inmediato
+  const btn = document.querySelector('button[onclick="agregarAsig()"]');
+  if(btn){ btn.disabled=true; btn.style.background='#666'; btn.textContent='⏳ Guardando...'; }
 
-  await saveTims();
+  try {
+    await saveTims();
+    toast('✓ Terminal "'+terminal+'" guardada');
+    console.log('[Asignación] OK — timbrados:', JSON.stringify(timbrados[timIdx].asignaciones));
+  } catch(e) {
+    toast('⚠️ Error al guardar: '+e.message);
+    console.error('[Asignación] Error:', e);
+  }
 
-  if(btn){ btn.disabled=false; btn.textContent='AGREGAR'; }
-  toast('✓ Terminal "'+terminal+'" guardada correctamente');
+  if(btn){ btn.disabled=false; btn.style.background='var(--green)'; btn.textContent='AGREGAR'; }
 
-  // Reabrir modal con datos frescos
-  abrirModalAsignar(timIdx);
+  // Actualizar modal en lugar (sin cerrar/abrir)
+  // Limpiar campos
+  const termInput = document.getElementById('asigTerminal');
+  const pexInput  = document.getElementById('asigPtoExp');
+  const desdeInput= document.getElementById('asigDesde');
+  if(termInput) termInput.value = '';
+  if(pexInput)  pexInput.value  = '001';
+  if(desdeInput)desdeInput.value= '1';
+
+  // Reconstruir lista de asignaciones en el modal
+  const asigLista = document.getElementById('asigLista');
+  const t2 = timbrados[timIdx];
+  const asignaciones2 = t2.asignaciones || [];
+  if(asigLista){
+    asigLista.innerHTML = asignaciones2.length ? asignaciones2.map((a,j)=>`
+      <div style="display:flex;align-items:center;gap:8px;background:#111;border:1px solid #2a2a2a;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;color:#fff;">${a.terminal}</div>
+          <div style="font-size:11px;color:var(--muted);">
+            Pto. Exp.: <strong style="color:var(--green);font-family:monospace;">${String(a.punto_exp||'001').padStart(3,'0')}</strong>
+            · Siguiente: <strong style="color:var(--green);font-family:monospace;">${String(a.nro_actual||1).padStart(7,'0')}</strong>
+          </div>
+          <div style="font-size:10px;color:#444;margin-top:2px;font-family:monospace;">
+            Factura N° ${pad3(t2.sucursal)}-${String(a.punto_exp||'001').padStart(3,'0')}-${String(a.nro_actual||1).padStart(7,'0')}
+          </div>
+        </div>
+        <button onclick="elimAsig(${j})" style="background:var(--r2);border:1px solid var(--red);border-radius:6px;color:var(--red);font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;">✕</button>
+      </div>`).join('')
+    : '<div style="text-align:center;padding:16px;color:var(--muted);font-size:13px;">Sin terminales asignadas</div>';
+  }
+
+  // También actualizar la card del timbrado
+  refreshTimLista();
 }
 
 function cerrarModalAsignar(){
   document.getElementById('mAsignarOv').style.display='none';
-  refreshTimLista();
+  // Refresh using LOCAL data (already updated by saveTims)
+  // Don't reload from server here — use what's in memory
+  const lista = document.getElementById('timLista');
+  if(lista) lista.innerHTML = buildTimLista();
 }
 function elimTim(i){
   if(!confirm('¿Eliminar este timbrado?'))return;
