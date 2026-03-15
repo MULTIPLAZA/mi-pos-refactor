@@ -3256,10 +3256,35 @@ let facturaActiva = false;
 let rucTimer = null;
 let timbradoSession = null; // timbrado cargado para esta sesión
 
-function cargarTimbradoSesion(){
-  timbradoSession = getTimbradoActivo();
-  if(timbradoSession){
-    console.log('[Timbrado] Activo:', timbradoSession.nro, '| Próx. nro:', getNroFactura(timbradoSession));
+async function cargarTimbradoSesion(){
+  const terminal = localStorage.getItem('pos_terminal')||'Terminal 1';
+  const email    = localStorage.getItem('lic_email');
+  if(!email || USAR_DEMO){ timbradoSession = getTimbradoActivo(); return; }
+
+  try {
+    const r = await fetch(SUPA_URL+'/rest/v1/rpc/get_timbrado_terminal',{
+      method:'POST',
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json'},
+      body: JSON.stringify({ p_email:email, p_terminal:terminal })
+    });
+    const d = await r.json();
+    if(d && d.nro){
+      // Guardar en cache de sesión y localStorage
+      window._timbradoCache = d;
+      localStorage.setItem('pos_timbrado_activo', JSON.stringify(d));
+      // Actualizar localStorage para modo offline
+      const tims = [{ ...d, asignaciones:[{ terminal, punto_exp:d.punto_exp, nro_actual:d.nro_actual }] }];
+      localStorage.setItem('pos_timbrados', JSON.stringify(tims));
+      localStorage.setItem('pos_timbrados_mapa', JSON.stringify({ [terminal]:{timIdx:0,asigIdx:0} }));
+      timbradoSession = d;
+      console.log('[Timbrado] ✅ Cargado:', d.nro, '| Próx.:', getNroFactura(d));
+    } else {
+      console.warn('[Timbrado] Sin asignación para terminal:', terminal, d);
+      timbradoSession = getTimbradoActivo(); // fallback local
+    }
+  } catch(e){
+    console.warn('[Timbrado] Error RPC:', e.message);
+    timbradoSession = getTimbradoActivo();
   }
 }
 
@@ -3293,17 +3318,8 @@ async function sincronizarConfigNegocio(){
           console.log('[Config] Negocio:', configData.negocio, '| RUC:', configData.ruc);
         }
 
-        if(row.clave === 'timbrados_config'){
-          // Guardar timbrados en localStorage del POS
-          localStorage.setItem('pos_timbrados', JSON.stringify(val));
-          console.log('[Timbrados] Descargados:', Array.isArray(val)?val.length:0, 'timbrados');
-        }
-
-        if(row.clave === 'timbrados_mapa'){
-          // Guardar mapa terminal→timbrado en localStorage del POS
-          localStorage.setItem('pos_timbrados_mapa', JSON.stringify(val));
-          console.log('[Mapa] Descargado:', JSON.stringify(val));
-        }
+        // timbrados_config y timbrados_mapa ahora vienen de tablas específicas
+        // Se cargan via cargarTimbradoSesion()
 
       } catch(e){ console.warn('[Config] Error parsing', row.clave, e.message); }
     });
@@ -4030,110 +4046,55 @@ let turnoData = {
 // ══════════════════════════════════════════════════════
 
 function getTimbradoActivo(){
-  const terminal = localStorage.getItem('pos_terminal') || 'Terminal 1';
-  const sucursal = localStorage.getItem('pos_sucursal') || 'Principal';
+  // Usar el timbrado cargado en sesión (descargado de Supabase)
+  if(window._timbradoCache) return window._timbradoCache;
+  // Fallback a localStorage
   try {
+    const terminal = localStorage.getItem('pos_terminal')||'Terminal 1';
     const mapa = JSON.parse(localStorage.getItem('pos_timbrados_mapa')||'{}');
     const tims = JSON.parse(localStorage.getItem('pos_timbrados')||'[]');
-
-    // 1. Buscar por nombre exacto de terminal en el mapa
-    let asig = mapa[terminal];
-
-    // 2. Si no encontró, buscar por sucursal
-    if(asig === undefined) asig = mapa[sucursal];
-
-    if(asig !== undefined){
-      if(typeof asig === 'object' && asig.timIdx !== undefined){
-        const tim = tims[asig.timIdx];
-        const a   = tim && tim.asignaciones && tim.asignaciones[asig.asigIdx];
-        if(tim && a){
-          return { ...tim,
-            sucursal:   tim.sucursal,
-            punto_exp:  a.punto_exp,
-            nro_actual: a.nro_actual || a.desde || 1,
-            _asigIdx: asig.asigIdx,
-            _timIdx:  asig.timIdx
-          };
-        }
-      }
-      // Formato simple: índice directo al timbrado
-      if(typeof asig === 'number' && tims[asig]){
-        return tims[asig];
-      }
+    const asig = mapa[terminal];
+    if(asig !== undefined && tims[asig.timIdx]){
+      const t = tims[asig.timIdx];
+      const a = t.asignaciones && t.asignaciones[asig.asigIdx];
+      if(a) return { ...t, punto_exp:a.punto_exp, nro_actual:a.nro_actual||a.desde||1 };
     }
-
-    // 3. Buscar en asignaciones de cada timbrado por nombre de terminal
-    for(let i=0; i<tims.length; i++){
-      const t = tims[i];
-      if(!t.asignaciones) continue;
-      const aIdx = t.asignaciones.findIndex(a => a.terminal === terminal);
-      if(aIdx >= 0){
-        const a = t.asignaciones[aIdx];
-        return { ...t,
-          sucursal:   t.sucursal,
-          punto_exp:  a.punto_exp,
-          nro_actual: a.nro_actual || a.desde || 1,
-          _asigIdx: aIdx,
-          _timIdx:  i
-        };
-      }
+    // Buscar en asignaciones directamente
+    for(const t of tims){
+      const a = (t.asignaciones||[]).find(a=>a.terminal===terminal);
+      if(a) return { ...t, punto_exp:a.punto_exp, nro_actual:a.nro_actual||1 };
     }
-
-    // 4. Fallback: primer timbrado vigente
-    const hoy = new Date();
-    const vigente = tims.find(t => {
-      if(t.tipo==='electronico') return true;
-      return t.vig_fin ? new Date(t.vig_fin+' 00:00:00') >= hoy : true;
-    });
-    if(vigente) return vigente;
-
-    // 5. Último fallback: global activo guardado
-    const global = localStorage.getItem('pos_timbrado_activo');
-    if(global) return JSON.parse(global);
-
-  } catch(e){ console.warn('[Timbrado]', e.message); }
+    if(tims.length) return tims[0];
+  } catch(e){ console.warn('[getTimbrado]', e.message); }
   return null;
 }
 
 function getNroFactura(timbrado){
-  if(!timbrado) return null;
-  const pad3 = n => String(n||0).padStart(3,'0');
-  const padN = n => String(n||0).padStart(7,'0');
-  // Usar datos específicos de la terminal si existen
-  const ptoExp = timbrado._punto_exp || timbrado.punto_exp;
-  const nro    = timbrado._nro_actual || timbrado.nro_actual || timbrado.desde || 1;
-  return pad3(timbrado.sucursal)+'-'+pad3(ptoExp)+'-'+padN(nro);
+  const t = timbrado || window._timbradoCache;
+  if(!t) return null;
+  const pad3 = n=>String(n||0).padStart(3,'0');
+  const padN = n=>String(n||0).padStart(7,'0');
+  return pad3(t.sucursal)+'-'+pad3(t.punto_exp)+'-'+padN(t.nro_actual||t.desde||1);
 }
 
-function avanzarNroFactura(timbrado){
+async function avanzarNroFactura(timbrado){
   if(!timbrado) return;
-  try {
-    const tims = JSON.parse(localStorage.getItem('pos_timbrados')||'[]');
-    // Incrementar correlativo específico de la terminal
-    if(timbrado._timIdx !== undefined && timbrado._asigIdx !== undefined){
-      const tim = tims[timbrado._timIdx];
-      if(tim && tim.asignaciones && tim.asignaciones[timbrado._asigIdx]){
-        tim.asignaciones[timbrado._asigIdx].nro_actual =
-          (tim.asignaciones[timbrado._asigIdx].nro_actual || tim.asignaciones[timbrado._asigIdx].desde || 1) + 1;
-        localStorage.setItem('pos_timbrados', JSON.stringify(tims));
-        // Actualizar mapa también
-        const mapa = JSON.parse(localStorage.getItem('pos_timbrados_mapa')||'{}');
-        const terminal = localStorage.getItem('pos_terminal')||'Terminal 1';
-        if(mapa[terminal]){
-          mapa[terminal].nro_actual = tim.asignaciones[timbrado._asigIdx].nro_actual;
-          localStorage.setItem('pos_timbrados_mapa', JSON.stringify(mapa));
-        }
-        console.log('[Timbrado] Próximo nro:', tim.asignaciones[timbrado._asigIdx].nro_actual);
-        return;
-      }
-    }
-    // Fallback: incrementar nro global del timbrado
-    const idx = tims.findIndex(t=>t.nro===timbrado.nro);
-    if(idx >= 0){
-      tims[idx].nro_actual = (tims[idx].nro_actual || tims[idx].desde || 1) + 1;
-      localStorage.setItem('pos_timbrados', JSON.stringify(tims));
-    }
-  } catch(e){ console.warn('[Timbrado] Error avanzando nro:', e.message); }
+  const terminal = localStorage.getItem('pos_terminal')||'Terminal 1';
+  const email    = localStorage.getItem('lic_email');
+  // Incrementar local inmediatamente
+  if(window._timbradoCache) window._timbradoCache.nro_actual=(window._timbradoCache.nro_actual||1)+1;
+  const cached = JSON.parse(localStorage.getItem('pos_timbrado_activo')||'null');
+  if(cached){ cached.nro_actual=(cached.nro_actual||1)+1; localStorage.setItem('pos_timbrado_activo',JSON.stringify(cached)); }
+  // Avisar a Supabase sin bloquear
+  if(email && !USAR_DEMO){
+    fetch(SUPA_URL+'/rest/v1/rpc/avanzar_correlativo',{
+      method:'POST',
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json'},
+      body: JSON.stringify({ p_email:email, p_terminal:terminal })
+    }).then(r=>r.json()).then(d=>{
+      if(d&&d.ok) console.log('[Correlativo] +1 en Supabase → nro_actual:',d.nro_actual);
+    }).catch(e=>console.warn('[Correlativo]',e.message));
+  }
 }
 
 // ══════════════════════════════════════════════════════
