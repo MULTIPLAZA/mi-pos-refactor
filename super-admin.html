@@ -2,11 +2,11 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Super Admin — POS</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>POS Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
+
 *{margin:0;padding:0;box-sizing:border-box;}
 :root{
   --bg:#0a0a0a;--card:#141414;--card2:#1a1a1a;
@@ -46,10 +46,14 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
 
 /* Sidebar — hidden on mobile */
 #sidebar{
-  display:none; /* mobile: hidden */
+  display:flex;
+  flex-direction:column;
   width:220px;background:var(--card);border-right:1px solid var(--border);
-  flex-direction:column;position:fixed;left:0;top:0;bottom:0;z-index:30;
+  position:fixed;left:0;top:0;bottom:0;z-index:30;
+  transform:translateX(-100%);
+  transition:transform .25s;
 }
+#sidebar.open{transform:translateX(0);}
 .sb-hd{padding:18px 16px;border-bottom:1px solid var(--border);}
 .sb-brand{font-size:15px;font-weight:800;color:var(--green);}
 .sb-sub{font-size:11px;color:var(--muted);margin-top:2px;}
@@ -76,7 +80,7 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
 .btn-ic{background:none;border:none;color:var(--muted);cursor:pointer;padding:6px;}
 
 /* Main */
-#main{padding:16px 14px 80px;}
+#main{padding:16px 14px 80px;background:var(--bg);color:#fff;}
 
 /* Bottom nav — mobile only */
 #bnav{
@@ -91,10 +95,12 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
 
 /* ═══ DESKTOP (≥900px) ═══ */
 @media(min-width:900px){
-  #sidebar{display:flex;}  /* show sidebar */
-  #topbar{display:none;}   /* hide mobile topbar */
-  #bnav{display:none;}     /* hide bottom nav */
+  #sidebar{transform:translateX(0) !important;}
+  #topbar{display:none;}
+  #bnav{display:none;}
   #main{margin-left:220px;padding:28px;max-width:none;}
+  #content{margin-left:220px;padding:28px;padding-bottom:40px;}
+  #sbOv{display:none !important;}
 }
 
 /* ═══ TABLET (640-899px) ═══ */
@@ -199,216 +205,93 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
   font-size:13px;font-weight:600;opacity:0;transition:all .3s;z-index:9999;white-space:nowrap;}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
 @media(min-width:900px){.toast{bottom:24px;}}
+
 </style>
 </head>
 <body>
 
-<!-- ══ LOGIN ══ -->
-<div id="loginWrap">
-  <div class="lbox">
-    <div class="l-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>
-    <div class="l-t">Super Admin</div>
-    <div class="l-s">Panel de administración</div>
-    <div class="fi"><label>Usuario</label><input type="text" id="saU" placeholder="admin" onkeydown="if(event.key==='Enter')login()"></div>
-    <div class="fi"><label>Contraseña</label><input type="password" id="saP" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()"></div>
-    <button class="btn-p" onclick="login()">INGRESAR</button>
-    <div class="l-err" id="lErr"></div>
+<!-- LOGIN -->
+<div id="loginWrap" style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:32px 28px;width:100%;max-width:360px;">
+    <div style="font-size:24px;font-weight:800;color:var(--green);margin-bottom:4px;">⚡ POS Admin</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:24px;">Panel de Super Administrador</div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:5px;">USUARIO</label>
+      <input id="loginUser" type="text" value="admin" style="width:100%;background:#1e1e1e;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:inherit;font-size:15px;padding:11px 14px;outline:none;box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:16px;">
+      <label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:5px;">CONTRASEÑA</label>
+      <input id="loginPass" type="password" style="width:100%;background:#1e1e1e;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:inherit;font-size:15px;padding:11px 14px;outline:none;box-sizing:border-box;" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button onclick="doLogin()" style="width:100%;background:var(--green);border:none;border-radius:8px;color:#fff;font-family:inherit;font-size:14px;font-weight:800;padding:13px;cursor:pointer;letter-spacing:.5px;">INGRESAR</button>
+    <div id="loginErr" style="display:none;color:var(--red);font-size:12px;text-align:center;margin-top:8px;"></div>
   </div>
 </div>
 
-<!-- ══ APP ══ -->
-<div id="app">
+<!-- APP -->
+<div id="app" style="display:none;">
 
-  <!-- SIDEBAR (desktop) -->
+  <!-- Sidebar -->
   <div id="sidebar">
     <div class="sb-hd">
-      <div class="sb-brand">⚡ POS Admin</div>
-      <div class="sb-sub">Super Administrador</div>
+      <div style="font-size:14px;font-weight:800;color:var(--green);">⚡ POS Admin</div>
+      <div style="font-size:11px;color:var(--muted);">Super Administrador</div>
     </div>
     <div class="sb-nav">
-      <div class="sb-i on" onclick="nav('lic',this,'Licencias')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>Licencias</div>
-      <div class="sb-i" onclick="nav('cli',this,'Clientes')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Clientes</div>
-      <div class="sb-i" onclick="nav('ter',this,'Terminales')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Terminales</div>
-      <div class="sb-i" onclick="nav('rep',this,'Reportes')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reportes</div>
-      <div class="sb-i" onclick="nav('ruc',this,'Contribuyentes')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>Contribuyentes</div>
+      <div class="sb-i on" onclick="goTo('lic')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>Licencias</div>
+      <div class="sb-i" onclick="goTo('cli')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Clientes</div>
+      <div class="sb-i" onclick="goTo('ter')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Terminales</div>
+      <div class="sb-i" onclick="goTo('rep')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reportes</div>
+      <div class="sb-i" onclick="goTo('ruc')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>Contribuyentes</div>
     </div>
     <div class="sb-ft">
-      <div class="sb-av">A</div>
-      <div style="flex:1;font-size:12px;color:var(--muted);">admin</div>
-      <button class="btn-out" onclick="logout()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+      <div style="width:30px;height:30px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">A</div>
+      <div style="flex:1;font-size:12px;color:#aaa;">admin</div>
+      <button onclick="logout()" style="background:none;border:none;color:var(--muted);cursor:pointer;" title="Cerrar sesión">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
     </div>
   </div>
 
-  <!-- TOPBAR (mobile) -->
+  <!-- Topbar mobile -->
   <div id="topbar">
-    <div class="tb-brand">⚡ POS Admin</div>
     <div style="display:flex;align-items:center;gap:8px;">
-      <span class="tb-page" id="tbPage">Licencias</span>
-      <button class="btn-ic" onclick="logout()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+      <button class="menu-btn" onclick="toggleSB()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <span style="font-size:15px;font-weight:800;color:var(--green);">⚡ POS Admin</span>
     </div>
+    <span id="tbPage" style="font-size:12px;color:var(--muted);">Licencias</span>
   </div>
 
-  <!-- MAIN -->
-  <div id="main">
+  <!-- Sidebar overlay -->
+  <div id="sbOv" onclick="toggleSB()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:29;"></div>
 
-    <!-- LICENCIAS -->
-    <div class="page on" id="pLic">
-      <div class="ph">
-        <div>
-          <div class="ph-t">Licencias</div>
-          <div class="lcount" id="licCount">—</div>
-        </div>
-        <button class="btn-nueva" onclick="openM()">+ NUEVA</button>
-      </div>
-      <div class="sbar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="licQ" placeholder="Buscar clave, cliente, email, rubro..." oninput="filtrL(this.value)">
-      </div>
-      <div id="licList"><div class="loading"><span class="sp"></span>Cargando...</div></div>
-    </div>
-
-    <!-- CLIENTES -->
-    <div class="page" id="pCli">
-      <div class="ph"><div><div class="ph-t">Clientes</div><div class="ph-s">Negocios registrados</div></div></div>
-      <div id="cliList"><div class="loading"><span class="sp"></span>Cargando...</div></div>
-    </div>
-
-    <!-- TERMINALES -->
-    <div class="page" id="pTer">
-      <div class="ph">
-        <div><div class="ph-t">Terminales</div><div class="ph-s" id="terCount">Dispositivos activados</div></div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <select id="terFiltroEmp" onchange="filtrTer()"
-            style="background:var(--card2);border:1px solid var(--border);border-radius:8px;color:#ccc;font-family:'Barlow',sans-serif;font-size:13px;padding:8px 12px;outline:none;max-width:160px;">
-            <option value="">Todas las empresas</option>
-          </select>
-        </div>
-      </div>
-      <div class="sbar" style="margin-bottom:14px;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="terQ" placeholder="Buscar terminal, negocio, email..." oninput="filtrTer()">
-      </div>
-      <div id="terList"><div class="loading"><span class="sp"></span>Cargando...</div></div>
-    </div>
-
-    <!-- REPORTES -->
-    <div class="page" id="pRep">
-      <div class="ph"><div><div class="ph-t">Reportes</div><div class="ph-s">Visión global del negocio</div></div></div>
-
-  <!-- PAGE: CONTRIBUYENTES RUC -->
-  <div class="page" id="pRuc" style="display:none;">
-    <div class="ph">
-      <div>
-        <div class="pt">Contribuyentes RUC</div>
-        <div class="ps">Importar y consultar base de datos del SET/DNIT</div>
-      </div>
-    </div>
-
-    <!-- Stats -->
-    <div class="kg" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;">
-      <div class="kc" style="--c:var(--green)"><div class="kc-l">Total registros</div><div class="kc-v" id="rucTotal">—</div><div class="kc-s">en base de datos</div></div>
-      <div class="kc" style="--c:var(--blue)"><div class="kc-l">Activos</div><div class="kc-v" id="rucActivos">—</div></div>
-      <div class="kc" style="--c:var(--muted)"><div class="kc-l">Última importación</div><div class="kc-v" id="rucUltima" style="font-size:14px;">—</div></div>
-    </div>
-
-    <!-- Importar archivos -->
-    <div class="card" style="margin-bottom:20px;">
-      <div class="card-h"><span class="card-t">📥 Importar archivos TXT del SET</span></div>
-      <div style="padding:16px;">
-        <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6;">
-          Seleccioná uno o varios archivos TXT del SET (ruc1.txt, ruc2.txt... ruc9.txt).<br>
-          El formato esperado es: <code style="background:#1e1e1e;padding:2px 6px;border-radius:4px;">RUC|RAZON_SOCIAL|DV|CODIGO|ESTADO|</code>
-        </div>
-
-        <!-- Drop zone -->
-        <div id="rucDropZone" style="border:2px dashed #2a2a2a;border-radius:10px;padding:30px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:14px;"
-          onclick="document.getElementById('rucFileInput').click()"
-          ondragover="event.preventDefault();this.style.borderColor='var(--green)'"
-          ondragleave="this.style.borderColor='#2a2a2a'"
-          ondrop="event.preventDefault();this.style.borderColor='#2a2a2a';handleRucFiles(event.dataTransfer.files)">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.5" style="margin-bottom:8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <div style="font-size:14px;font-weight:700;color:#aaa;margin-bottom:4px;">Arrastrá los archivos acá</div>
-          <div style="font-size:12px;color:#555;">o hacé click para seleccionar</div>
-          <input type="file" id="rucFileInput" accept=".txt" multiple style="display:none" onchange="handleRucFiles(this.files)">
-        </div>
-
-        <!-- Progress -->
-        <div id="rucProgress" style="display:none;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <span style="font-size:13px;font-weight:700;" id="rucProgressLabel">Procesando...</span>
-            <span style="font-size:12px;color:var(--muted);" id="rucProgressPct">0%</span>
-          </div>
-          <div style="background:#1e1e1e;border-radius:4px;height:8px;overflow:hidden;margin-bottom:8px;">
-            <div id="rucProgressBar" style="height:100%;width:0%;background:var(--green);border-radius:4px;transition:width .3s;"></div>
-          </div>
-          <div style="font-size:12px;color:var(--muted);" id="rucProgressDetail"></div>
-        </div>
-
-        <!-- Log -->
-        <div id="rucLog" style="display:none;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;max-height:200px;overflow-y:auto;color:#aaa;"></div>
-      </div>
-    </div>
-
-    <!-- Buscar contribuyente -->
-    <div class="card">
-      <div class="card-h"><span class="card-t">🔍 Consultar contribuyente</span></div>
-      <div style="padding:16px;">
-        <div style="display:flex;gap:8px;margin-bottom:12px;">
-          <input id="rucBuscarInput" type="text" placeholder="Ingresá RUC o nombre..." 
-            style="flex:1;background:#1e1e1e;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:10px 14px;outline:none;"
-            oninput="buscarRucAdmin(this.value)">
-        </div>
-        <div id="rucResultados"></div>
-      </div>
-    </div>
+  <!-- SINGLE CONTENT DIV -->
+  <div id="content" style="padding:16px 14px 80px;min-height:calc(100vh - 52px);box-sizing:border-box;">
+    <div class="loading"><span class="sp"></span>Cargando...</div>
   </div>
-      <div class="kg k4">
-        <div class="kc" style="--c:var(--green)"><div class="kc-l">Activas</div><div class="kc-v" id="rA">—</div></div>
-        <div class="kc" style="--c:var(--blue)"><div class="kc-l">Terminales</div><div class="kc-v" id="rT">—</div></div>
-        <div class="kc" style="--c:var(--orange)"><div class="kc-l">Vencen pronto</div><div class="kc-v" id="rV">—</div></div>
-        <div class="kc" style="--c:var(--red)"><div class="kc-l">Suspendidas</div><div class="kc-v" id="rS">—</div></div>
-      </div>
-      <div class="kg k3">
-        <div class="kc" style="--c:var(--green)"><div class="kc-l">MRR</div><div class="kc-v" id="rMRR">₲0</div><div class="kc-s">Mensual recurrente</div></div>
-        <div class="kc" style="--c:var(--blue)"><div class="kc-l">ARR</div><div class="kc-v" id="rARR">₲0</div><div class="kc-s">Anual recurrente</div></div>
-        <div class="kc" style="--c:var(--orange)"><div class="kc-l">Churn rate</div><div class="kc-v" id="rCH">0%</div><div class="kc-s">Susp. / total</div></div>
-      </div>
-      <div class="ccard">
-        <div class="cc-t">Ingresos por mes</div>
-        <div class="cc-s">Nuevas licencias vs renovaciones recurrentes</div>
-        <div class="cc-w"><canvas id="cIngresos"></canvas></div>
-        <div class="cc-leg">
-          <div class="cc-li"><div class="cc-dot" style="background:#4caf50"></div>Nuevas</div>
-          <div class="cc-li"><div class="cc-dot" style="background:#42a5f5"></div>Recurrentes</div>
-          <div class="cc-li"><div class="cc-dot" style="background:#ff9800"></div>Pago único</div>
-        </div>
-      </div>
-      <div class="ccard">
-        <div class="cc-t">Activas vs Suspendidas + Churn</div>
-        <div class="cc-s">Evolución mensual y tasa de churn</div>
-        <div class="cc-w"><canvas id="cChurn"></canvas></div>
-        <div class="cc-leg">
-          <div class="cc-li"><div class="cc-dot" style="background:#4caf50"></div>Activas</div>
-          <div class="cc-li"><div class="cc-dot" style="background:#ef5350"></div>Suspendidas</div>
-          <div class="cc-li"><div class="cc-dot" style="background:#ff9800;border-radius:2px"></div>Churn %</div>
-        </div>
-      </div>
-      <div id="repExtra"></div>
-    </div>
 
-  </div><!-- /main -->
-
-  <!-- BOTTOM NAV (mobile) -->
+  <!-- Bottom nav -->
   <div id="bnav">
-    <div class="bn on" onclick="nav('lic',this,'Licencias')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>Licencias</div>
-    <div class="bn" onclick="nav('cli',this,'Clientes')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Clientes</div>
-    <div class="bn" onclick="nav('ter',this,'Terminales')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Terminales</div>
-    <div class="bn" onclick="nav('rep',this,'Reportes')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reportes</div>
-    <div class="bn" onclick="nav('ruc',this,'RUC')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg><span>RUC</span></div>
-      
+    <div class="bn on" onclick="goTo('lic')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><span>Licencias</span></div>
+    <div class="bn" onclick="goTo('cli')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Clientes</span></div>
+    <div class="bn" onclick="goTo('ter')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg><span>Terminales</span></div>
+    <div class="bn" onclick="goTo('rep')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Reportes</span></div>
+    <div class="bn" onclick="goTo('ruc')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg><span>RUC</span></div>
   </div>
 
-</div><!-- /app -->
+</div><!-- /#app -->
 
 <!-- ══ MODAL — completamente fuera del app ══ -->
 <div id="mOv" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;align-items:flex-end;justify-content:center;padding:0;" onclick="if(event.target===this)closeM()">
@@ -519,12 +402,51 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
 <div class="toast" id="toast">
 
 
-</div>
+
+
+<div class="toast" id="toast"></div>
 
 <script>
 const SURL  = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
 const SKEY  = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 const PASS  = 'admin2025';
+
+function toggleSB(){
+  var sb = document.getElementById('sidebar');
+  var ov = document.getElementById('sbOv');
+  var isOpen = sb.classList.toggle('open');
+  ov.style.display = isOpen ? 'block' : 'none';
+}
+
+function doLogin(){
+  var u = document.getElementById('loginUser').value.trim();
+  var p = document.getElementById('loginPass').value;
+  var e = document.getElementById('loginErr');
+  if(u==='admin' && p===PASS){
+    localStorage.setItem('sa','1');
+    document.getElementById('loginWrap').style.display='none';
+    document.getElementById('app').style.display='block';
+    goTo('lic');
+  } else {
+    e.textContent='Usuario o contraseña incorrectos';
+    e.style.display='block';
+  }
+}
+
+function logout(){
+  localStorage.removeItem('sa');
+  document.getElementById('app').style.display='none';
+  document.getElementById('loginWrap').style.display='flex';
+}
+
+// Auto-login
+if(localStorage.getItem('sa')){
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('app').style.display='block';
+}
+
+
+
 
 let allL=[], editId=null, renoMode=false;
 let chI=null, chC=null;
@@ -594,32 +516,7 @@ function logout(){
 }
 
 // ── NAV ──────────────────────────────────────────────────
-function nav(p,el,title){
-  // Hide all pages
-  ['pLic','pCli','pTer','pRep','pRuc'].forEach(function(id){
-    var el2 = document.getElementById(id);
-    if(el2) el2.style.display='none';
-  });
-  // Show target page
-  var pageMap = {lic:'pLic',cli:'pCli',ter:'pTer',rep:'pRep',ruc:'pRuc'};
-  var pid = pageMap[p];
-  if(pid){
-    var page = document.getElementById(pid);
-    if(page) page.style.display='block';
-  }
-  // Nav highlights
-  document.querySelectorAll('.bn,.sb-i').forEach(function(x){ x.classList.remove('on'); });
-  document.querySelectorAll('.bn,.sb-i').forEach(function(x){
-    if(x.getAttribute('onclick')&&x.getAttribute('onclick').includes("'"+p+"'")) x.classList.add('on');
-  });
-  var tb = document.getElementById('tbPage');
-  if(tb) tb.textContent = title||p;
-  if(p==='lic') loadL();
-  if(p==='cli') loadCli();
-  if(p==='ter') loadTer();
-  if(p==='rep') loadRep();
-  if(p==='ruc') loadRuc();
-}
+
 
 // ── LICENCIAS ────────────────────────────────────────────
 const PLANES={1:'Básico',2:'Pro',3:'Completo'};
@@ -1291,6 +1188,146 @@ async function buscarRucAdmin(q){
   }, 400);
 }
 
+
+// ── NAVEGACIÓN — inyecta contenido en #content ───────────
+function goTo(p){
+  curPage = p;
+  // Highlight nav
+  document.querySelectorAll('.sb-i,.bn').forEach(function(el){
+    el.classList.toggle('on', (el.getAttribute('onclick')||'').includes("'"+p+"'"));
+  });
+  // Update topbar title
+  var titles = {lic:'Licencias',cli:'Clientes',ter:'Terminales',rep:'Reportes',ruc:'Contribuyentes RUC'};
+  var tb = document.getElementById('tbPage');
+  if(tb) tb.textContent = titles[p]||p;
+  // Inject content
+  var c = document.getElementById('content');
+  if(!c) return;
+  c.innerHTML = '<div class="loading"><span class="sp"></span>Cargando...</div>';
+  setTimeout(function(){
+    if(p==='lic') renderLic();
+    if(p==='cli') renderCli();
+    if(p==='ter') renderTerPage();
+    if(p==='rep') renderRep();
+    if(p==='ruc') renderRuc();
+  }, 10);
+}
+
+// Wrappers that call goTo
+function nav(p,el,title){ goTo(p); }
+
+// ── RENDER FUNCTIONS (inject into #content) ──────────────
+
+async function renderLic(){
+  document.getElementById('content').innerHTML = `
+    <div class="ph"><div><div class="pt">Licencias</div><div class="ps" id="licCount">Cargando...</div></div>
+    <button class="btn-nueva" onclick="openMOv()">+ NUEVA</button></div>
+    <div class="sbar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input placeholder="Buscar clave, cliente, email, rubro..." oninput="filtrarL(this.value)" id="licQ"></div>
+    <div id="licList"><div class="loading"><span class="sp"></span></div></div>`;
+  await loadL();
+}
+
+async function renderCli(){
+  document.getElementById('content').innerHTML = `
+    <div class="ph"><div><div class="pt">Clientes</div><div class="ps">Agrupados por email</div></div></div>
+    <div id="cliList"><div class="loading"><span class="sp"></span></div></div>`;
+  await loadCli();
+}
+
+async function renderTerPage(){
+  document.getElementById('content').innerHTML = `
+    <div class="ph"><div><div class="pt">Terminales</div><div class="ps" id="terCount">Cargando...</div></div>
+    <select id="terFiltroEmp" onchange="filtrarTer()" style="background:#1e1e1e;border:1px solid #2a2a2a;border-radius:8px;color:#fff;font-family:inherit;font-size:13px;padding:8px 12px;outline:none;"><option value="">Todas las empresas</option></select></div>
+    <div class="sbar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input placeholder="Buscar terminal..." oninput="filtrarTer()" id="terQ"></div>
+    <div id="terList"><div class="loading"><span class="sp"></span></div></div>`;
+  await loadTer();
+}
+
+async function renderRep(){
+  document.getElementById('content').innerHTML = `
+    <div class="ph"><div><div class="pt">Reportes</div><div class="ps">Visión global del negocio</div></div></div>
+    <div class="kg k4">
+      <div class="kc" style="--c:var(--green)"><div class="kc-l">Activas</div><div class="kc-v" id="rA">—</div></div>
+      <div class="kc" style="--c:var(--blue)"><div class="kc-l">Terminales</div><div class="kc-v" id="rT">—</div></div>
+      <div class="kc" style="--c:var(--orange)"><div class="kc-l">Vencen pronto</div><div class="kc-v" id="rV">—</div></div>
+      <div class="kc" style="--c:var(--red)"><div class="kc-l">Suspendidas</div><div class="kc-v" id="rS">—</div></div>
+    </div>
+    <div class="kg" style="grid-template-columns:repeat(3,1fr);">
+      <div class="kc" style="--c:var(--green)"><div class="kc-l">MRR</div><div class="kc-v" id="rMRR">—</div></div>
+      <div class="kc" style="--c:var(--green)"><div class="kc-l">ARR</div><div class="kc-v" id="rARR">—</div></div>
+      <div class="kc" style="--c:var(--red)"><div class="kc-l">Churn</div><div class="kc-v" id="rCH">—</div></div>
+    </div>
+    <div id="repExtra"></div>`;
+  await loadRep();
+}
+
+async function renderRuc(){
+  document.getElementById('content').innerHTML = `
+    <div class="ph"><div><div class="pt">Contribuyentes RUC</div><div class="ps">Importar base de datos SET/DNIT</div></div></div>
+    <div class="kg" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;">
+      <div class="kc" style="--c:var(--green)"><div class="kc-l">Total registros</div><div class="kc-v" id="rucTotal">—</div><div class="kc-s">en base de datos</div></div>
+      <div class="kc" style="--c:var(--blue)"><div class="kc-l">Activos</div><div class="kc-v" id="rucActivos">—</div></div>
+      <div class="kc" style="--c:var(--muted)"><div class="kc-l">Última importación</div><div class="kc-v" id="rucUltima" style="font-size:14px;">—</div></div>
+    </div>
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-h"><span class="card-t">📥 Importar archivos TXT del SET</span></div>
+      <div style="padding:16px;">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6;">
+          Seleccioná uno o varios archivos TXT del SET (ruc1.txt ... ruc9.txt).<br>
+          Formato: <code style="background:#1e1e1e;padding:2px 6px;border-radius:4px;font-size:11px;">RUC|RAZON_SOCIAL|DV|CODIGO|ESTADO|</code>
+        </div>
+        <div id="rucDropZone" style="border:2px dashed #2a2a2a;border-radius:10px;padding:30px;text-align:center;cursor:pointer;margin-bottom:14px;">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.5" style="margin-bottom:8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div style="font-size:14px;font-weight:700;color:#aaa;margin-bottom:4px;">Arrastrá los archivos acá</div>
+          <div style="font-size:12px;color:#555;">o hacé click para seleccionar</div>
+          <input type="file" id="rucFileInput" accept=".txt" multiple style="display:none">
+        </div>
+        <div id="rucProgress" style="display:none;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:13px;font-weight:700;" id="rucProgressLabel">Procesando...</span>
+            <span style="font-size:12px;color:var(--muted);" id="rucProgressPct">0%</span>
+          </div>
+          <div style="background:#1e1e1e;border-radius:4px;height:8px;overflow:hidden;margin-bottom:8px;">
+            <div id="rucProgressBar" style="height:100%;width:0%;background:var(--green);border-radius:4px;transition:width .3s;"></div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);" id="rucProgressDetail"></div>
+        </div>
+        <div id="rucLog" style="display:none;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;max-height:200px;overflow-y:auto;color:#aaa;"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><span class="card-t">🔍 Consultar contribuyente</span></div>
+      <div style="padding:16px;">
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <input id="rucBuscarInput" type="text" placeholder="Ingresá RUC o nombre..."
+            style="flex:1;background:#1e1e1e;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:inherit;font-size:14px;padding:10px 14px;outline:none;">
+        </div>
+        <div id="rucResultados"></div>
+      </div>
+    </div>`;
+
+  // Wire up events
+  var dz = document.getElementById('rucDropZone');
+  var fi = document.getElementById('rucFileInput');
+  if(dz){
+    dz.onclick = function(){ fi.click(); };
+    dz.ondragover = function(e){ e.preventDefault(); dz.style.borderColor='var(--green)'; };
+    dz.ondragleave = function(){ dz.style.borderColor='#2a2a2a'; };
+    dz.ondrop = function(e){ e.preventDefault(); dz.style.borderColor='#2a2a2a'; handleRucFiles(e.dataTransfer.files); };
+  }
+  if(fi){ fi.onchange = function(){ handleRucFiles(fi.files); }; }
+
+  var bi = document.getElementById('rucBuscarInput');
+  if(bi){ bi.oninput = function(){ buscarRucAdmin(bi.value); }; }
+
+  await loadRuc();
+}
+
+
+// Init
+if(localStorage.getItem('sa')) goTo('lic');
 </script>
 </body>
 </html>
