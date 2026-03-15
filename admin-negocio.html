@@ -994,9 +994,10 @@ function refreshTimLista(){
 }
 
 async function refreshTimListaFromServer(){
-  // Only call this when explicitly needed (e.g. page load)
   await cargarTimbradosDesdeSupabase();
-  refreshTimLista();
+  // Update the list if we're on admin page
+  const lista = document.getElementById('timLista');
+  if(lista) lista.innerHTML = buildTimLista();
 }
 function usarTim(i){
   const t = timbrados[i];
@@ -1214,65 +1215,95 @@ async function agregarAsig(){
   if(btn){ btn.disabled=true; btn.textContent='⏳ Guardando...'; }
 
   try {
-    // 1. Asegurar que el timbrado existe en BD y tiene ID
     const t = timbrados[timIdx];
-    if(!t._db_id){
-      // Buscar por nro en Supabase
-      const rows = await sg('timbrados',
-        'licencia_email=eq.'+encodeURIComponent(SE)+'&nro=eq.'+t.nro);
-      if(rows.length) t._db_id = rows[0].id;
-      else {
-        // Crear el timbrado si no existe
-        const res = await supaPost('timbrados', {
-          licencia_email: SE, nro: t.nro, tipo: t.tipo||'autoimpresor',
-          vig_ini: t.vig_ini, vig_fin: t.tipo==='electronico'?null:t.vig_fin,
-          sucursal: t.sucursal||'001', nombre_suc: t.nombre_suc||null,
-          desde: parseInt(t.desde)||1, hasta: parseInt(t.hasta)||5000,
-          activo: true
-        }, 'licencia_email,nro');
-        const s = Array.isArray(res)?res[0]:res;
-        if(s&&s.id) t._db_id = s.id;
-      }
-    }
 
-    if(!t._db_id) throw new Error('No se pudo obtener ID del timbrado');
-
-    // 2. Upsert en timbrado_terminales — conflict on (licencia_email, terminal)
-    const res2 = await supaPost('timbrado_terminales', {
+    // PASO 1: Guardar/obtener el timbrado en Supabase
+    console.log('[Asignar] PASO 1 — guardando timbrado:', t.nro);
+    const timData = {
       licencia_email: SE,
-      timbrado_id:    t._db_id,
-      terminal,
+      nro:            String(t.nro),
+      tipo:           t.tipo||'autoimpresor',
+      vig_ini:        t.vig_ini||null,
+      vig_fin:        t.tipo==='electronico' ? null : (t.vig_fin||null),
+      sucursal:       String(t.sucursal||'001'),
+      nombre_suc:     t.nombre_suc||null,
+      desde:          parseInt(t.desde)||1,
+      hasta:          parseInt(t.hasta)||5000,
+      activo:         true
+    };
+
+    const r1 = await fetch(
+      SUPA_URL+'/rest/v1/timbrados?on_conflict=licencia_email,nro',
+      {
+        method: 'POST',
+        headers: {
+          'apikey':        SUPA_ANON,
+          'Authorization': 'Bearer '+SUPA_ANON,
+          'Content-Type':  'application/json',
+          'Prefer':        'resolution=merge-duplicates,return=representation'
+        },
+        body: JSON.stringify(timData)
+      }
+    );
+    const txt1 = await r1.text();
+    console.log('[Asignar] PASO 1 response:', r1.status, txt1.substring(0,200));
+    if(!r1.ok) throw new Error('Error guardando timbrado: '+r1.status+' '+txt1.substring(0,100));
+
+    const saved1 = JSON.parse(txt1);
+    const dbId = Array.isArray(saved1) ? saved1[0]?.id : saved1?.id;
+    if(!dbId) throw new Error('Sin ID de timbrado. Respuesta: '+txt1.substring(0,100));
+    t._db_id = dbId;
+    console.log('[Asignar] PASO 1 ✅ timbrado_id:', dbId);
+
+    // PASO 2: Guardar asignación terminal → timbrado
+    console.log('[Asignar] PASO 2 — asignando terminal:', terminal);
+    const terData = {
+      licencia_email: SE,
+      timbrado_id:    dbId,
+      terminal:       terminal,
       sucursal:       null,
       punto_exp:      ptoExp,
       nro_actual:     desde,
       activo:         true
-    }, 'licencia_email,terminal');
+    };
 
-    const saved = Array.isArray(res2)?res2[0]:res2;
-    console.log('[Asignar] ✅ Terminal guardada:', saved);
+    const r2 = await fetch(
+      SUPA_URL+'/rest/v1/timbrado_terminales?on_conflict=licencia_email,terminal',
+      {
+        method: 'POST',
+        headers: {
+          'apikey':        SUPA_ANON,
+          'Authorization': 'Bearer '+SUPA_ANON,
+          'Content-Type':  'application/json',
+          'Prefer':        'resolution=merge-duplicates,return=representation'
+        },
+        body: JSON.stringify(terData)
+      }
+    );
+    const txt2 = await r2.text();
+    console.log('[Asignar] PASO 2 response:', r2.status, txt2.substring(0,200));
+    if(!r2.ok) throw new Error('Error guardando terminal: '+r2.status+' '+txt2.substring(0,100));
 
-    // 3. Actualizar memoria local
-    if(!t.asignaciones) t.asignaciones = [];
-    const existing = t.asignaciones.findIndex(a=>a.terminal===terminal);
-    const aData = { terminal, punto_exp:ptoExp, nro_actual:desde, _ter_id: saved?.id };
-    if(existing>=0) t.asignaciones[existing] = aData;
-    else t.asignaciones.push(aData);
-    t.seleccionado = true;
-    localStorage.setItem(TIM_KEY, JSON.stringify(timbrados));
+    const saved2 = JSON.parse(txt2);
+    const terId = Array.isArray(saved2) ? saved2[0]?.id : saved2?.id;
+    console.log('[Asignar] PASO 2 ✅ terminal_id:', terId);
 
-    toast('✓ Terminal "'+terminal+'" asignada correctamente');
+    toast('✓ Terminal "'+terminal+'" asignada');
+
+    // Recargar desde Supabase para confirmar
+    await cargarTimbradosDesdeSupabase();
+
   } catch(e){
-    console.error('[Asignar] Error:', e.message);
-    alert('Error al asignar: '+e.message);
+    console.error('[Asignar] ❌ Error:', e.message);
+    alert('Error al asignar terminal: '+e.message);
   }
 
   if(btn){ btn.disabled=false; btn.textContent='✓ ASIGNAR TERMINAL'; }
 
-  // Limpiar y recargar
+  // Limpiar campos y reabrir modal actualizado
   document.getElementById('asigTerminal').value = '';
   document.getElementById('asigPtoExp').value   = '001';
   document.getElementById('asigDesde').value    = '1';
-  await cargarTimbradosDesdeSupabase();
   abrirModalAsignar(timIdx);
 }
 
