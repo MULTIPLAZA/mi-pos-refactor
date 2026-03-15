@@ -995,38 +995,138 @@ function guardarTim(){
 }
 
 // ── CONFIG ────────────────────────────────────────────────
-function renderConfig(){
+async function renderConfig(){
+  // Intentar cargar config desde Supabase
+  let saved = {};
+  try {
+    const rows = await sg('pos_config','licencia_email=eq.'+encodeURIComponent(SE)+'&clave=eq.negocio_config');
+    if(rows && rows[0]) saved = JSON.parse(rows[0].valor||'{}');
+  } catch(e){}
+  // Merge con localStorage como fallback
+  const v = k => saved[k] || localStorage.getItem(k) || '';
+
   document.getElementById('content').innerHTML=`
   <div class="ph">
-    <div><div class="pt">Configuración</div><div class="ps">Datos del negocio</div></div>
+    <div><div class="pt">Configuración</div><div class="ps">Datos del negocio y terminales</div></div>
     <button class="btn-sv" onclick="saveConf()">GUARDAR</button>
   </div>
+
   <div class="cfg-s">
-    <div class="cfg-st">Datos del negocio</div>
-    <div class="cfg-r"><div><div class="cfg-rl">Nombre del negocio</div></div><input class="cfg-inp" id="cfgN" value="${localStorage.getItem('an')||''}"></div>
-    <div class="cfg-r"><div><div class="cfg-rl">Sucursal</div></div><input class="cfg-inp" id="cfgS" value="${localStorage.getItem('as')||''}"></div>
-    <div class="cfg-r"><div><div class="cfg-rl">Dirección</div></div><input class="cfg-inp" id="cfgD" value="${localStorage.getItem('ad')||''}"></div>
-    <div class="cfg-r"><div><div class="cfg-rl">Teléfono</div></div><input class="cfg-inp" id="cfgT" value="${localStorage.getItem('at')||''}"></div>
-    <div class="cfg-r"><div><div class="cfg-rl">RUC</div></div><input class="cfg-inp" id="cfgR" value="${localStorage.getItem('ar')||''}"></div>
+    <div class="cfg-st">Datos del negocio (se muestran en recibos y facturas)</div>
+    <div class="cfg-r">
+      <div><div class="cfg-rl">Razón social / Nombre</div><div class="cfg-rs">Nombre legal del negocio</div></div>
+      <input class="cfg-inp" id="cfgN" placeholder="Ej: PIZZA EXPRESS SRL" value="${v('an')}">
+    </div>
+    <div class="cfg-r">
+      <div><div class="cfg-rl">RUC</div><div class="cfg-rs">Número de RUC con dígito verificador</div></div>
+      <input class="cfg-inp" id="cfgRuc" placeholder="Ej: 80012345-6" value="${v('ar')}">
+    </div>
+    <div class="cfg-r">
+      <div><div class="cfg-rl">Dirección</div><div class="cfg-rs">Dirección del local principal</div></div>
+      <input class="cfg-inp" id="cfgD" placeholder="Ej: Av. Mcal. López 1234" value="${v('ad')}">
+    </div>
+    <div class="cfg-r">
+      <div><div class="cfg-rl">Ciudad</div></div>
+      <input class="cfg-inp" id="cfgCiudad" placeholder="Ej: Asunción" value="${v('ciudad')}">
+    </div>
+    <div class="cfg-r">
+      <div><div class="cfg-rl">Teléfono</div></div>
+      <input class="cfg-inp" id="cfgT" placeholder="Ej: 021 123 456" value="${v('at')}">
+    </div>
+    <div class="cfg-r">
+      <div><div class="cfg-rl">Email del negocio</div></div>
+      <input class="cfg-inp" id="cfgEmail" type="email" placeholder="negocio@email.com" value="${v('email_negocio')}">
+    </div>
+    <div class="cfg-r">
+      <div><div class="cfg-rl">Sitio web</div></div>
+      <input class="cfg-inp" id="cfgWeb" placeholder="www.minegocio.com.py" value="${v('web')}">
+    </div>
   </div>
+
+  <div class="cfg-s">
+    <div class="cfg-st">Configuración de terminales</div>
+    <div class="cfg-r">
+      <div><div class="cfg-rl">Pie de recibo</div><div class="cfg-rs">Mensaje al final del ticket</div></div>
+      <input class="cfg-inp" id="cfgPie" placeholder="Ej: ¡Gracias por su compra!" value="${v('pie_recibo')}">
+    </div>
+    <div class="cfg-r">
+      <div><div class="cfg-rl">Mostrar RUC en recibo</div></div>
+      <select class="cfg-inp" id="cfgMostrarRuc" style="min-width:120px;">
+        <option value="1" ${v('mostrar_ruc')!=='0'?'selected':''}>Sí</option>
+        <option value="0" ${v('mostrar_ruc')==='0'?'selected':''}>No</option>
+      </select>
+    </div>
+    <div class="cfg-r">
+      <div><div class="cfg-rl">Moneda</div></div>
+      <select class="cfg-inp" id="cfgMoneda" style="min-width:120px;">
+        <option value="GS" ${(v('moneda')||'GS')==='GS'?'selected':''}>₲ Guaraníes</option>
+        <option value="USD" ${v('moneda')==='USD'?'selected':''}>$ Dólares</option>
+      </select>
+    </div>
+  </div>
+
   <div class="cfg-s">
     <div class="cfg-st">Licencia</div>
-    <div class="cfg-r"><div><div class="cfg-rl">Email registrado</div><div class="cfg-rs">${SE||'—'}</div></div><span class="tag tag-g">Plan ${SP||'—'}</span></div>
+    <div class="cfg-r">
+      <div><div class="cfg-rl">Email registrado</div><div class="cfg-rs">${SE||'—'}</div></div>
+      <span class="tag tag-g">Plan ${SP||'—'}</span>
+    </div>
     <div class="cfg-r"><div><div class="cfg-rl">Vencimiento</div><div class="cfg-rs">${SV||'—'}</div></div></div>
   </div>
+
   <div class="cfg-s">
     <div class="cfg-st">Sesión</div>
-    <div class="cfg-r"><div><div class="cfg-rl">Cerrar sesión</div><div class="cfg-rs">Se limpiará la sesión del dispositivo</div></div><button class="btn-dn" onclick="doLogout()">SALIR</button></div>
+    <div class="cfg-r">
+      <div><div class="cfg-rl">Cerrar sesión</div><div class="cfg-rs">Se limpiará la sesión del dispositivo</div></div>
+      <button class="btn-dn" onclick="doLogout()">SALIR</button>
+    </div>
   </div>`;
 }
-function saveConf(){
-  localStorage.setItem('an',document.getElementById('cfgN').value);
-  localStorage.setItem('as',document.getElementById('cfgS').value);
-  localStorage.setItem('ad',document.getElementById('cfgD').value);
-  localStorage.setItem('at',document.getElementById('cfgT').value);
-  localStorage.setItem('ar',document.getElementById('cfgR').value);
-  document.getElementById('sbNeg').textContent=document.getElementById('cfgN').value||'Mi Negocio';
-  toast('✓ Guardado');
+async function saveConf(){
+  const cfg = {
+    an:            document.getElementById('cfgN')?.value||'',
+    ar:            document.getElementById('cfgRuc')?.value||'',
+    ad:            document.getElementById('cfgD')?.value||'',
+    ciudad:        document.getElementById('cfgCiudad')?.value||'',
+    at:            document.getElementById('cfgT')?.value||'',
+    email_negocio: document.getElementById('cfgEmail')?.value||'',
+    web:           document.getElementById('cfgWeb')?.value||'',
+    pie_recibo:    document.getElementById('cfgPie')?.value||'',
+    mostrar_ruc:   document.getElementById('cfgMostrarRuc')?.value||'1',
+    moneda:        document.getElementById('cfgMoneda')?.value||'GS',
+  };
+  // Guardar en localStorage
+  Object.entries(cfg).forEach(([k,v])=>localStorage.setItem(k,v));
+  // Actualizar sidebar
+  document.getElementById('sbNeg').textContent=cfg.an||'Mi Negocio';
+
+  // Guardar en Supabase
+  try {
+    const payload = {
+      licencia_email: SE,
+      clave: 'negocio_config',
+      valor: JSON.stringify(cfg),
+      updated_at: new Date().toISOString()
+    };
+    // Intentar PATCH primero, luego POST
+    const existing = await sg('pos_config','licencia_email=eq.'+encodeURIComponent(SE)+'&clave=eq.negocio_config');
+    if(existing && existing.length > 0){
+      await fetch(SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(SE)+'&clave=eq.negocio_config',{
+        method:'PATCH',
+        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json'},
+        body:JSON.stringify(payload)
+      });
+    } else {
+      await fetch(SUPA_URL+'/rest/v1/pos_config',{
+        method:'POST',
+        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify(payload)
+      });
+    }
+    toast('✓ Configuración guardada y sincronizada');
+  } catch(e){
+    toast('✓ Guardado localmente (sin conexión)');
+  }
 }
 
 // ── ASIGNACIÓN DE TERMINALES ─────────────────────────────

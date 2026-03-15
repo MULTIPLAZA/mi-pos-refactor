@@ -3235,6 +3235,47 @@ function cargarTimbradoSesion(){
   }
 }
 
+// Descargar config del negocio desde Supabase y aplicar al POS
+async function sincronizarConfigNegocio(){
+  const email = localStorage.getItem('lic_email');
+  if(!email || USAR_DEMO) return;
+  try {
+    const res = await fetch(SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+'&clave=eq.negocio_config',{
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}
+    });
+    if(!res.ok) return;
+    const rows = await res.json();
+    if(!rows || !rows[0]) return;
+    const cfg = JSON.parse(rows[0].valor||'{}');
+    // Aplicar a configData
+    if(cfg.an)  configData.negocio   = cfg.an;
+    if(cfg.ar)  configData.ruc       = cfg.ar;
+    if(cfg.ad)  configData.direccion = cfg.ad;
+    if(cfg.ciudad) configData.ciudad = cfg.ciudad;
+    if(cfg.at)  configData.telefono  = cfg.at;
+    if(cfg.email_negocio) configData.email = cfg.email_negocio;
+    if(cfg.pie_recibo)    configData.pie_recibo = cfg.pie_recibo;
+    if(cfg.mostrar_ruc)   configData.mostrar_ruc = cfg.mostrar_ruc;
+    if(cfg.moneda)        configData.moneda = cfg.moneda;
+    // Guardar en localStorage para uso offline
+    Object.entries(cfg).forEach(([k,v])=>{ if(v) localStorage.setItem(k,v); });
+    console.log('[Config] Negocio sincronizado:', configData.negocio, '| RUC:', configData.ruc);
+  } catch(e){ console.warn('[Config] Error sync:', e.message); }
+}
+
+// Cargar config desde localStorage (offline fallback)
+function cargarConfigLocal(){
+  const keys = {
+    an:'negocio', ar:'ruc', ad:'direccion',
+    ciudad:'ciudad', at:'telefono', pie_recibo:'pie_recibo',
+    mostrar_ruc:'mostrar_ruc', moneda:'moneda'
+  };
+  Object.entries(keys).forEach(([lk, ck])=>{
+    const v = localStorage.getItem(lk);
+    if(v) configData[ck] = v;
+  });
+}
+
 // Datos simulados para demo (mientras no hay API real)
 const RUC_DEMO = {
   '80069563': { nombre: 'SUPERMERCADO LA ESTRELLA SA', direccion: 'Av. Mcal. López 1234, Asunción' },
@@ -3489,7 +3530,12 @@ function generarRecibo(data){
   ) : '');
 
   document.getElementById('reciboPapel').innerHTML =
-    '<div class="rec-center"><div class="rec-title">MI NEGOCIO</div><div class="rec-sub">ASUNCION</div><div class="rec-sub">Tel: ---</div></div>'+
+    '<div class="rec-center">'+
+    '<div class="rec-title">'+(configData.negocio||'MI NEGOCIO')+'</div>'+
+    (configData.ruc&&configData.mostrar_ruc!=='0'?'<div class="rec-sub">RUC: '+configData.ruc+'</div>':'')+
+    (configData.direccion?'<div class="rec-sub">'+(configData.direccion)+(configData.ciudad?', '+configData.ciudad:'')+'</div>':'')+
+    (configData.telefono?'<div class="rec-sub">Tel: '+configData.telefono+'</div>':'')+
+    '</div>'+
     '<hr class="rec-divider">'+
     '<div class="rec-row"><span class="rec-nro">Ticket: '+nroStr+'</span><span class="rec-nro">'+fechaStr+'</span></div>'+
     '<hr class="rec-divider">'+
@@ -3507,7 +3553,13 @@ function generarRecibo(data){
       (data.factura.direccion?'<div style="font-size:11px;color:#555;">'+data.factura.direccion+'</div>':'')+
       '<hr class="rec-divider">'
     ) : '')+
-    '<div class="rec-footer-text">¡Gracias por su compra!</div>';
+    '<hr class="rec-divider">'+
+    '<div class="rec-footer-text">'+(configData.pie_recibo||'¡Gracias por su compra!')+'</div>'+
+    (configData.telefono?'<div class="rec-footer-text">Tel: '+configData.telefono+'</div>':'')+
+    (configData.email?'<div class="rec-footer-text">'+configData.email+'</div>':'')+
+    '<div class="rec-footer-text" style="font-size:10px;color:#aaa;">'+
+      (configData.terminal||'Terminal')+(configData.sucursal?' — '+configData.sucursal:'')+
+    '</div>';
 }
 
 function imprimirRecibo(){
@@ -4850,11 +4902,15 @@ function cerrarPreviewCierre(){
 
 // ── CONFIGURACIÓN ────────────────────────────────────────────────────────────
 let configData = {
-  negocio:      'MI NEGOCIO',
-  direccion:    'ASUNCION',
-  telefono:     '',
-  ruc:          '',
-  email:        'usuario@email.com',
+  negocio:      localStorage.getItem('an')       || 'MI NEGOCIO',
+  direccion:    localStorage.getItem('ad')       || 'ASUNCION',
+  ciudad:       localStorage.getItem('ciudad')   || '',
+  telefono:     localStorage.getItem('at')       || '',
+  ruc:          localStorage.getItem('ar')       || '',
+  email:        localStorage.getItem('email_negocio') || '',
+  pie_recibo:   localStorage.getItem('pie_recibo')|| '¡Gracias por su compra!',
+  mostrar_ruc:  localStorage.getItem('mostrar_ruc')||'1',
+  moneda:       localStorage.getItem('moneda')   || 'GS',
   terminal:     localStorage.getItem('pos_terminal')  || 'Terminal 1',
   sucursal:     localStorage.getItem('pos_sucursal')  || 'Principal',
   deposito:     localStorage.getItem('pos_deposito')  || 'Depósito Principal',
@@ -5891,8 +5947,14 @@ async function iniciarApp(){
     goTo('scClosed');
   }
 
+  // Cargar config local primero (offline)
+  cargarConfigLocal();
+
   // Cargar timbrado activo para esta sesión
   cargarTimbradoSesion();
+
+  // Sincronizar config del negocio desde Supabase (en background)
+  setTimeout(sincronizarConfigNegocio, 3000);
 
   // Sincronizar en background
   setTimeout(syncConSupabase, 5000);
