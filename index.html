@@ -3235,31 +3235,54 @@ function cargarTimbradoSesion(){
   }
 }
 
-// Descargar config del negocio desde Supabase y aplicar al POS
+// Descargar config, timbrados y mapa desde Supabase
 async function sincronizarConfigNegocio(){
   const email = localStorage.getItem('lic_email');
   if(!email || USAR_DEMO) return;
   try {
-    const res = await fetch(SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+'&clave=eq.negocio_config',{
-      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}
+    // Descargar todas las claves de config en una sola query
+    const rows = await fetch(
+      SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+
+      '&clave=in.(negocio_config,timbrados_config,timbrados_mapa)',
+      { headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'} }
+    ).then(r=>r.ok?r.json():[]);
+
+    rows.forEach(row => {
+      try {
+        const val = JSON.parse(row.valor||'{}');
+
+        if(row.clave === 'negocio_config'){
+          if(val.an)  configData.negocio   = val.an;
+          if(val.ar)  configData.ruc        = val.ar;
+          if(val.ad)  configData.direccion  = val.ad;
+          if(val.ciudad) configData.ciudad  = val.ciudad;
+          if(val.at)  configData.telefono   = val.at;
+          if(val.email_negocio) configData.email = val.email_negocio;
+          if(val.pie_recibo)    configData.pie_recibo  = val.pie_recibo;
+          if(val.mostrar_ruc)   configData.mostrar_ruc = val.mostrar_ruc;
+          if(val.moneda)        configData.moneda = val.moneda;
+          Object.entries(val).forEach(([k,v])=>{ if(v) localStorage.setItem(k,v); });
+          console.log('[Config] Negocio:', configData.negocio, '| RUC:', configData.ruc);
+        }
+
+        if(row.clave === 'timbrados_config'){
+          // Guardar timbrados en localStorage del POS
+          localStorage.setItem('pos_timbrados', JSON.stringify(val));
+          console.log('[Timbrados] Descargados:', Array.isArray(val)?val.length:0, 'timbrados');
+        }
+
+        if(row.clave === 'timbrados_mapa'){
+          // Guardar mapa terminal→timbrado en localStorage del POS
+          localStorage.setItem('pos_timbrados_mapa', JSON.stringify(val));
+          console.log('[Mapa] Descargado:', JSON.stringify(val));
+        }
+
+      } catch(e){ console.warn('[Config] Error parsing', row.clave, e.message); }
     });
-    if(!res.ok) return;
-    const rows = await res.json();
-    if(!rows || !rows[0]) return;
-    const cfg = JSON.parse(rows[0].valor||'{}');
-    // Aplicar a configData
-    if(cfg.an)  configData.negocio   = cfg.an;
-    if(cfg.ar)  configData.ruc       = cfg.ar;
-    if(cfg.ad)  configData.direccion = cfg.ad;
-    if(cfg.ciudad) configData.ciudad = cfg.ciudad;
-    if(cfg.at)  configData.telefono  = cfg.at;
-    if(cfg.email_negocio) configData.email = cfg.email_negocio;
-    if(cfg.pie_recibo)    configData.pie_recibo = cfg.pie_recibo;
-    if(cfg.mostrar_ruc)   configData.mostrar_ruc = cfg.mostrar_ruc;
-    if(cfg.moneda)        configData.moneda = cfg.moneda;
-    // Guardar en localStorage para uso offline
-    Object.entries(cfg).forEach(([k,v])=>{ if(v) localStorage.setItem(k,v); });
-    console.log('[Config] Negocio sincronizado:', configData.negocio, '| RUC:', configData.ruc);
+
+    // Recargar timbrado activo con los nuevos datos
+    cargarTimbradoSesion();
+
   } catch(e){ console.warn('[Config] Error sync:', e.message); }
 }
 
@@ -3781,24 +3804,66 @@ let turnoData = {
 
 function getTimbradoActivo(){
   const terminal = localStorage.getItem('pos_terminal') || 'Terminal 1';
+  const sucursal = localStorage.getItem('pos_sucursal') || 'Principal';
   try {
     const mapa = JSON.parse(localStorage.getItem('pos_timbrados_mapa')||'{}');
     const tims = JSON.parse(localStorage.getItem('pos_timbrados')||'[]');
-    const asig = mapa[terminal];
+
+    // 1. Buscar por nombre exacto de terminal en el mapa
+    let asig = mapa[terminal];
+
+    // 2. Si no encontró, buscar por sucursal
+    if(asig === undefined) asig = mapa[sucursal];
+
     if(asig !== undefined){
-      // Formato nuevo: { timIdx, asigIdx }
       if(typeof asig === 'object' && asig.timIdx !== undefined){
         const tim = tims[asig.timIdx];
         const a   = tim && tim.asignaciones && tim.asignaciones[asig.asigIdx];
         if(tim && a){
-          // Devolver timbrado con datos de esta terminal específica
-          return { ...tim, _punto_exp: a.punto_exp, _nro_actual: a.nro_actual||a.desde||1, _asigIdx: asig.asigIdx, _timIdx: asig.timIdx };
+          return { ...tim,
+            sucursal:   tim.sucursal,
+            punto_exp:  a.punto_exp,
+            nro_actual: a.nro_actual || a.desde || 1,
+            _asigIdx: asig.asigIdx,
+            _timIdx:  asig.timIdx
+          };
         }
       }
+      // Formato simple: índice directo al timbrado
+      if(typeof asig === 'number' && tims[asig]){
+        return tims[asig];
+      }
     }
-    // Fallback global
+
+    // 3. Buscar en asignaciones de cada timbrado por nombre de terminal
+    for(let i=0; i<tims.length; i++){
+      const t = tims[i];
+      if(!t.asignaciones) continue;
+      const aIdx = t.asignaciones.findIndex(a => a.terminal === terminal);
+      if(aIdx >= 0){
+        const a = t.asignaciones[aIdx];
+        return { ...t,
+          sucursal:   t.sucursal,
+          punto_exp:  a.punto_exp,
+          nro_actual: a.nro_actual || a.desde || 1,
+          _asigIdx: aIdx,
+          _timIdx:  i
+        };
+      }
+    }
+
+    // 4. Fallback: primer timbrado vigente
+    const hoy = new Date();
+    const vigente = tims.find(t => {
+      if(t.tipo==='electronico') return true;
+      return t.vig_fin ? new Date(t.vig_fin+' 00:00:00') >= hoy : true;
+    });
+    if(vigente) return vigente;
+
+    // 5. Último fallback: global activo guardado
     const global = localStorage.getItem('pos_timbrado_activo');
     if(global) return JSON.parse(global);
+
   } catch(e){ console.warn('[Timbrado]', e.message); }
   return null;
 }

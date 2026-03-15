@@ -719,7 +719,55 @@ function buildTimLista(){
 function togTim(i){const b=document.getElementById('tB'+i);if(b)b.classList.toggle('open');}
 
 function saveTims(){
-  localStorage.setItem(TIM_KEY,JSON.stringify(timbrados));
+  localStorage.setItem(TIM_KEY, JSON.stringify(timbrados));
+  // También sincronizar con Supabase para que el POS lo descargue
+  sincronizarTimbrados();
+}
+
+async function sincronizarMapa(mapa){
+  if(!SE) return;
+  const payload = {
+    licencia_email: SE,
+    clave: 'timbrados_mapa',
+    valor: JSON.stringify(mapa),
+    updated_at: new Date().toISOString()
+  };
+  try {
+    const existing = await sg('pos_config','licencia_email=eq.'+encodeURIComponent(SE)+'&clave=eq.timbrados_mapa');
+    const method = (existing && existing.length > 0) ? 'PATCH' : 'POST';
+    const url = method === 'PATCH'
+      ? SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(SE)+'&clave=eq.timbrados_mapa'
+      : SUPA_URL+'/rest/v1/pos_config';
+    await fetch(url, {
+      method,
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify(payload)
+    });
+    console.log('[Mapa] Sincronizado en Supabase');
+  } catch(e){ console.warn('[Mapa] Sin conexión'); }
+}
+
+async function sincronizarTimbrados(){
+  if(!SE) return;
+  const payload = {
+    licencia_email: SE,
+    clave: 'timbrados_config',
+    valor: JSON.stringify(timbrados),
+    updated_at: new Date().toISOString()
+  };
+  try {
+    const existing = await sg('pos_config','licencia_email=eq.'+encodeURIComponent(SE)+'&clave=eq.timbrados_config');
+    const method = (existing && existing.length > 0) ? 'PATCH' : 'POST';
+    const url = method === 'PATCH'
+      ? SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(SE)+'&clave=eq.timbrados_config'
+      : SUPA_URL+'/rest/v1/pos_config';
+    await fetch(url, {
+      method,
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify(payload)
+    });
+    console.log('[Timbrados] Sincronizado en Supabase');
+  } catch(e){ console.warn('[Timbrados] Sin conexión, guardado solo local'); }
 }
 function refreshTimLista(){
   const el=document.getElementById('timLista');
@@ -831,8 +879,10 @@ function agregarAsig(){
   localStorage.setItem('pos_timbrados_mapa', JSON.stringify(mapa));
 
   saveTims();
+  // También sincronizar el mapa
+  sincronizarMapa(mapa);
   abrirModalAsignar(timIdx);
-  toast('✓ Terminal "'+terminal+'" asignada');
+  toast('✓ Terminal "'+terminal+'" asignada y sincronizada');
 }
 
 function cerrarModalAsignar(){
