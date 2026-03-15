@@ -370,10 +370,45 @@ async function sg(t,q){
   });
   if(!r.ok){
     const txt = await r.text().catch(()=>'');
-    throw new Error('HTTP '+r.status+' en '+t+': '+txt.substring(0,100));
+    throw new Error('HTTP '+r.status+' en '+t+': '+txt.substring(0,150));
   }
   const d = await r.json();
   return Array.isArray(d) ? d : [];
+}
+
+// POST/PATCH directo a tabla Supabase con upsert
+async function supaPost(tabla, data, conflictCol){
+  const headers = {
+    'apikey':        SUPA_ANON,
+    'Authorization': 'Bearer '+SUPA_ANON,
+    'Content-Type':  'application/json',
+    'Prefer':        conflictCol
+      ? 'resolution=merge-duplicates,return=representation'
+      : 'return=representation'
+  };
+  const url = conflictCol
+    ? SUPA_URL+'/rest/v1/'+tabla+'?on_conflict='+conflictCol
+    : SUPA_URL+'/rest/v1/'+tabla;
+  const r = await fetch(url, { method:'POST', headers, body:JSON.stringify(data) });
+  const txt = await r.text();
+  if(!r.ok) throw new Error('HTTP '+r.status+': '+txt.substring(0,150));
+  try { return JSON.parse(txt); } catch(e){ return []; }
+}
+
+async function supaPatch(tabla, filtro, data){
+  const r = await fetch(SUPA_URL+'/rest/v1/'+tabla+'?'+filtro,{
+    method:'PATCH',
+    headers:{
+      'apikey':        SUPA_ANON,
+      'Authorization': 'Bearer '+SUPA_ANON,
+      'Content-Type':  'application/json',
+      'Prefer':        'return=representation'
+    },
+    body: JSON.stringify(data)
+  });
+  const txt = await r.text();
+  if(!r.ok) throw new Error('HTTP '+r.status+': '+txt.substring(0,150));
+  try { return JSON.parse(txt); } catch(e){ return []; }
 }
 
 // Test de conectividad con Supabase
@@ -767,7 +802,11 @@ async function cargarTimbradosDesdeSupabase(){
       timbrados.reduce((s,t)=>s+(t.asignaciones||[]).length,0), 'terminales');
   } catch(e){
     console.warn('[Carga] Error:', e.message, '— usando localStorage');
-    try{ timbrados=JSON.parse(localStorage.getItem(TIM_KEY)||'[]'); }catch(e2){ timbrados=[]; }
+    try{
+      const local = localStorage.getItem(TIM_KEY);
+      timbrados = local ? JSON.parse(local) : [];
+      console.log('[Carga] Desde localStorage:', timbrados.length, 'timbrados');
+    }catch(e2){ timbrados=[]; }
   }
 }
 
@@ -795,10 +834,12 @@ function buildTimLista(){
         </div>
         <div class="tim-info">
           <div class="tim-nro">Timbrado ${t.nro}</div>
-          <div class="tim-meta">${pad3(t.sucursal)}-${pad3(t.punto_exp)} · ${t.tipo==='electronico'?'📱 Electrónico':'🖨️ Autoimpresor'}${t.nombre_suc?' · '+t.nombre_suc:''}</div>
-          ${t.asignaciones&&t.asignaciones.length?`<div style="font-size:11px;color:var(--green);margin-top:1px;">🖥️ ${t.asignaciones.length} terminal${t.asignaciones.length!==1?'es':''}: ${t.asignaciones.map(a=>a.terminal).join(', ')}</div>`:'<div style="font-size:11px;color:var(--muted);margin-top:1px;">Sin terminales asignadas</div>'}
+          <div class="tim-meta">
+            Sucursal ${pad3(t.sucursal||'001')} · ${t.tipo==='electronico'?'📱 Electrónico':'🖨️ Autoimpresor'}${t.nombre_suc?' · '+t.nombre_suc:''}
+          </div>
+          ${t.asignaciones&&t.asignaciones.length?`<div style="font-size:11px;color:var(--green);margin-top:1px;">🖥️ ${t.asignaciones.length} terminal${t.asignaciones.length!==1?'es':''}: ${t.asignaciones.map(a=>a.terminal).join(', ')}</div>`:'<div style="font-size:11px;color:var(--muted);margin-top:1px;">Sin terminales — usá ASIGNAR TERMINALES</div>'}
           <div class="tim-tags">${vBdg}${certBdg}${t.seleccionado?'<span class="tag tag-g">✓ ACTIVO</span>':''}</div>
-          ${(t.asignaciones||[]).length?`<div style="font-size:11px;color:var(--green);margin-top:3px;">🖥️ ${(t.asignaciones||[]).length} terminal${(t.asignaciones||[]).length!==1?'es':''} asignada${(t.asignaciones||[]).length!==1?'s':''}</div>`:'<div style="font-size:11px;color:#555;margin-top:3px;">Sin terminales asignadas</div>'}
+          ${(t.asignaciones||[]).length?`<div style="font-size:11px;color:var(--green);margin-top:3px;">🖥️ ${(t.asignaciones||[]).length} terminal${(t.asignaciones||[]).length!==1?'es':''} asignada${(t.asignaciones||[]).length!==1?'s':''}</div>`:'<div style="font-size:11px;color:#555;margin-top:3px;">Sin terminales — usá ASIGNAR TERMINALES</div>'}
         </div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
@@ -808,7 +849,7 @@ function buildTimLista(){
         <div class="tim-row"><span style="color:var(--muted)">Inicio vigencia</span><span>${fmt(t.vig_ini)}</span></div>
         <div class="tim-row"><span style="color:var(--muted)">Fin vigencia</span><span>${fmt(t.vig_fin)}</span></div>
         <div class="tim-row"><span style="color:var(--muted)">Sucursal</span><span style="font-family:monospace;font-weight:700">${pad3(t.sucursal)}</span></div>
-        <div class="tim-row"><span style="color:var(--muted)">Sucursal nro</span><span style="font-family:monospace;font-weight:700">${pad3(t.sucursal)}</span></div>
+        <div class="tim-row"><span style="color:var(--muted)">Sucursal nro</span><span style="font-family:monospace;font-weight:700">${pad3(t.sucursal||'001')}</span></div>
         ${(t.asignaciones||[]).length?`
           <div style="margin-top:6px;"><div style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;font-weight:700;margin-bottom:6px;">Terminales y puntos de expedición</div>
           ${(t.asignaciones||[]).map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #1e1e1e;font-size:12px;"><span style="font-weight:600;color:#fff;">${a.terminal}</span><span style="font-family:monospace;color:#42a5f5;font-weight:700;">Pto. ${String(a.punto_exp).padStart(3,'0')}</span><span style="color:var(--green);">→ nro ${String(a.nro_actual||1).padStart(7,'0')}</span></div>`).join('')}
@@ -820,7 +861,7 @@ function buildTimLista(){
               <span style="font-size:12px;color:#ccc;flex:1;">${a.terminal}</span>
               <span style="font-family:monospace;font-size:11px;color:var(--green);">${pad3(t.sucursal)}-${pad3(a.punto_exp)}-${String(a.nro_actual||1).padStart(7,'0')}</span>
             </div>`).join('')
-          :'<span style="color:var(--muted);font-size:12px;">Sin terminales asignadas</span>'}
+          :'<span style="color:var(--muted);font-size:12px;">Sin terminales — usá ASIGNAR TERMINALES</span>'}
         </div>
         <div class="tim-row"><span style="color:var(--muted)">Numeración</span><span>${t.tipo==='electronico'?'<span style="color:var(--muted)">Sin límite</span>':padN(t.desde)+' al '+padN(t.hasta)}</span></div>
         <div class="tim-row"><span style="color:var(--muted)">Siguiente nro</span><span style="color:var(--green);font-weight:700">${padN(t.nro_actual||t.desde)}</span></div>
@@ -1023,7 +1064,7 @@ async function abrirModalAsignar(timIdx){
           </div>
           <button onclick="elimAsig(${j})" style="background:var(--r2);border:1px solid var(--red);border-radius:6px;color:var(--red);font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;font-family:inherit;">✕</button>
         </div>`).join('')
-      : '<div style="text-align:center;padding:12px;color:var(--muted);font-size:12px;background:#111;border-radius:8px;">Sin terminales asignadas</div>'}
+      : '<div style="text-align:center;padding:12px;color:var(--muted);font-size:12px;background:#111;border-radius:8px;">Sin terminales — usá ASIGNAR TERMINALES</div>'}
     </div>
 
     <!-- Agregar terminal -->
@@ -1123,20 +1164,17 @@ async function elimAsig(j){
   const timIdx = parseInt(document.getElementById('mAsignarOv').dataset.timIdx);
   const a = timbrados[timIdx].asignaciones[j];
   if(!confirm('¿Desasignar terminal "'+a.terminal+'"?')) return;
-
-  // Si tiene ID de BD, desactivar en Supabase
-  if(a._ter_id){
-    try {
-      await fetch(SUPA_URL+'/rest/v1/timbrado_terminales?id=eq.'+a._ter_id,{
-        method:'PATCH',
-        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json'},
-        body: JSON.stringify({ activo:false })
-      });
-      console.log('[elimAsig] Desactivada terminal ID:', a._ter_id);
-    } catch(e){ console.error('[elimAsig]', e.message); }
-  }
-
-  // Remover de memoria y recargar
+  try {
+    if(a._ter_id){
+      await supaPatch('timbrado_terminales', 'id=eq.'+a._ter_id, { activo:false });
+    } else {
+      // Buscar por terminal y email
+      await supaPatch('timbrado_terminales',
+        'licencia_email=eq.'+encodeURIComponent(SE)+'&terminal=eq.'+encodeURIComponent(a.terminal),
+        { activo:false });
+    }
+    console.log('[elimAsig] ✅ Desactivada:', a.terminal);
+  } catch(e){ console.error('[elimAsig]', e.message); }
   await cargarTimbradosDesdeSupabase();
   abrirModalAsignar(timIdx);
   toast('✓ Terminal desasignada');
@@ -1145,64 +1183,74 @@ async function elimAsig(j){
 async function agregarAsig(){
   const timIdx  = parseInt(document.getElementById('mAsignarOv').dataset.timIdx);
   const terminal= document.getElementById('asigTerminal').value.trim();
-  const ptoExp  = document.getElementById('asigPtoExp').value.trim().padStart(3,'0');
+  const ptoExp  = (document.getElementById('asigPtoExp').value||'001').padStart(3,'0');
   const desde   = parseInt(document.getElementById('asigDesde').value)||1;
 
-  if(!terminal){ alert('Ingresá el nombre de la terminal'); return; }
+  if(!terminal){ alert('Seleccioná o escribí el nombre de la terminal'); return; }
   if(!ptoExp||ptoExp==='000'){ alert('Ingresá el punto de expedición'); return; }
 
-  if(!timbrados[timIdx].asignaciones) timbrados[timIdx].asignaciones=[];
-  const dup = timbrados[timIdx].asignaciones.find(a=>a.terminal===terminal||a.punto_exp===ptoExp);
-  if(dup){ alert('Ya existe esa terminal o punto de expedición'); return; }
-
-  // Feedback
   const btn = document.querySelector('button[onclick="agregarAsig()"]');
   if(btn){ btn.disabled=true; btn.textContent='⏳ Guardando...'; }
 
-  // Agregar en memoria
-  timbrados[timIdx].asignaciones.push({ terminal, punto_exp:ptoExp, nro_actual:desde });
-  timbrados[timIdx].seleccionado = true;
-
-  // Guardar timbrado primero (para tener _db_id)
-  await saveTims();
-
-  const dbId = timbrados[timIdx]._db_id;
-  if(!dbId){ console.error('[Asignar] Sin _db_id — revisar guardar_timbrado'); }
-
-  // Llamar asignar_terminal directamente
-  let ok = false;
   try {
-    const r = await fetch(SUPA_URL+'/rest/v1/rpc/asignar_terminal',{
-      method:'POST',
-      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json'},
-      body: JSON.stringify({
-        p_email:       SE,
-        p_timbrado_id: dbId,
-        p_terminal:    terminal,
-        p_sucursal:    localStorage.getItem('pos_sucursal')||null,
-        p_punto_exp:   ptoExp,
-        p_nro_actual:  desde
-      })
-    });
-    const d = await r.json();
-    ok = d && d.ok;
-    console.log('[Asignar]', terminal, ok?'✅ OK':'❌ Error', d);
-  } catch(e){ console.error('[Asignar] Exception:', e.message); }
+    // 1. Asegurar que el timbrado existe en BD y tiene ID
+    const t = timbrados[timIdx];
+    if(!t._db_id){
+      // Buscar por nro en Supabase
+      const rows = await sg('timbrados',
+        'licencia_email=eq.'+encodeURIComponent(SE)+'&nro=eq.'+t.nro);
+      if(rows.length) t._db_id = rows[0].id;
+      else {
+        // Crear el timbrado si no existe
+        const res = await supaPost('timbrados', {
+          licencia_email: SE, nro: t.nro, tipo: t.tipo||'autoimpresor',
+          vig_ini: t.vig_ini, vig_fin: t.tipo==='electronico'?null:t.vig_fin,
+          sucursal: t.sucursal||'001', nombre_suc: t.nombre_suc||null,
+          desde: parseInt(t.desde)||1, hasta: parseInt(t.hasta)||5000,
+          activo: true
+        }, 'licencia_email,nro');
+        const s = Array.isArray(res)?res[0]:res;
+        if(s&&s.id) t._db_id = s.id;
+      }
+    }
 
-  if(btn){ btn.disabled=false; btn.textContent='AGREGAR'; }
+    if(!t._db_id) throw new Error('No se pudo obtener ID del timbrado');
 
-  if(ok){
+    // 2. Upsert en timbrado_terminales — conflict on (licencia_email, terminal)
+    const res2 = await supaPost('timbrado_terminales', {
+      licencia_email: SE,
+      timbrado_id:    t._db_id,
+      terminal,
+      sucursal:       null,
+      punto_exp:      ptoExp,
+      nro_actual:     desde,
+      activo:         true
+    }, 'licencia_email,terminal');
+
+    const saved = Array.isArray(res2)?res2[0]:res2;
+    console.log('[Asignar] ✅ Terminal guardada:', saved);
+
+    // 3. Actualizar memoria local
+    if(!t.asignaciones) t.asignaciones = [];
+    const existing = t.asignaciones.findIndex(a=>a.terminal===terminal);
+    const aData = { terminal, punto_exp:ptoExp, nro_actual:desde, _ter_id: saved?.id };
+    if(existing>=0) t.asignaciones[existing] = aData;
+    else t.asignaciones.push(aData);
+    t.seleccionado = true;
+    localStorage.setItem(TIM_KEY, JSON.stringify(timbrados));
+
     toast('✓ Terminal "'+terminal+'" asignada correctamente');
-  } else {
-    toast('⚠️ Error al asignar — revisar consola');
+  } catch(e){
+    console.error('[Asignar] Error:', e.message);
+    alert('Error al asignar: '+e.message);
   }
 
-  // Limpiar campos y actualizar modal
+  if(btn){ btn.disabled=false; btn.textContent='✓ ASIGNAR TERMINAL'; }
+
+  // Limpiar y recargar
   document.getElementById('asigTerminal').value = '';
   document.getElementById('asigPtoExp').value   = '001';
   document.getElementById('asigDesde').value    = '1';
-
-  // Recargar datos frescos desde Supabase y refrescar modal
   await cargarTimbradosDesdeSupabase();
   abrirModalAsignar(timIdx);
 }
@@ -1215,21 +1263,18 @@ function cerrarModalAsignar(){
   if(lista) lista.innerHTML = buildTimLista();
 }
 async function elimTim(i){
-  if(!confirm('¿Eliminar este timbrado? Las terminales asignadas también se desasignan.')) return;
+  if(!confirm('¿Eliminar este timbrado?')) return;
   const t = timbrados[i];
-
-  // Soft delete en Supabase si tiene ID
-  if(t._db_id){
-    try {
-      await fetch(SUPA_URL+'/rest/v1/timbrados?id=eq.'+t._db_id,{
-        method:'PATCH',
-        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json'},
-        body: JSON.stringify({ activo:false })
-      });
-      console.log('[elimTim] Desactivado timbrado ID:', t._db_id);
-    } catch(e){ console.error('[elimTim]', e.message); }
-  }
-
+  try {
+    if(t._db_id){
+      await supaPatch('timbrados', 'id=eq.'+t._db_id, { activo:false });
+    } else {
+      await supaPatch('timbrados',
+        'licencia_email=eq.'+encodeURIComponent(SE)+'&nro=eq.'+t.nro,
+        { activo:false });
+    }
+    console.log('[elimTim] ✅ Eliminado:', t.nro);
+  } catch(e){ console.error('[elimTim]', e.message); }
   await refreshTimListaFromServer();
   toast('✓ Timbrado eliminado');
 }
@@ -1361,7 +1406,6 @@ async function guardarTim(){
   const vigIni = document.getElementById('mVigIni').value;
   const vigFin = document.getElementById('mVigFin').value;
   const suc    = pad3(document.getElementById('mSuc').value||'001');
-  const pex    = pad3(document.getElementById('mPEx').value||'001');
   const desde  = parseInt(document.getElementById('mDesde').value)||1;
   const hasta  = parseInt(document.getElementById('mHasta').value)||5000;
   const nomSuc = document.getElementById('mNomSuc').value.trim();
@@ -1369,47 +1413,42 @@ async function guardarTim(){
   const certV  = document.getElementById('mCertVenc')?.value||null;
   const certE  = document.getElementById('mCertEmis')?.value.trim()||null;
 
-  if(!nro)                     { alert('Ingresá el número de timbrado'); return; }
-  if(nro.length!==8)           { alert('El timbrado debe tener 8 dígitos'); return; }
-  if(!vigIni)                  { alert('Ingresá la fecha de inicio de vigencia'); return; }
-  if(tipo!=='electronico'&&!vigFin){ alert('Ingresá la fecha de fin de vigencia'); return; }
-  if(desde>=hasta)             { alert('Desde debe ser menor a Hasta'); return; }
+  if(!nro||nro.length!==8){ alert('El timbrado debe tener 8 dígitos'); return; }
+  if(!vigIni){ alert('Ingresá inicio de vigencia'); return; }
+  if(tipo!=='electronico'&&!vigFin){ alert('Ingresá fin de vigencia'); return; }
 
   const btn = document.querySelector('button[onclick="guardarTim()"]');
   if(btn){ btn.disabled=true; btn.textContent='⏳ Guardando...'; }
 
   try {
-    const r = await fetch(SUPA_URL+'/rest/v1/rpc/guardar_timbrado',{
-      method:'POST',
-      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json'},
-      body: JSON.stringify({
-        p_email:      SE,
-        p_nro:        nro,
-        p_tipo:       tipo,
-        p_vig_ini:    vigIni,
-        p_vig_fin:    tipo==='electronico' ? null : vigFin,
-        p_sucursal:   suc,
-        p_nombre_suc: nomSuc||null,
-        p_desde:      desde,
-        p_hasta:      tipo==='electronico' ? 9999999 : hasta,
-        p_cert_venc:  certV||null,
-        p_cert_emis:  certE||null
-      })
-    });
-    const d = await r.json();
-    if(!d||!d.id) throw new Error('Sin ID en respuesta: '+JSON.stringify(d));
+    const data = {
+      licencia_email: SE,
+      nro,
+      tipo,
+      vig_ini:    vigIni||null,
+      vig_fin:    tipo==='electronico' ? null : (vigFin||null),
+      sucursal:   suc,
+      nombre_suc: nomSuc||null,
+      desde,
+      hasta:      tipo==='electronico' ? 9999999 : hasta,
+      cert_venc:  certV||null,
+      cert_emis:  certE||null,
+      activo:     true
+    };
 
-    console.log('[guardarTim] ✅ ID:', d.id, 'nro:', nro);
+    // Upsert — conflict on (licencia_email, nro)
+    const result = await supaPost('timbrados', data, 'licencia_email,nro');
+    const saved = Array.isArray(result) ? result[0] : result;
+    if(!saved||!saved.id) throw new Error('Sin ID: '+JSON.stringify(result));
+
+    console.log('[guardarTim] ✅ ID:', saved.id, 'nro:', nro);
     closeMTim();
-
-    // Recargar lista desde Supabase
     await refreshTimListaFromServer();
     toast(timEditIdx!==null ? '✓ Timbrado actualizado' : '✓ Timbrado guardado');
   } catch(e){
     console.error('[guardarTim] Error:', e.message);
-    toast('⚠️ Error al guardar: '+e.message);
+    alert('Error al guardar timbrado: '+e.message);
   }
-
   if(btn){ btn.disabled=false; btn.textContent='GUARDAR'; }
 }
 
