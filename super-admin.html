@@ -335,6 +335,8 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
     <div class="bn" onclick="nav('cli',this,'Clientes')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Clientes</div>
     <div class="bn" onclick="nav('ter',this,'Terminales')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Terminales</div>
     <div class="bn" onclick="nav('rep',this,'Reportes')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reportes</div>
+    <div class="bn" onclick="nav('ruc',this,'RUC')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg><span>RUC</span></div>
+      <div class="sb-i" onclick="nav('ruc',this,'Contribuyentes')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>Contribuyentes</div>
   </div>
 
 </div><!-- /app -->
@@ -443,7 +445,76 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
 </div>
 
 <!-- TOAST -->
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast">
+  <!-- PAGE: CONTRIBUYENTES RUC -->
+  <div class="page" id="pRuc">
+    <div class="ph">
+      <div>
+        <div class="pt">Contribuyentes RUC</div>
+        <div class="ps">Importar y consultar base de datos del SET/DNIT</div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="kg" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;">
+      <div class="kc" style="--c:var(--green)"><div class="kc-l">Total registros</div><div class="kc-v" id="rucTotal">—</div><div class="kc-s">en base de datos</div></div>
+      <div class="kc" style="--c:var(--blue)"><div class="kc-l">Activos</div><div class="kc-v" id="rucActivos">—</div></div>
+      <div class="kc" style="--c:var(--muted)"><div class="kc-l">Última importación</div><div class="kc-v" id="rucUltima" style="font-size:14px;">—</div></div>
+    </div>
+
+    <!-- Importar archivos -->
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-h"><span class="card-t">📥 Importar archivos TXT del SET</span></div>
+      <div style="padding:16px;">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6;">
+          Seleccioná uno o varios archivos TXT del SET (ruc1.txt, ruc2.txt... ruc9.txt).<br>
+          El formato esperado es: <code style="background:#1e1e1e;padding:2px 6px;border-radius:4px;">RUC|RAZON_SOCIAL|DV|CODIGO|ESTADO|</code>
+        </div>
+
+        <!-- Drop zone -->
+        <div id="rucDropZone" style="border:2px dashed #2a2a2a;border-radius:10px;padding:30px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:14px;"
+          onclick="document.getElementById('rucFileInput').click()"
+          ondragover="event.preventDefault();this.style.borderColor='var(--green)'"
+          ondragleave="this.style.borderColor='#2a2a2a'"
+          ondrop="event.preventDefault();this.style.borderColor='#2a2a2a';handleRucFiles(event.dataTransfer.files)">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.5" style="margin-bottom:8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div style="font-size:14px;font-weight:700;color:#aaa;margin-bottom:4px;">Arrastrá los archivos acá</div>
+          <div style="font-size:12px;color:#555;">o hacé click para seleccionar</div>
+          <input type="file" id="rucFileInput" accept=".txt" multiple style="display:none" onchange="handleRucFiles(this.files)">
+        </div>
+
+        <!-- Progress -->
+        <div id="rucProgress" style="display:none;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-size:13px;font-weight:700;" id="rucProgressLabel">Procesando...</span>
+            <span style="font-size:12px;color:var(--muted);" id="rucProgressPct">0%</span>
+          </div>
+          <div style="background:#1e1e1e;border-radius:4px;height:8px;overflow:hidden;margin-bottom:8px;">
+            <div id="rucProgressBar" style="height:100%;width:0%;background:var(--green);border-radius:4px;transition:width .3s;"></div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);" id="rucProgressDetail"></div>
+        </div>
+
+        <!-- Log -->
+        <div id="rucLog" style="display:none;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;max-height:200px;overflow-y:auto;color:#aaa;"></div>
+      </div>
+    </div>
+
+    <!-- Buscar contribuyente -->
+    <div class="card">
+      <div class="card-h"><span class="card-t">🔍 Consultar contribuyente</span></div>
+      <div style="padding:16px;">
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <input id="rucBuscarInput" type="text" placeholder="Ingresá RUC o nombre..." 
+            style="flex:1;background:#1e1e1e;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:10px 14px;outline:none;"
+            oninput="buscarRucAdmin(this.value)">
+        </div>
+        <div id="rucResultados"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
 
 <script>
 const SURL  = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
@@ -521,7 +592,7 @@ function logout(){
 function nav(p,el,title){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));
   document.querySelectorAll('.bn,.sb-i').forEach(x=>x.classList.remove('on'));
-  const pid={lic:'pLic',cli:'pCli',ter:'pTer',rep:'pRep'}[p];
+  const pid={lic:'pLic',cli:'pCli',ter:'pTer',rep:'pRep',ruc:'pRuc'}[p];
   if(pid) document.getElementById(pid).classList.add('on');
   // Activate matching nav items
   document.querySelectorAll('.bn,.sb-i').forEach(x=>{
@@ -532,6 +603,7 @@ function nav(p,el,title){
   if(p==='cli') loadCli();
   if(p==='ter') loadTer();
   if(p==='rep') loadRep();
+  if(p==='ruc'){ loadRuc(); document.getElementById('pRuc').classList.add('on'); }
 }
 
 // ── LICENCIAS ────────────────────────────────────────────
@@ -1025,6 +1097,185 @@ if(localStorage.getItem('sa')){
   document.getElementById('app').style.display='block';
   loadL();
 }
+
+// ═══════════════════════════════════════════════════════
+// CONTRIBUYENTES RUC
+// ═══════════════════════════════════════════════════════
+
+async function loadRuc(){
+  // Cargar estadísticas
+  try {
+    const r = await fetch(SURL+'/rest/v1/contribuyentes?select=estado&limit=1',{
+      headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Accept':'application/json','Prefer':'count=exact'}
+    });
+    const total = r.headers.get('content-range');
+    if(total){
+      const tot = total.split('/')[1];
+      document.getElementById('rucTotal').textContent = parseInt(tot).toLocaleString('es-PY');
+    }
+    const rows = await r.json();
+
+    // Contar activos
+    const r2 = await fetch(SURL+'/rest/v1/contribuyentes?estado=eq.ACTIVO&select=ruc&limit=1',{
+      headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Accept':'application/json','Prefer':'count=exact'}
+    });
+    const activos = r2.headers.get('content-range');
+    if(activos) document.getElementById('rucActivos').textContent = parseInt(activos.split('/')[1]).toLocaleString('es-PY');
+
+    // Última actualización
+    const r3 = await fetch(SURL+'/rest/v1/contribuyentes?select=updated_at&order=updated_at.desc&limit=1',{
+      headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Accept':'application/json'}
+    });
+    const d3 = await r3.json();
+    if(d3&&d3[0]) {
+      const dt = new Date(d3[0].updated_at);
+      document.getElementById('rucUltima').textContent = dt.toLocaleDateString('es-PY');
+    }
+  } catch(e){ console.warn('[RUC Stats]', e.message); }
+}
+
+// Manejar archivos seleccionados
+async function handleRucFiles(files){
+  if(!files||!files.length) return;
+  const fileArr = Array.from(files);
+  
+  document.getElementById('rucProgress').style.display='block';
+  document.getElementById('rucLog').style.display='block';
+  const log = document.getElementById('rucLog');
+  log.innerHTML = '';
+
+  function addLog(msg, color='#aaa'){
+    const line = document.createElement('div');
+    line.style.color = color;
+    line.textContent = new Date().toLocaleTimeString()+' '+msg;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  let totalLines = 0, totalInserted = 0, totalErrors = 0;
+
+  for(let fi=0; fi<fileArr.length; fi++){
+    const file = fileArr[fi];
+    addLog('📄 Procesando: '+file.name, '#fff');
+
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter(l=>l.trim());
+      addLog('  '+lines.length+' registros encontrados');
+
+      // Procesar en lotes de 500
+      const BATCH = 500;
+      let inserted = 0;
+
+      for(let i=0; i<lines.length; i+=BATCH){
+        const batch = lines.slice(i, i+BATCH);
+        const records = [];
+
+        batch.forEach(line => {
+          const parts = line.trim().split('|');
+          if(parts.length >= 5 && parts[0]){
+            records.push({
+              ruc:          parts[0].trim(),
+              razon_social: parts[1]?.trim()||'',
+              dv:           parts[2]?.trim()||'',
+              codigo:       parts[3]?.trim()||'',
+              estado:       parts[4]?.trim()||'ACTIVO',
+              updated_at:   new Date().toISOString()
+            });
+          }
+        });
+
+        if(!records.length) continue;
+
+        // Upsert batch
+        const r = await fetch(SURL+'/rest/v1/contribuyentes?on_conflict=ruc',{
+          method:'POST',
+          headers:{
+            'apikey':SKEY,'Authorization':'Bearer '+SKEY,
+            'Content-Type':'application/json',
+            'Prefer':'resolution=merge-duplicates,return=minimal'
+          },
+          body: JSON.stringify(records)
+        });
+
+        if(r.ok){
+          inserted += records.length;
+          totalInserted += records.length;
+        } else {
+          const err = await r.text();
+          totalErrors++;
+          addLog('  ⚠️ Error lote '+(i/BATCH+1)+': '+err.substring(0,80), '#ef5350');
+        }
+
+        // Actualizar progreso
+        const pct = Math.round(((fi*lines.length + i + BATCH) / (fileArr.length*lines.length)) * 100);
+        const pctClamped = Math.min(pct, 100);
+        document.getElementById('rucProgressBar').style.width = pctClamped+'%';
+        document.getElementById('rucProgressPct').textContent = pctClamped+'%';
+        document.getElementById('rucProgressLabel').textContent = 'Importando '+file.name+'...';
+        document.getElementById('rucProgressDetail').textContent = 
+          'Lote '+(Math.floor(i/BATCH)+1)+' de '+Math.ceil(lines.length/BATCH)+
+          ' | '+inserted.toLocaleString()+' registros insertados';
+
+        // Pequeña pausa para no sobrecargar
+        await new Promise(r=>setTimeout(r,50));
+      }
+
+      totalLines += lines.length;
+      addLog('  ✅ '+file.name+': '+inserted.toLocaleString()+' registros importados', '#4caf50');
+
+    } catch(e){
+      addLog('  ❌ Error leyendo '+file.name+': '+e.message, '#ef5350');
+    }
+  }
+
+  // Resumen final
+  document.getElementById('rucProgressBar').style.width = '100%';
+  document.getElementById('rucProgressPct').textContent = '100%';
+  document.getElementById('rucProgressLabel').textContent = '✅ Importación completa';
+  document.getElementById('rucProgressDetail').textContent = 
+    totalInserted.toLocaleString()+' registros importados · '+totalErrors+' errores';
+  addLog('─────────────────────────────────', '#333');
+  addLog('TOTAL: '+totalInserted.toLocaleString()+' registros | '+totalErrors+' errores', '#fff');
+
+  // Recargar estadísticas
+  await loadRuc();
+  toast('✅ Importación finalizada: '+totalInserted.toLocaleString()+' registros');
+}
+
+// Buscar contribuyente en tabla
+let rucBuscarTimer = null;
+async function buscarRucAdmin(q){
+  clearTimeout(rucBuscarTimer);
+  const el = document.getElementById('rucResultados');
+  if(!q||q.length<2){ el.innerHTML=''; return; }
+  rucBuscarTimer = setTimeout(async()=>{
+    el.innerHTML='<div class="loading"><span class="sp"></span>Buscando...</div>';
+    try {
+      const qClean = q.replace(/[-\s\.]/g,'');
+      // Buscar por RUC exacto o nombre
+      const isNum = /^\d+$/.test(qClean);
+      const query = isNum
+        ? 'ruc=like.'+encodeURIComponent(qClean+'%')+'&limit=10'
+        : 'razon_social=ilike.'+encodeURIComponent('%'+q+'%')+'&limit=10';
+      const rows = await fetch(SURL+'/rest/v1/contribuyentes?'+query+'&select=ruc,razon_social,dv,estado',{
+        headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Accept':'application/json'}
+      }).then(r=>r.json());
+
+      if(!rows.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px 0;">Sin resultados</div>'; return; }
+
+      el.innerHTML = rows.map(r=>{
+        const color = r.estado==='ACTIVO'?'var(--green)':r.estado==='CANCELADO'?'var(--red)':'var(--orange)';
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">'+
+          '<div><div style="font-size:13px;font-weight:700;color:#fff;">'+r.razon_social+'</div>'+
+          '<div style="font-size:12px;color:var(--muted);">RUC: '+r.ruc+(r.dv?'-'+r.dv:'')+'</div></div>'+
+          '<span style="font-size:11px;background:rgba(0,0,0,.3);color:'+color+';padding:3px 8px;border-radius:10px;font-weight:700;">'+r.estado+'</span>'+
+          '</div>';
+      }).join('');
+    } catch(e){ el.innerHTML='<div style="color:var(--red);font-size:13px;">Error: '+e.message+'</div>'; }
+  }, 400);
+}
+
 </script>
 </body>
 </html>
