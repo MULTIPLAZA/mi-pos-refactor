@@ -2772,14 +2772,14 @@ function filterP(){
 
 function renderDescuentosTiles(){
   const g = document.getElementById('pgrid');
-  const descs = PRODS.filter(p=>p.esDescuento && p.activo!==false);
+  const descs = DESCUENTOS.filter(d=>d.activo!==false);
   if(!descs.length){
     g.innerHTML = '<div style="grid-column:span 3;padding:40px;text-align:center;color:#555;font-size:14px;">Sin descuentos — creá uno en Artículos → Descuentos</div>';
     return;
   }
   g.innerHTML = descs.map(d => {
-    const valStr = d.descValor!=null
-      ? (d.descTipo==='%' ? d.descValor+'%' : gs(d.descValor))
+    const valStr = d.valor!=null
+      ? (d.tipo==='%' ? d.valor+'%' : gs(d.valor))
       : 'valor al vender';
     return '<div class="ptile" style="background:#b71c1c;" onclick="addDescuento('+d.id+')">'+
       '<span class="pname" style="font-size:11px;">'+d.name+'<br>'+
@@ -2868,7 +2868,7 @@ function openCat(){
     html += '<div class="cat-item ' + (curCat===c.nombre?'sel':'') + '" onclick="pickCat(this)">' + c.nombre + '</div>';
   });
   // Agregar Descuentos si hay alguno creado
-  if(PRODS.filter(p=>p.esDescuento && p.activo!==false).length){
+  if(DESCUENTOS.filter(d=>d.activo!==false).length){
     html += '<div class="cat-item ' + (curCat==='Descuentos'?'sel':'') +
       '" onclick="pickCat(this)" style="color:#ef5350;border-left:3px solid #ef5350;">🏷️ Descuentos</div>';
   }
@@ -5241,7 +5241,7 @@ function renderDescList(){
   if(!list) return;
 
   // Leer descuentos directo de PRODS (cat=Descuentos)
-  const descs = PRODS.filter(p=>p.esDescuento && p.activo!==false);
+  const descs = DESCUENTOS.filter(d=>d.activo!==false);
 
   if(!descs.length){
     list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:14px;">'+
@@ -5252,15 +5252,15 @@ function renderDescList(){
   }
 
   list.innerHTML = descs.map(d => {
-    const valorStr = d.descValor != null
-      ? (d.descTipo==='%' ? d.descValor+'%' : gs(d.descValor))
+    const valorStr = d.valor != null
+      ? (d.tipo==='%' ? d.valor+'%' : gs(d.valor))
       : '<span style="color:#555;font-style:italic;">se ingresa al vender</span>';
     return '<div class="art-item" onclick="editarDesc('+d.id+')" style="border-left:3px solid #e53935;">'+
       '<div class="art-item-color" style="background:#e53935;font-size:12px;font-weight:800;">%</div>'+
       '<div class="art-item-info">'+
         '<div class="art-item-name">'+d.name+'</div>'+
         '<div class="art-item-meta">'+
-          '<span>'+(d.descTipo==='%'?'Porcentaje':'Monto fijo')+'</span>'+
+          '<span>'+(d.tipo==='%'?'Porcentaje':'Monto fijo')+'</span>'+
           '<span>·</span><span>'+valorStr+'</span>'+
         '</div>'+
       '</div>'+
@@ -5283,14 +5283,14 @@ function abrirNuevoDesc(){
 }
 
 function editarDesc(id){
-  const prod = PRODS.find(p=>p.id===id && p.esDescuento);
-  if(!prod) return;
+  const d = DESCUENTOS.find(x=>x.id===id);
+  if(!d) return;
   descEditId  = id;
-  descTipoSel = prod.descTipo || '%';
+  descTipoSel = d.tipo || '%';
   document.getElementById('mDescTitulo').textContent = 'Editar Descuento';
-  document.getElementById('mDescNombre').value = prod.name;
-  document.getElementById('mDescValor').value  = prod.descValor != null ? prod.descValor : '';
-  selDescTipo(prod.descTipo || '%');
+  document.getElementById('mDescNombre').value = d.name;
+  document.getElementById('mDescValor').value  = d.valor != null ? d.valor : '';
+  selDescTipo(d.tipo || '%');
   document.getElementById('mDescOv').style.display = 'flex';
 }
 
@@ -5328,73 +5328,94 @@ function guardarDesc(){
     toast('El porcentaje debe ser entre 1 y 100'); return;
   }
 
-  // Asegurar que existe la categoría "Descuentos"
-  if(!CATEGORIAS.find(c=>c.nombre==='Descuentos')){
-    const newCat = {id: nextCatId++, nombre:'Descuentos', color:'#e53935', icono:'🏷️'};
-    CATEGORIAS.push(newCat);
-    dbSaveCategoria(newCat);
-    supaUpsertCategoria(newCat);
-  }
-
   if(descEditId != null){
-    // Editar — actualizar en PRODS y DESCUENTOS
-    const prod = PRODS.find(p=>p.id===descEditId);
-    if(prod){
-      prod.name        = nombre;
-      prod.descTipo    = descTipoSel;
-      prod.descValor   = valor;
-      // precio = valor si es monto fijo, 0 si es % (se calcula al vender)
-      prod.price       = (descTipoSel==='monto' && valor!=null) ? valor : 0;
-      prod.precioVariable = (valor == null);
-      dbSaveProducto(prod);
-      supaUpsertProducto(prod);
-    }
     const d = DESCUENTOS.find(x=>x.id===descEditId);
     if(d){ d.name=nombre; d.tipo=descTipoSel; d.valor=valor; }
   } else {
-    // Nuevo descuento — guardar como producto en categoría Descuentos
-    const newId = nextDescId++;
-    const prod = {
-      id:           newId,
-      name:         nombre,
-      price:        (descTipoSel==='monto' && valor!=null) ? valor : 0,
-      precioVariable: (valor == null),
-      costo:        0,
-      codigo:       '',
-      cat:          'Descuentos',
-      iva:          'exento',
-      color:        '#e53935',
-      colorPropio:  true,
-      activo:       true,
-      esDescuento:  true,
-      descTipo:     descTipoSel,
-      descValor:    valor,
-    };
-    PRODS.push(prod);
-    DESCUENTOS.push({id:newId, name:nombre, tipo:descTipoSel, valor:valor, color:'#e53935', activo:true});
-    dbSaveProducto(prod);
-    supaUpsertProducto(prod);
-    nextProdId = Math.max(nextProdId, newId+1);
+    DESCUENTOS.push({
+      id:    nextDescId++,
+      name:  nombre,
+      tipo:  descTipoSel,
+      valor: valor,
+      color: '#e53935',
+      activo:true
+    });
   }
 
+  // Persistir en pos_config y localStorage
+  guardarDescuentosConfig();
   cerrarMDesc();
   renderDescList();
   filterP();
   toast('Descuento guardado');
 }
 
+function guardarDescuentosConfig(){
+  // Guardar en localStorage
+  localStorage.setItem('pos_descuentos', JSON.stringify(DESCUENTOS));
+  // Guardar en Supabase pos_config
+  const email = localStorage.getItem('pos_email')||localStorage.getItem('pos_licencia_email');
+  if(!email || USAR_DEMO) return;
+  fetch(SUPA_URL+'/rest/v1/pos_config?on_conflict=licencia_email,clave',{
+    method:'POST',
+    headers:{
+      'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+      'Content-Type':'application/json',
+      'Prefer':'resolution=merge-duplicates'
+    },
+    body: JSON.stringify({
+      licencia_email: email,
+      clave: 'descuentos_config',
+      valor: JSON.stringify(DESCUENTOS)
+    })
+  }).catch(e=>console.warn('[Desc] No se pudo guardar en Supabase:', e.message));
+}
+
+async function cargarDescuentosConfig(){
+  // 1. Intentar desde Supabase
+  try {
+    const email = localStorage.getItem('pos_email')||localStorage.getItem('pos_licencia_email');
+    if(email && !USAR_DEMO){
+      const r = await fetch(
+        SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+
+        '&clave=eq.descuentos_config&select=valor',
+        {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}}
+      );
+      if(r.ok){
+        const data = await r.json();
+        if(data && data[0] && data[0].valor){
+          const parsed = JSON.parse(data[0].valor);
+          if(Array.isArray(parsed) && parsed.length){
+            DESCUENTOS.length = 0;
+            parsed.forEach(d=>DESCUENTOS.push(d));
+            localStorage.setItem('pos_descuentos', JSON.stringify(DESCUENTOS));
+            console.log('[Desc] Cargados desde Supabase:', DESCUENTOS.length);
+            return;
+          }
+        }
+      }
+    }
+  } catch(e){ console.warn('[Desc] Fallback a localStorage'); }
+
+  // 2. Fallback localStorage
+  try {
+    const stored = localStorage.getItem('pos_descuentos');
+    if(stored){
+      const parsed = JSON.parse(stored);
+      if(Array.isArray(parsed)){
+        DESCUENTOS.length = 0;
+        parsed.forEach(d=>DESCUENTOS.push(d));
+        console.log('[Desc] Cargados desde localStorage:', DESCUENTOS.length);
+      }
+    }
+  } catch(e){ console.warn('[Desc] Error cargando descuentos:', e.message); }
+}
+
 function eliminarDesc(id){
   if(!confirm('Eliminar este descuento?')) return;
-  // Desactivar en PRODS
-  const prod = PRODS.find(p=>p.id===id);
-  if(prod){
-    prod.activo = false;
-    dbSaveProducto(prod);
-    supaUpsertProducto(prod);
-  }
-  // Quitar de DESCUENTOS
   const idx = DESCUENTOS.findIndex(x=>x.id===id);
   if(idx>=0) DESCUENTOS.splice(idx,1);
+  guardarDescuentosConfig();
   renderDescList();
   filterP();
   toast('Descuento eliminado');
@@ -5491,11 +5512,13 @@ function renderArtList(filter){
   const list = document.getElementById('artList');
   if(!list) return;
 
-  // Todos los productos que coincidan con el filtro
+  // Todos los productos (excluir ítem libre y descuentos — esos tienen su propia pantalla)
   let items = PRODS.filter(p =>
-    !filter ||
-    p.name.toLowerCase().includes(filter.toLowerCase()) ||
-    (p.codigo && p.codigo.includes(filter))
+    !p.itemLibre &&
+    !p.esDescuento &&
+    (!filter ||
+      p.name.toLowerCase().includes(filter.toLowerCase()) ||
+      (p.codigo && p.codigo.includes(filter)))
   );
 
   // Separar activos e inactivos
@@ -6357,6 +6380,8 @@ function supaUpsertProducto(prod){
   if(USAR_DEMO || !navigator.onLine) return;
   const email = localStorage.getItem(SK.email);
   if(!email) return;
+  // No guardar descuentos en pos_productos — van en pos_config
+  if(prod.esDescuento) return;
   const data = {
     id: prod.id, nombre: prod.name, precio: prod.price||0,
     precio_variable: prod.precioVariable||false,
@@ -6365,8 +6390,6 @@ function supaUpsertProducto(prod){
     color: prod.color, color_propio: prod.colorPropio||false,
     mitad: prod.mitad||false, inventario: prod.inventario||false,
     comanda: prod.comanda||false, item_libre: prod.itemLibre||false,
-    es_descuento: prod.esDescuento||false,
-    desc_tipo: prod.descTipo||null, desc_valor: prod.descValor||null,
     activo: prod.activo !== false, licencia_email: email,
     updated_at: new Date().toISOString()
   };
@@ -6435,9 +6458,6 @@ async function supaLoadProductos(){
         comanda:        p.comanda || false,
         itemLibre:      false,
         activo:         p.activo !== false && p.activo !== 0,
-        esDescuento:    p.es_descuento  || false,
-        descTipo:       p.desc_tipo     || null,
-        descValor:      p.desc_valor    != null ? p.desc_valor : null,
       });
     });
 
@@ -6445,17 +6465,10 @@ async function supaLoadProductos(){
     PRODS.length = 0;
     newProds.forEach(p => PRODS.push(p));
 
-    // Reconstruir DESCUENTOS desde PRODS
-    DESCUENTOS.length = 0;
-    PRODS.filter(p=>p.esDescuento && p.activo!==false).forEach(p=>{
-      DESCUENTOS.push({id:p.id, name:p.name, tipo:p.descTipo||'%', valor:p.descValor, color:'#e53935', activo:true});
-    });
-
     // Actualizar contadores
     const maxId = Math.max(...PRODS.filter(p=>!p.itemLibre).map(p=>p.id), 0);
     nextProdId  = maxId + 1;
-    nextDescId  = Math.max(nextDescId, maxId + 1);
-    console.log('[Supabase] Productos:', PRODS.length-1, '| Descuentos:', DESCUENTOS.length);
+    console.log('[Supabase] Productos cargados:', PRODS.length-1);
     filterP();
   } catch(e){
     if(!e.message?.includes('Failed to fetch'))
