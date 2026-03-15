@@ -359,14 +359,73 @@ function toast(m,dur=2200){
 
 // ── SUPABASE ──────────────────────────────────────────────
 async function sg(t,q){
-  try{
-    const r=await fetch(SUPA_URL+'/rest/v1/'+t+(q?'?'+q:''),{
-      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Accept':'application/json'}
+  const url = SUPA_URL+'/rest/v1/'+t+(q?'?'+q:'');
+  const r = await fetch(url,{
+    headers:{
+      'apikey':        SUPA_ANON,
+      'Authorization': 'Bearer '+SUPA_ANON,
+      'Content-Type':  'application/json',
+      'Accept':        'application/json'
+    }
+  });
+  if(!r.ok){
+    const txt = await r.text().catch(()=>'');
+    throw new Error('HTTP '+r.status+' en '+t+': '+txt.substring(0,100));
+  }
+  const d = await r.json();
+  return Array.isArray(d) ? d : [];
+}
+
+// Test de conectividad con Supabase
+async function testConexion(){
+  try {
+    // Query simple a tabla que siempre existe
+    const r = await fetch(SUPA_URL+'/rest/v1/licencias?limit=1',{
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}
     });
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    const d=await r.json();
-    return Array.isArray(d)?d:[];
-  }catch(e){ throw e; }
+    console.log('[Supabase] Conectividad OK — status:', r.status);
+    // Verificar tabla timbrados
+    const r2 = await fetch(SUPA_URL+'/rest/v1/timbrados?limit=1',{
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}
+    });
+    if(r2.status === 404 || r2.status === 400){
+      const err = await r2.text();
+      console.error('[Supabase] Tabla timbrados NO EXISTE o error:', r2.status, err.substring(0,150));
+      mostrarAlertaTablas();
+    } else {
+      console.log('[Supabase] Tabla timbrados OK — status:', r2.status);
+    }
+    // Verificar tabla timbrado_terminales
+    const r3 = await fetch(SUPA_URL+'/rest/v1/timbrado_terminales?limit=1',{
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}
+    });
+    if(r3.status === 404 || r3.status === 400){
+      console.error('[Supabase] Tabla timbrado_terminales NO EXISTE:', r3.status);
+    } else {
+      console.log('[Supabase] Tabla timbrado_terminales OK — status:', r3.status);
+    }
+  } catch(e){
+    console.error('[Supabase] Sin conexión:', e.message);
+  }
+}
+
+function mostrarAlertaTablas(){
+  const c = document.getElementById('content');
+  if(!c) return;
+  const alerta = document.createElement('div');
+  alerta.style.cssText = 'background:rgba(239,83,80,.1);border:1px solid var(--red);border-radius:10px;padding:14px 16px;margin:0 0 16px;';
+  alerta.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span style="font-size:13px;font-weight:700;color:var(--red);">Tablas no encontradas en Supabase</span>
+    </div>
+    <div style="font-size:12px;color:#aaa;line-height:1.6;">
+      Las tablas <code style="background:#2a2a2a;padding:1px 5px;border-radius:3px;">timbrados</code> y 
+      <code style="background:#2a2a2a;padding:1px 5px;border-radius:3px;">timbrado_terminales</code> 
+      no existen en tu base de datos.<br>
+      Ejecutá el archivo <strong>supabase_timbrados.sql</strong> en Supabase → SQL Editor.
+    </div>`;
+  c.insertBefore(alerta, c.firstChild);
 }
 async function srpc(fn,p){
   const r=await fetch(SUPA_URL+'/rest/v1/rpc/'+fn,{method:'POST',
@@ -413,6 +472,8 @@ function doLogout(){
 function showApp(){
   document.getElementById('loginWrap').style.display='none';
   document.getElementById('app').style.display='block';
+  // Verificar conectividad y tablas
+  setTimeout(testConexion, 1000);
   document.getElementById('sbNeg').textContent=localStorage.getItem('an')||'Mi Negocio';
   document.getElementById('sbPlan').textContent='Plan '+(SP||'—');
   document.getElementById('sbEmail').textContent=SE||'—';
@@ -902,74 +963,160 @@ function usarTim(i){
   abrirModalAsignar(i);
 }
 
-function abrirModalAsignar(timIdx){
-  const t = timbrados[timIdx];
-  const mapa = JSON.parse(localStorage.getItem('pos_timbrados_mapa')||'{}');
-  // Obtener asignaciones actuales de este timbrado
-  const asignaciones = t.asignaciones || [];
-
+async function abrirModalAsignar(timIdx){
   const modal = document.getElementById('mAsignarOv');
   const body  = document.getElementById('mAsignarBody');
   if(!modal||!body) return;
-
   modal.dataset.timIdx = timIdx;
 
+  // Mostrar loading
+  body.innerHTML = '<div class="loading"><span class="sp"></span>Cargando terminales...</div>';
+  modal.style.display = 'flex';
+
+  // Cargar terminales registradas desde activaciones
+  let terminalesDisp = [];
+  try {
+    const rows = await sg('activaciones',
+      'licencia_email=eq.'+encodeURIComponent(SE)+'&activa=eq.true&order=nombre_terminal.asc');
+    terminalesDisp = rows.map(r => ({
+      nombre:   r.nombre_terminal || r.device_id || 'Terminal',
+      sucursal: r.sucursal || '',
+      device_id: r.device_id
+    }));
+  } catch(e){ console.warn('[Terminales]', e.message); }
+
+  // Timbrado actual
+  const t = timbrados[timIdx];
+  const asignaciones = t.asignaciones || [];
+
+  // Terminales ya asignadas a ESTE timbrado
+  const yaAsignadas = new Set(asignaciones.map(a=>a.terminal));
+
+  // Terminales asignadas a OTROS timbrados
+  const asignadasOtros = new Set();
+  timbrados.forEach((ot, oi) => {
+    if(oi === timIdx) return;
+    (ot.asignaciones||[]).forEach(a => asignadasOtros.add(a.terminal));
+  });
+
   body.innerHTML = `
-    <div style="font-size:13px;color:var(--muted);margin-bottom:16px;">
-      Timbrado <strong style="color:#fff">${t.nro}</strong> · 
-      Sucursal <strong style="color:#fff">${pad3(t.sucursal)}</strong><br>
-      <span style="font-size:11px;">Asignás este timbrado a cada terminal indicando su punto de expedición.</span>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:14px;">
+      Timbrado <strong style="color:#fff">${t.nro}</strong> ·
+      Sucursal <strong style="color:#fff">${pad3(t.sucursal)}</strong>
+      ${t.nombre_suc?'· '+t.nombre_suc:''}
     </div>
 
-    <!-- Lista de terminales asignadas -->
-    <div id="asigLista" style="margin-bottom:14px;">
+    <!-- Terminales ya asignadas -->
+    <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;">
+      Terminales asignadas (${asignaciones.length})
+    </div>
+    <div id="asigLista" style="margin-bottom:16px;">
       ${asignaciones.length ? asignaciones.map((a,j)=>`
-        <div style="display:flex;align-items:center;gap:8px;background:#111;border:1px solid #2a2a2a;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:8px;background:#111;border:1px solid var(--green);border-radius:8px;padding:10px 12px;margin-bottom:6px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;"></div>
           <div style="flex:1;">
             <div style="font-size:13px;font-weight:700;color:#fff;">${a.terminal}</div>
             <div style="font-size:11px;color:var(--muted);">
-              Pto. Exp.: <strong style="color:var(--green);font-family:monospace;">${pad3(a.punto_exp)}</strong>
-              · Nro actual: <strong style="color:var(--green);font-family:monospace;">${String(a.nro_actual||1).padStart(7,'0')}</strong>
-            </div>
-            <div style="font-size:10px;color:#444;margin-top:2px;font-family:monospace;">
-              Factura N° ${pad3(t.sucursal)}-${pad3(a.punto_exp)}-${String(a.nro_actual||1).padStart(7,'0')}
+              Pto. Exp.: <strong style="color:var(--green);font-family:monospace;">${String(a.punto_exp||'001').padStart(3,'0')}</strong>
+              · Siguiente: <strong style="color:var(--green);font-family:monospace;">${String(a.nro_actual||1).padStart(7,'0')}</strong>
             </div>
           </div>
-          <button onclick="elimAsig(${j})" style="background:var(--r2);border:1px solid var(--red);border-radius:6px;color:var(--red);font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;font-family:'Barlow',sans-serif;">✕</button>
+          <button onclick="elimAsig(${j})" style="background:var(--r2);border:1px solid var(--red);border-radius:6px;color:var(--red);font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;font-family:inherit;">✕</button>
         </div>`).join('')
-      : '<div style="text-align:center;padding:16px;color:var(--muted);font-size:13px;">Sin terminales asignadas</div>'
-      }
+      : '<div style="text-align:center;padding:12px;color:var(--muted);font-size:12px;background:#111;border-radius:8px;">Sin terminales asignadas</div>'}
     </div>
 
-    <!-- Agregar nueva terminal -->
+    <!-- Agregar terminal -->
+    <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;">
+      Agregar terminal
+    </div>
     <div style="background:rgba(76,175,80,.05);border:1px solid rgba(76,175,80,.2);border-radius:8px;padding:12px 14px;">
-      <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:10px;">+ Agregar terminal</div>
-      <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:8px;">
-        <div>
-          <label style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700;display:block;margin-bottom:4px;">Nombre de terminal</label>
-          <input id="asigTerminal" type="text" placeholder="Ej: Caja 1, Delivery, Barra..."
-            style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:6px;color:#fff;font-family:'Barlow',sans-serif;font-size:13px;padding:8px 10px;outline:none;">
-        </div>
-        <div>
-          <label style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700;display:block;margin-bottom:4px;">Pto. Exp.</label>
-          <input id="asigPtoExp" type="text" maxlength="3" placeholder="001"
-            style="width:60px;background:#111;border:1.5px solid #2a2a2a;border-radius:6px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;letter-spacing:2px;padding:8px 10px;outline:none;text-align:center;"
-            oninput="this.value=this.value.replace(/\D/g,'')">
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <div>
-          <label style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700;display:block;margin-bottom:4px;">Nro desde</label>
-          <input id="asigDesde" type="number" value="1" min="1"
-            style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:6px;color:#fff;font-family:'Barlow',sans-serif;font-size:13px;padding:8px 10px;outline:none;">
-        </div>
-        <div style="display:flex;align-items:flex-end;">
-          <button onclick="agregarAsig()" style="width:100%;background:var(--green);border:none;border-radius:6px;color:#fff;font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;padding:9px;cursor:pointer;">AGREGAR</button>
-        </div>
-      </div>
-    </div>`;
 
-  modal.style.display = 'flex';
+      <!-- Selector de terminal registrada -->
+      <div style="margin-bottom:10px;">
+        <label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:5px;">
+          Seleccioná una terminal registrada
+        </label>
+        ${terminalesDisp.length ? `
+        <div style="display:flex;flex-direction:column;gap:6px;" id="terList">
+          ${terminalesDisp.map((ter,i)=>{
+            const yaEsta = yaAsignadas.has(ter.nombre);
+            const esOtra = asignadasOtros.has(ter.nombre);
+            const clickable = !yaEsta && !esOtra;
+            const borderColor = yaEsta?'var(--green)':esOtra?'#333':'#2a2a2a';
+            const bgColor     = yaEsta?'rgba(76,175,80,.08)':esOtra?'#0d0d0d':'#111';
+            const dotColor    = yaEsta?'var(--green)':'#333';
+            const nameColor   = yaEsta?'var(--green)':'#fff';
+            const safeNombre  = ter.nombre.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            const safeSuc     = (ter.sucursal||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            return `<div
+              data-nombre="${ter.nombre.replace(/"/g,'&quot;')}"
+              data-sucursal="${(ter.sucursal||'').replace(/"/g,'&quot;')}"
+              data-clickable="${clickable}"
+              onclick="if(this.dataset.clickable==='true') selTerminal(this.dataset.nombre, this.dataset.sucursal)"
+              style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;
+                border:1.5px solid ${borderColor};background:${bgColor};
+                cursor:${clickable?'pointer':'default'};opacity:${esOtra?'0.5':'1'};">
+              <div style="width:10px;height:10px;border-radius:50%;background:${dotColor};flex-shrink:0;border:2px solid ${dotColor};"></div>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:700;color:${nameColor};">${ter.nombre}</div>
+                ${ter.sucursal?`<div style="font-size:11px;color:var(--muted);">${ter.sucursal}</div>`:''}
+              </div>
+              ${yaEsta?'<span style="font-size:10px;background:var(--g2);color:var(--green);padding:2px 7px;border-radius:10px;font-weight:700;">YA ASIGNADA</span>':''}
+              ${esOtra?'<span style="font-size:10px;background:#1e1e1e;color:#555;padding:2px 7px;border-radius:10px;">OTRO TIMB.</span>':''}
+            </div>`;
+          }).join('')}
+        </div>` : `
+        <div style="text-align:center;padding:14px;color:var(--muted);font-size:12px;background:#111;border-radius:8px;">
+          Sin terminales activas registradas.<br>
+          <span style="font-size:11px;">Las terminales aparecen aquí cuando activan su licencia.</span>
+        </div>`}
+
+        <!-- Input manual como fallback -->
+        <div style="margin-top:10px;display:flex;align-items:center;gap:6px;">
+          <input id="asigTerminal" type="text" placeholder="O escribí el nombre manualmente..."
+            style="flex:1;background:#111;border:1.5px solid #2a2a2a;border-radius:6px;color:#fff;font-family:inherit;font-size:13px;padding:8px 10px;outline:none;">
+        </div>
+      </div>
+
+      <!-- Punto de expedición y desde -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <div>
+          <label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:4px;">Pto. Expedición *</label>
+          <input id="asigPtoExp" type="text" maxlength="3" placeholder="001" value="001"
+            oninput="this.value=this.value.replace(/\D/g,'')"
+            style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:6px;color:#fff;font-family:monospace;font-size:15px;font-weight:700;letter-spacing:2px;padding:8px 10px;outline:none;text-align:center;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:4px;">Nro desde</label>
+          <input id="asigDesde" type="number" value="1" min="1"
+            style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:6px;color:#fff;font-family:inherit;font-size:13px;padding:8px 10px;outline:none;">
+        </div>
+      </div>
+
+      <button onclick="agregarAsig()"
+        style="width:100%;background:var(--green);border:none;border-radius:8px;color:#fff;font-family:inherit;font-size:14px;font-weight:800;padding:12px;cursor:pointer;">
+        ✓ ASIGNAR TERMINAL
+      </button>
+    </div>`;
+}
+
+// Seleccionar terminal de la lista
+function selTerminal(nombre, sucursal){
+  document.getElementById('asigTerminal').value = nombre;
+  // Highlight seleccionado
+  document.querySelectorAll('[id^="ter-opt-"]').forEach(el=>{
+    el.style.borderColor = '#2a2a2a';
+    el.style.background  = '#111';
+  });
+  // Buscar el elemento clickeado
+  const all = document.querySelectorAll('[id^="ter-opt-"]');
+  all.forEach(el => {
+    if(el.querySelector('div')?.textContent?.trim() === nombre){
+      el.style.borderColor = 'var(--green)';
+      el.style.background  = 'rgba(76,175,80,.08)';
+    }
+  });
 }
 
 async function elimAsig(j){
