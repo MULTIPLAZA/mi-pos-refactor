@@ -1880,8 +1880,8 @@
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><circle cx="11" cy="14" r="3"/><line x1="11" y1="11" x2="11" y2="8"/></svg>
     <span>Modificadores</span>
   </div>
-  <div class="art-menu-item" onclick="toast('Descuentos — próximamente')">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+  <div class="art-menu-item" onclick="goTo('scDescuentos')">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
     <span>Descuentos</span>
   </div>
   <div class="art-menu-footer">
@@ -1907,6 +1907,75 @@
   </div>
   <div class="art-list" id="artList"></div>
 </div>
+
+<!-- ======== SCREEN: DESCUENTOS ======== -->
+<div id="scDescuentos" class="screen">
+  <header class="header">
+    <button class="hbtn" onclick="goTo('scArticulos')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="htitle"><span class="htitle-text">Descuentos</span></div>
+    <button class="hbtn" onclick="abrirNuevoDesc()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+  </header>
+  <div style="flex:1;overflow-y:auto;padding:12px;">
+
+    <!-- Info -->
+    <div style="background:rgba(76,175,80,.08);border:1px solid rgba(76,175,80,.2);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#aaa;line-height:1.6;">
+      Los descuentos aparecen como una <b style="color:#fff;">categoría especial</b> en la pantalla de ventas.<br>
+      Al seleccionarlo se aplica al ticket como ítem — sin valores negativos, compatible con facturas SET.
+    </div>
+
+    <!-- Lista de descuentos -->
+    <div id="descList">
+      <div class="loading"><span class="sp"></span>Cargando...</div>
+    </div>
+
+  </div>
+
+  <!-- Modal nuevo/editar descuento -->
+  <div id="mDescOv" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:flex-end;justify-content:center;">
+    <div style="background:var(--card);border-radius:16px 16px 0 0;width:100%;max-width:480px;padding:20px 18px 32px;">
+      <div style="font-size:16px;font-weight:800;margin-bottom:16px;" id="mDescTitulo">Nuevo Descuento</div>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:5px;">NOMBRE</label>
+        <input id="mDescNombre" type="text" placeholder="Ej: Descuento Cliente VIP" maxlength="40"
+          style="width:100%;background:#1e1e1e;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:inherit;font-size:15px;padding:11px 14px;outline:none;box-sizing:border-box;">
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:5px;">TIPO</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <button id="mDescTipoPct" onclick="selDescTipo('%')"
+            style="padding:12px;border-radius:8px;border:2px solid var(--green);background:rgba(76,175,80,.1);color:var(--green);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">
+            % Porcentaje
+          </button>
+          <button id="mDescTipoMonto" onclick="selDescTipo('monto')"
+            style="padding:12px;border-radius:8px;border:2px solid #2a2a2a;background:transparent;color:#aaa;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">
+            ₲ Monto fijo
+          </button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:5px;">
+          VALOR <span style="color:#555;font-weight:400;">(dejar vacío para ingresar en el momento)</span>
+        </label>
+        <input id="mDescValor" type="number" min="0" placeholder="Dejar vacío = se ingresa al vender"
+          style="width:100%;background:#1e1e1e;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:inherit;font-size:18px;font-weight:700;padding:11px 14px;outline:none;box-sizing:border-box;text-align:center;">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <button onclick="cerrarMDesc()" style="padding:14px;border-radius:8px;border:1.5px solid #333;background:transparent;color:#888;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">CANCELAR</button>
+        <button onclick="guardarDesc()" style="padding:14px;border-radius:8px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">GUARDAR</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
 
 <!-- ======== SCREEN: NUEVO / EDITAR ARTICULO ======== -->
 <div id="scArticuloNuevo" class="screen">
@@ -2686,12 +2755,36 @@ function renderP(list){
   g.innerHTML=list.map(p=>`<div class="ptile" style="background:${getProductColor(p)}" onclick="addCart(${p.id})"><span class="pname">${p.name}</span></div>`).join('');
 }
 function filterP(){
-  const q=document.getElementById('sinput').value.toLowerCase();
-  // Excluir inactivos de la pantalla de ventas
-  let l=(curCat==='Todos los artículos'?PRODS:PRODS.filter(p=>p.cat===curCat))
-         .filter(p=>p.activo!==false);
-  if(q)l=l.filter(p=>p.name.toLowerCase().includes(q));
+  const q = document.getElementById('sinput').value.toLowerCase();
+
+  // Categoría especial: Descuentos
+  if(curCat==='Descuentos' || curCat==='🏷️ Descuentos'){
+    renderDescuentosTiles();
+    return;
+  }
+
+  // Productos normales (excluir inactivos)
+  let l = (curCat==='Todos los artículos' ? PRODS : PRODS.filter(p=>p.cat===curCat))
+           .filter(p=>p.activo!==false);
+  if(q) l = l.filter(p=>p.name.toLowerCase().includes(q));
   renderP(l);
+}
+
+function renderDescuentosTiles(){
+  const g = document.getElementById('pgrid');
+  const descs = DESCUENTOS.filter(d=>d.activo!==false);
+  if(!descs.length){
+    g.innerHTML = '<div style="grid-column:span 3;padding:40px;text-align:center;color:#555;font-size:14px;">Sin descuentos — creá uno en Artículos → Descuentos</div>';
+    return;
+  }
+  g.innerHTML = descs.map(d => {
+    const valStr = d.valor!=null
+      ? (d.tipo==='%' ? d.valor+'%' : gs(d.valor))
+      : 'valor al vender';
+    return '<div class="ptile" style="background:#b71c1c;" onclick="addDescuento('+d.id+')">'+
+      '<span class="pname" style="font-size:11px;">'+d.name+'<br><span style="font-size:13px;font-weight:800;">'+valStr+'</span></span>'+
+    '</div>';
+  }).join('');
 }
 function toggleSearch(){
   const sb=document.getElementById('sbar'); sb.classList.toggle('open');
@@ -2718,15 +2811,25 @@ function chgQty(lineId,d){
   updUI(); updBtnGuardar(); renderTkt();
 }
 function calcItemTotal(item){
+  if(item.esDescuento) return item.price; // ya es negativo
   const base = item.price * item.qty;
   if(item.desc && item.desc > 0) return Math.round(base * (1 - item.desc/100));
   return base;
 }
-function calcSubtotal(){ return cart.reduce((s,i)=>s+calcItemTotal(i),0); }
+function calcSubtotal(){
+  // Solo ítems normales (sin descuentos)
+  return cart.filter(i=>!i.esDescuento).reduce((s,i)=>s+calcItemTotal(i),0);
+}
+function calcTotalDescuentos(){
+  // Suma de descuentos aplicados (montoDesc positivo)
+  return cart.filter(i=>i.esDescuento).reduce((s,i)=>s+(i.montoDesc||0),0);
+}
 function calcTotal(){
-  const sub = calcSubtotal();
-  if(ticketDescuento > 0) return Math.round(sub * (1 - ticketDescuento/100));
-  return sub;
+  const sub  = calcSubtotal();
+  const desc = calcTotalDescuentos();
+  // Aplicar descuento de ticket si hay
+  const conTicketDesc = ticketDescuento>0 ? Math.round(sub*(1-ticketDescuento/100)) : sub;
+  return conTicketDesc - desc;
 }
 function calcDescuentoMonto(){ return calcSubtotal() - calcTotal(); }
 function updUI(){
@@ -2763,8 +2866,18 @@ function openCat(){
   CATEGORIAS.forEach(c => {
     html += '<div class="cat-item ' + (curCat===c.nombre?'sel':'') + '" onclick="pickCat(this)">' + c.nombre + '</div>';
   });
+  // Agregar Descuentos si hay alguno creado
+  if(DESCUENTOS.filter(d=>d.activo!==false).length){
+    html += '<div class="cat-item ' + (curCat==='Descuentos'?'sel':'') +
+      '" onclick="pickCat(this)" style="color:#ef5350;border-left:3px solid #ef5350;">🏷️ Descuentos</div>';
+  }
   sheet.innerHTML = html;
   document.getElementById('catOv').classList.add('open');
+}
+
+function renderCategoriasVenta(){
+  // Refrescar el catOv si está abierto
+  if(document.getElementById('catOv')?.classList.contains('open')) openCat();
 }
 function closeCat(e){ if(e.target===document.getElementById('catOv'))document.getElementById('catOv').classList.remove('open'); }
 function pickCat(el){
@@ -2815,6 +2928,22 @@ function renderDetalle(){
     div.id = 'detItem_' + item.lineId;
 
     const delIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
+
+    // Ítem de descuento — renderizado especial
+    if(item.esDescuento){
+      div.style.borderLeft = '3px solid #ef5350';
+      div.innerHTML =
+        '<div class="det-item-main">' +
+          '<div class="det-item-color" style="background:#e53935;font-size:9px;font-weight:800;">%</div>' +
+          '<div class="det-item-name" style="color:#ef9a9a;">' + item.name + '</div>' +
+          '<div class="det-item-subtotal" style="color:#ef5350;">-' + gs(item.montoDesc) + '</div>' +
+        '</div>' +
+        '<div class="det-item-controls">' +
+          '<button class="det-qbtn del" onclick="detChgQty(' + item.lineId + ',-1)">' + delIcon + '</button>' +
+        '</div>';
+      list.appendChild(div);
+      return;
+    }
 
     div.innerHTML =
       '<div class="det-item-main">' +
@@ -3946,35 +4075,68 @@ function resetFactura(){
 
 // RECIBO
 function generarRecibo(data){
-  ultimoReciboData = data; // guardar para reimprimir
+  ultimoReciboData = data;
 
-  // Determinar si es factura o ticket
   const esFactura = data.factura && data.factura.timbrado;
-  const size = getPaperSize('ticket');
+  const size      = getPaperSize('ticket');
 
-  // Actualizar título
+  // Título
   const titulo = document.getElementById('reciboTitulo');
   if(titulo) titulo.textContent = esFactura ? 'Factura' : 'Ticket';
 
-  // Generar HTML de impresión
+  // Generar HTML y renderizarlo en un iframe dentro de reciboPapel
   const htmlImpresion = esFactura
     ? generarHTMLFactura(data, size)
     : generarHTMLTicket(data, size);
 
-  // Extraer solo el body para la previsualización
-  const bodyMatch = htmlImpresion.match(/<body>([\s\S]*)<\/body>/);
-  const bodyHTML  = bodyMatch ? bodyMatch[1] : htmlImpresion;
+  mostrarPreviewRecibo(htmlImpresion, size);
 
-  // Convertir HTML térmico a texto plano para previsualización
-  const preview = htmlToPreview(bodyHTML, size);
-  document.getElementById('reciboPapel').textContent = preview;
-
-  // Mostrar/ocultar botón comanda
-  const tieneComanda = data.items && data.items.length > 0;
+  // Botón comanda
   const btnComanda = document.getElementById('btnComandaRecibo');
-  if(btnComanda){
-    btnComanda.style.display = tieneComanda ? 'flex' : 'none';
-  }
+  if(btnComanda) btnComanda.style.display = data.items?.length ? 'flex' : 'none';
+}
+
+function mostrarPreviewRecibo(html, size){
+  const papel = document.getElementById('reciboPapel');
+  if(!papel) return;
+
+  // Usar iframe para renderizar el HTML térmico fielmente
+  const pxW = size==='58' ? 220 : 300;
+  papel.style.width  = pxW+'px';
+  papel.style.padding = '0';
+  papel.style.background = 'transparent';
+  papel.style.boxShadow = 'none';
+
+  // Remover iframe anterior si existe
+  let iframe = document.getElementById('previewIframe');
+  if(iframe) iframe.remove();
+
+  iframe = document.createElement('iframe');
+  iframe.id = 'previewIframe';
+  iframe.style.cssText = [
+    'width:'+pxW+'px',
+    'border:none',
+    'background:#fff',
+    'border-radius:4px',
+    'box-shadow:0 2px 20px rgba(0,0,0,.6)',
+    'display:block',
+    'min-height:200px'
+  ].join(';');
+  iframe.scrolling = 'no';
+  papel.appendChild(iframe);
+
+  // Escribir el HTML térmico en el iframe
+  iframe.contentDocument.open();
+  iframe.contentDocument.write(html.replace(/<div id="printInfo"[\s\S]*?<\/div>/, ''));
+  iframe.contentDocument.close();
+
+  // Auto-altura
+  setTimeout(()=>{
+    try {
+      const h = iframe.contentDocument.body.scrollHeight;
+      iframe.style.height = (h+10)+'px';
+    } catch(e){}
+  }, 200);
 }
 
 // Convertir HTML térmico a texto plano para preview
@@ -4155,10 +4317,25 @@ function generarHTMLTicket(data, size){
   lineas += '<p class="hr"></p>';
 
   // Totales
-  const subtotal = data.items.reduce((s,i)=>s+(i.desc>0?Math.round(i.price*i.qty*(1-i.desc/100)):i.price*i.qty),0);
-  if(data.descTicket>0){
+  const subtotal = data.items
+    .filter(i=>!i.esDescuento)
+    .reduce((s,i)=>s+(i.desc>0?Math.round(i.price*i.qty*(1-i.desc/100)):i.price*i.qty),0);
+  const totalDescuentos = data.items
+    .filter(i=>i.esDescuento)
+    .reduce((s,i)=>s+(i.montoDesc||0),0);
+  const hayDescuentos = totalDescuentos>0 || (data.descTicket>0);
+
+  if(hayDescuentos){
     lineas += '<p class="row s"><span class="l1">SUBTOTAL</span><span class="l2">'+gn(subtotal)+'</span></p>';
-    lineas += '<p class="row s"><span class="l1">DESCUENTO '+data.descTicket+'%</span><span class="l2">-'+gn(data.descMonto||0)+'</span></p>';
+    if(totalDescuentos>0){
+      // Mostrar cada descuento aplicado
+      data.items.filter(i=>i.esDescuento).forEach(d=>{
+        lineas += '<p class="row s"><span class="l1">(-) '+d.name+'</span><span class="l2">'+gn(d.montoDesc)+'</span></p>';
+      });
+    }
+    if(data.descTicket>0){
+      lineas += '<p class="row s"><span class="l1">(-) Desc. ticket '+data.descTicket+'%</span><span class="l2">'+gn(data.descMonto||0)+'</span></p>';
+    }
   }
   lineas += '<p class="row b l"><span class="l1">TOTAL:</span><span class="l2">'+gn(data.total)+'</span></p>';
   lineas += '<p class="hr"></p>';
@@ -4196,9 +4373,16 @@ function generarHTMLFactura(data, size){
   const fecha = pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();
   const hora  = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
 
-  // Calcular IVA
+  // Calcular IVA (solo ítems normales, no descuentos)
   let grav10=0, grav5=0, exento=0;
-  data.items.forEach(item=>{
+  const subtotalFact = data.items
+    .filter(i=>!i.esDescuento)
+    .reduce((s,i)=>s+(i.desc>0?Math.round(i.price*i.qty*(1-i.desc/100)):i.price*i.qty),0);
+  const totalDescFact = data.items
+    .filter(i=>i.esDescuento)
+    .reduce((s,i)=>s+(i.montoDesc||0),0);
+
+  data.items.filter(i=>!i.esDescuento).forEach(item=>{
     const sub = item.desc>0 ? Math.round(item.price*item.qty*(1-item.desc/100)) : item.price*item.qty;
     if(item.iva==='10')       grav10  += sub;
     else if(item.iva==='5')   grav5   += sub;
@@ -5033,6 +5217,192 @@ const COLORES_TILE = [
 let CATEGORIAS = [];
 let nextCatId  = 1;
 const CATEGORIAS_DEFAULT = CATEGORIAS.map(c => c.nombre);
+
+// Descuentos (igual que productos pero categoría especial)
+let DESCUENTOS = []; // {id, name, tipo:'%'|'monto', valor:null|number, color:'#e53935'}
+let nextDescId = 9000;
+
+// ════════════════════════════════════════════════════════
+// DESCUENTOS
+// ════════════════════════════════════════════════════════
+
+let descEditId = null;
+let descTipoSel = '%';
+
+function goToDescuentos(){
+  goTo('scDescuentos');
+  renderDescList();
+  renderCategoriasVenta(); // actualizar categorías en pantalla de ventas
+}
+
+function renderDescList(){
+  const list = document.getElementById('descList');
+  if(!list) return;
+  if(!DESCUENTOS.length){
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:14px;">'+
+      '<div style="font-size:32px;margin-bottom:8px;">🏷️</div>'+
+      'Sin descuentos creados<br>'+
+      '<span style="font-size:12px;">Tocá + para crear uno</span></div>';
+    return;
+  }
+  list.innerHTML = DESCUENTOS.filter(d=>d.activo!==false).map(d => {
+    const valorStr = d.valor != null
+      ? (d.tipo==='%' ? d.valor+'%' : gs(d.valor))
+      : '<span style="color:#555;">se ingresa al vender</span>';
+    return '<div class="art-item" onclick="editarDesc('+d.id+')" style="border-left:3px solid #e53935;">'+
+      '<div class="art-item-color" style="background:#e53935;font-size:11px;font-weight:800;">%</div>'+
+      '<div class="art-item-info">'+
+        '<div class="art-item-name">'+d.name+'</div>'+
+        '<div class="art-item-meta"><span>'+(d.tipo==='%'?'Porcentaje':'Monto fijo')+'</span><span>·</span><span>'+valorStr+'</span></div>'+
+      '</div>'+
+      '<button onclick="event.stopPropagation();eliminarDesc('+d.id+')" style="background:rgba(239,83,80,.1);border:1px solid var(--red);border-radius:6px;color:var(--red);font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;">✕</button>'+
+    '</div>';
+  }).join('');
+}
+
+function abrirNuevoDesc(){
+  descEditId = null;
+  descTipoSel = '%';
+  document.getElementById('mDescTitulo').textContent = 'Nuevo Descuento';
+  document.getElementById('mDescNombre').value = '';
+  document.getElementById('mDescValor').value = '';
+  selDescTipo('%');
+  document.getElementById('mDescOv').style.display = 'flex';
+  setTimeout(()=>document.getElementById('mDescNombre').focus(), 100);
+}
+
+function editarDesc(id){
+  const d = DESCUENTOS.find(x=>x.id===id);
+  if(!d) return;
+  descEditId = id;
+  descTipoSel = d.tipo;
+  document.getElementById('mDescTitulo').textContent = 'Editar Descuento';
+  document.getElementById('mDescNombre').value = d.name;
+  document.getElementById('mDescValor').value = d.valor != null ? d.valor : '';
+  selDescTipo(d.tipo);
+  document.getElementById('mDescOv').style.display = 'flex';
+}
+
+function selDescTipo(tipo){
+  descTipoSel = tipo;
+  const bPct   = document.getElementById('mDescTipoPct');
+  const bMonto = document.getElementById('mDescTipoMonto');
+  if(bPct){
+    bPct.style.borderColor   = tipo==='%'     ? 'var(--green)' : '#2a2a2a';
+    bPct.style.background    = tipo==='%'     ? 'rgba(76,175,80,.1)' : 'transparent';
+    bPct.style.color         = tipo==='%'     ? 'var(--green)' : '#aaa';
+  }
+  if(bMonto){
+    bMonto.style.borderColor = tipo==='monto' ? 'var(--green)' : '#2a2a2a';
+    bMonto.style.background  = tipo==='monto' ? 'rgba(76,175,80,.1)' : 'transparent';
+    bMonto.style.color       = tipo==='monto' ? 'var(--green)' : '#aaa';
+  }
+  const inp = document.getElementById('mDescValor');
+  if(inp) inp.placeholder = tipo==='%'
+    ? 'Ej: 10 (= 10%) — vacío = ingresar al vender'
+    : 'Ej: 5000 — vacío = ingresar al vender';
+}
+
+function cerrarMDesc(){
+  document.getElementById('mDescOv').style.display = 'none';
+}
+
+function guardarDesc(){
+  const nombre = document.getElementById('mDescNombre').value.trim();
+  const valorStr = document.getElementById('mDescValor').value.trim();
+  const valor = valorStr !== '' ? parseFloat(valorStr) : null;
+
+  if(!nombre){ toast('Ingresá un nombre'); return; }
+  if(descTipoSel==='%' && valor!=null && (valor<=0||valor>100)){
+    toast('El porcentaje debe ser entre 1 y 100'); return;
+  }
+
+  if(descEditId != null){
+    const d = DESCUENTOS.find(x=>x.id===descEditId);
+    if(d){ d.name=nombre; d.tipo=descTipoSel; d.valor=valor; }
+  } else {
+    DESCUENTOS.push({
+      id: nextDescId++,
+      name: nombre,
+      tipo: descTipoSel,
+      valor: valor,
+      color: '#e53935',
+      activo: true
+    });
+  }
+
+  cerrarMDesc();
+  renderDescList();
+  renderCategoriasVenta(); // actualizar en pantalla de ventas
+  toast('Descuento guardado');
+}
+
+function eliminarDesc(id){
+  if(!confirm('Eliminar este descuento?')) return;
+  const idx = DESCUENTOS.findIndex(x=>x.id===id);
+  if(idx>=0) DESCUENTOS.splice(idx,1);
+  renderDescList();
+  renderCategoriasVenta();
+  toast('Descuento eliminado');
+}
+
+// Agregar descuento al carrito
+function addDescuento(descId){
+  const d = DESCUENTOS.find(x=>x.id===descId);
+  if(!d) return;
+
+  // Calcular subtotal actual del carrito (sin otros descuentos)
+  const subtotal = cart
+    .filter(i=>!i.esDescuento)
+    .reduce((s,i)=>s+calcItemTotal(i),0);
+
+  if(!subtotal){ toast('Agregá productos primero'); return; }
+
+  let monto = 0;
+
+  if(d.valor != null){
+    // Valor predefinido
+    monto = d.tipo==='%'
+      ? Math.round(subtotal * d.valor / 100)
+      : d.valor;
+  } else {
+    // Pedir valor en el momento
+    const input = prompt(
+      d.tipo==='%'
+        ? 'Ingresá el porcentaje de descuento (1-100):'
+        : 'Ingresá el monto del descuento:'
+    );
+    if(input===null) return;
+    const val = parseFloat(input);
+    if(!val || val<=0){ toast('Valor inválido'); return; }
+    monto = d.tipo==='%'
+      ? Math.round(subtotal * Math.min(val,100) / 100)
+      : val;
+  }
+
+  if(monto<=0){ toast('Monto de descuento inválido'); return; }
+  if(monto>subtotal){ toast('El descuento no puede superar el subtotal'); return; }
+
+  // Agregar como ítem especial
+  cart.push({
+    lineId:      Date.now()*1000+Math.floor(Math.random()*1000),
+    id:          descId,
+    name:        d.name,
+    price:       -monto, // negativo internamente para el cálculo
+    qty:         1,
+    obs:         '',
+    color:       '#e53935',
+    esDescuento: true,
+    montoDesc:   monto,
+    iva:         'exento'
+  });
+
+  updUI();
+  if(showTkt) renderTkt();
+  toast('Descuento aplicado: '+gs(monto));
+}
+
+
 let artEditIdx = -1;
 let artColorSel = COLORES_TILE[0];
 let artColorManual = false;
@@ -5063,67 +5433,86 @@ function renderArtList(filter){
   filter = filter || '';
   const list = document.getElementById('artList');
   if(!list) return;
+
+  // Todos los productos que coincidan con el filtro
   let items = PRODS.filter(p =>
-    !filter || p.name.toLowerCase().includes(filter.toLowerCase()) ||
+    !filter ||
+    p.name.toLowerCase().includes(filter.toLowerCase()) ||
     (p.codigo && p.codigo.includes(filter))
   );
-  // Sort: active first, inactive at bottom
-  items.sort((a,b) => (a.activo===false?1:0) - (b.activo===false?1:0));
 
-  if(!items.length){
+  // Separar activos e inactivos
+  const activos   = items.filter(p => p.activo !== false);
+  const inactivos = items.filter(p => p.activo === false);
+
+  if(!activos.length && !inactivos.length){
     list.innerHTML = '<div class="art-empty"><p>No hay artículos</p></div>';
     return;
   }
 
-  // Separator count
-  const activos   = items.filter(p=>p.activo!==false).length;
-  const inactivos = items.filter(p=>p.activo===false).length;
-
   list.innerHTML = '';
 
-  items.forEach((p, idx) => {
-    const inact     = p.activo === false;
-    const priceStr  = p.precioVariable ? '<span style="color:#ff9800;font-size:12px;">Precio variable</span>' : gs(p.price);
-    const ivaStr    = p.iva==='exento' ? 'Exento' : 'IVA '+p.iva+'%';
-    const prodIdx   = PRODS.indexOf(p);
-
-    // Separator before inactive section
-    if(inact && idx > 0 && PRODS[PRODS.indexOf(items[idx-1])]?.activo !== false){
-      const sep = document.createElement('div');
-      sep.style.cssText = 'padding:8px 14px 4px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;';
-      sep.textContent = 'Desactivados ('+inactivos+')';
-      list.appendChild(sep);
-    }
-
-    const div = document.createElement('div');
-    div.className = 'art-item';
-    div.style.opacity = inact ? '0.6' : '1';
-    div.style.borderLeft = inact ? '3px solid #ef5350' : '';
-
-    // Click: edit if active, show options if inactive
-    div.onclick = () => inact ? mostrarOpcionesInactivo(prodIdx) : editarArticulo(prodIdx);
-
-    div.innerHTML =
-      '<div class="art-item-color" style="background:'+(inact?'#333':getProductColor(p))+'">'+
-        p.name.substring(0,2)+
-      '</div>'+
-      '<div class="art-item-info">'+
-        '<div class="art-item-name">'+p.name+
-          (inact ? ' <span style="font-size:10px;background:rgba(239,83,80,.2);color:#ef5350;border-radius:3px;padding:1px 6px;font-weight:700;">INACTIVO</span>' : '')+
-        '</div>'+
-        '<div class="art-item-meta">'+
-          '<span>'+p.cat+'</span><span>·</span><span>'+ivaStr+'</span>'+
-          (p.codigo?'<span>·</span><span style="color:#666">'+p.codigo+'</span>':'')+
-        '</div>'+
-      '</div>'+
-      (inact ?
-        '<button onclick="event.stopPropagation();reactivarArticulo('+prodIdx+')" style="background:rgba(76,175,80,.15);border:1px solid var(--green);border-radius:6px;color:var(--green);font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;white-space:nowrap;">↑ ACTIVAR</button>'
-        : '<div class="art-item-price">'+priceStr+'</div>'
-      );
-
-    list.appendChild(div);
+  // ── Artículos ACTIVOS ──
+  activos.forEach(p => {
+    list.appendChild(buildArtItem(p, false));
   });
+
+  // ── Separador + INACTIVOS ──
+  if(inactivos.length){
+    const sep = document.createElement('div');
+    sep.style.cssText = 'padding:10px 14px 4px;font-size:10px;font-weight:700;'+
+      'color:var(--muted);letter-spacing:1px;text-transform:uppercase;'+
+      'border-top:1px solid #1e1e1e;margin-top:6px;';
+    sep.textContent = '── Desactivados ('+inactivos.length+') ──';
+    list.appendChild(sep);
+
+    inactivos.forEach(p => {
+      list.appendChild(buildArtItem(p, true));
+    });
+  }
 }
+
+function buildArtItem(p, inact){
+  const prodIdx  = PRODS.indexOf(p);
+  const priceStr = p.precioVariable
+    ? '<span style="color:#ff9800;font-size:12px;">Precio variable</span>'
+    : gs(p.price);
+  const ivaStr   = p.iva==='exento' ? 'Exento' : 'IVA '+p.iva+'%';
+
+  const div = document.createElement('div');
+  div.className = 'art-item';
+  if(inact){
+    div.style.opacity    = '0.55';
+    div.style.borderLeft = '3px solid #ef5350';
+  }
+
+  div.onclick = () => inact ? mostrarOpcionesInactivo(prodIdx) : editarArticulo(prodIdx);
+
+  div.innerHTML =
+    '<div class="art-item-color" style="background:'+(inact?'#2a2a2a':getProductColor(p))+'">'+
+      '<span style="font-size:11px;font-weight:700;">'+(inact?'✕':p.name.substring(0,2))+'</span>'+
+    '</div>'+
+    '<div class="art-item-info">'+
+      '<div class="art-item-name">'+p.name+
+        (inact?' <span style="font-size:10px;background:rgba(239,83,80,.2);color:#ef5350;'+
+          'border-radius:3px;padding:1px 6px;font-weight:700;">INACTIVO</span>':'')+
+      '</div>'+
+      '<div class="art-item-meta">'+
+        '<span>'+p.cat+'</span><span>·</span><span>'+ivaStr+'</span>'+
+        (p.codigo?'<span>·</span><span style="color:#555;">'+p.codigo+'</span>':'')+
+      '</div>'+
+    '</div>'+
+    (inact
+      ? '<button onclick="event.stopPropagation();reactivarArticulo('+prodIdx+')" '+
+          'style="background:rgba(76,175,80,.12);border:1px solid var(--green);'+
+          'border-radius:6px;color:var(--green);font-size:11px;font-weight:700;'+
+          'padding:6px 12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">↑ ACTIVAR</button>'
+      : '<div class="art-item-price">'+priceStr+'</div>'
+    );
+
+  return div;
+}
+
 
 // Mostrar opciones para artículo inactivo
 function mostrarOpcionesInactivo(prodIdx){
