@@ -1432,21 +1432,40 @@
     <button class="cbk" onclick="finalizarRecibo()">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
-    <div style="flex:1;font-size:17px;font-weight:700;">Recibo</div>
-    <button class="cbk" onclick="imprimirRecibo()">
+    <div style="flex:1;font-size:17px;font-weight:700;" id="reciboTitulo">Comprobante</div>
+    <button class="cbk" onclick="imprimirRecibo()" title="Imprimir">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
     </button>
   </div>
   <div class="recibo-body">
-    <div class="recibo-papel" id="reciboPapel">
-      <!-- contenido generado por JS -->
+    <!-- Vista previa tipo ticket real -->
+    <div style="display:flex;justify-content:center;padding:12px 0;">
+      <div id="reciboPapel" style="background:#fff;color:#000;font-family:'Courier New',monospace;font-size:12px;line-height:1.4;width:280px;padding:14px 10px;box-shadow:0 2px 16px rgba(0,0,0,.5);white-space:pre-wrap;word-break:break-all;"></div>
     </div>
-    <div class="recibo-btns">
-      <button class="rec-btn-print" onclick="imprimirRecibo()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-        IMPRIMIR
+
+    <!-- Botones de acción -->
+    <div style="padding:0 14px 12px;display:flex;flex-direction:column;gap:10px;">
+
+      <!-- Fila 1: Ticket + Factura -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button onclick="imprimirRecibo()" style="background:var(--green);border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;padding:14px 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          IMPRIMIR
+        </button>
+        <button id="btnComandaRecibo" onclick="imprimirComandaActual()" style="display:none;background:rgba(255,152,0,.15);border:1.5px solid var(--orange);border-radius:8px;color:var(--orange);font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;padding:14px 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
+          COMANDA
+        </button>
+      </div>
+
+      <!-- WhatsApp -->
+      <button onclick="compartirWhatsApp()" style="background:rgba(37,211,102,.15);border:1.5px solid #25d366;border-radius:8px;color:#25d366;font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;padding:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M11.5 2.5C6.253 2.5 2 6.753 2 12c0 1.821.487 3.53 1.338 5L2 22l5.15-1.316A9.454 9.454 0 0011.5 21.5c5.247 0 9.5-4.253 9.5-9.5S16.747 2.5 11.5 2.5z"/></svg>
+        COMPARTIR WHATSAPP
       </button>
-      <button class="rec-btn-new" onclick="finalizarRecibo()">
+
+      <!-- Nueva venta -->
+      <button onclick="finalizarRecibo()" style="background:transparent;border:1.5px solid #333;border-radius:8px;color:#888;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;padding:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         NUEVA VENTA
       </button>
@@ -2379,6 +2398,7 @@
     </div>
     <div class="det-footer-btns">
       <button class="det-guardar-btn" onclick="goGuardar()">GUARDAR</button>
+      <button class="det-cobrar-btn" onclick="imprimirComandaPreCobro()" style="background:#1565c0;margin-right:6px;padding:14px 12px;" title="Comanda cocina">🍳</button>
       <button class="det-cobrar-btn" onclick="goCobrar()">COBRAR</button>
     </div>
   </div>
@@ -2390,6 +2410,7 @@
     <button class="cbk" onclick="goTo('scSale')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
     <button class="cdividir" onclick="goDividir()">DIVIDIR</button>
     <button class="cdividir" onclick="abrirDescTicket()" id="btnDescTicket" style="background:var(--orange);color:#fff;">% DESC</button>
+    <button class="cdividir" onclick="imprimirComandaPreCobro()" style="background:#1565c0;color:#fff;" title="Imprimir comanda cocina">🍳</button>
   </div>
   <div class="cbody">
     <div class="ctotal" id="ctotal">₲0</div>
@@ -2879,6 +2900,17 @@ function saveDetDesc(lineId, val){
   // Update desc amount in box
   const span = document.querySelector('#detDesc_'+lineId+' span:last-child');
   if(span) span.textContent = '= '+gs(calcItemTotal(item));
+}
+
+function imprimirComandaPreCobro(){
+  if(!cart.length){ toast('Sin productos'); return; }
+  const d = new Date();
+  imprimirComanda({
+    items:     cart,
+    fecha:     d,
+    nroTicket: nroTicket || ticketCounter,
+    factura:   null
+  });
 }
 
 function abrirDescTicket(){
@@ -3915,76 +3947,68 @@ function resetFactura(){
 // RECIBO
 function generarRecibo(data){
   ultimoReciboData = data; // guardar para reimprimir
-  const fecha = data.fecha;
-  const pad = n => String(n).padStart(2,'0');
-  const fechaStr = pad(fecha.getDate())+'/'+pad(fecha.getMonth()+1)+'/'+fecha.getFullYear()+' '+pad(fecha.getHours())+':'+pad(fecha.getMinutes());
-  const nroStr = data.nroTicket ? '#'+String(data.nroTicket).padStart(4,'0') : '#'+String(ticketCounter-1).padStart(4,'0');
 
-  let itemsHTML = '';
-  data.items.forEach(i=>{
-    const subtotal = i.desc>0 ? Math.round(i.price*i.qty*(1-i.desc/100)) : i.price*i.qty;
-    itemsHTML += '<div class="rec-row"><span class="rec-item-qty">'+i.qty+'x</span><span class="rec-item-name">'+i.name+'</span><span class="rec-item-price">'+gs(subtotal)+'</span></div>';
-    if(i.desc>0) itemsHTML += '<div class="rec-obs" style="color:#ff9800;">  → Descuento '+i.desc+'%</div>';
-    if(i.obs) itemsHTML += '<div class="rec-obs">  → '+i.obs+'</div>';
-  });
+  // Determinar si es factura o ticket
+  const esFactura = data.factura && data.factura.timbrado;
+  const size = getPaperSize('ticket');
 
-  const vueltoHTML = data.vuelto
-    ? '<div class="rec-row vuelto"><span>Vuelto</span><span>'+data.vuelto+'</span></div>'
-    : '';
+  // Actualizar título
+  const titulo = document.getElementById('reciboTitulo');
+  if(titulo) titulo.textContent = esFactura ? 'Factura' : 'Ticket';
 
-  const compHTML = data.comprobante
-    ? '<div class="rec-row"><span class="rec-nro">Comprobante: '+data.comprobante+'</span></div>'
-    : '';
+  // Generar HTML de impresión
+  const htmlImpresion = esFactura
+    ? generarHTMLFactura(data, size)
+    : generarHTMLTicket(data, size);
 
-  // Datos de factura con timbrado
-  const factHTML = (data.factura && data.factura.timbrado) ? (
-    '<hr class="rec-divider">'+
-    '<div class="rec-center" style="font-size:10px;color:#888;">FACTURA</div>'+
-    '<div class="rec-row"><span style="font-size:10px;color:#888;">TIMBRADO</span><span style="font-family:monospace;font-weight:700;font-size:12px;">'+data.factura.timbrado+'</span></div>'+
-    '<div class="rec-row"><span style="font-size:10px;color:#888;">Nro. Factura</span><span style="font-family:monospace;font-weight:700;">'+data.factura.nro_factura+'</span></div>'+
-    (data.factura.ruc?'<div class="rec-row"><span style="font-size:10px;color:#888;">RUC/CI</span><span>'+data.factura.ruc+'</span></div>':'')+
-    (data.factura.nombre?'<div class="rec-row"><span style="font-size:10px;color:#888;">Cliente</span><span>'+data.factura.nombre+'</span></div>':'')+
-    '<hr class="rec-divider">'
-  ) : (data.factura && data.factura.ruc ? (
-    '<hr class="rec-divider">'+
-    '<div class="rec-row"><span style="font-size:10px;color:#888;">RUC/CI</span><span>'+data.factura.ruc+'</span></div>'+
-    (data.factura.nombre?'<div class="rec-row"><span style="font-size:10px;color:#888;">Cliente</span><span>'+data.factura.nombre+'</span></div>':'')+
-    '<hr class="rec-divider">'
-  ) : '');
+  // Extraer solo el body para la previsualización
+  const bodyMatch = htmlImpresion.match(/<body>([\s\S]*)<\/body>/);
+  const bodyHTML  = bodyMatch ? bodyMatch[1] : htmlImpresion;
 
-  document.getElementById('reciboPapel').innerHTML =
-    '<div class="rec-center">'+
-    '<div class="rec-title">'+(configData.negocio||'MI NEGOCIO')+'</div>'+
-    (configData.ruc&&configData.mostrar_ruc!=='0'?'<div class="rec-sub">RUC: '+configData.ruc+'</div>':'')+
-    (configData.direccion?'<div class="rec-sub">'+(configData.direccion)+(configData.ciudad?', '+configData.ciudad:'')+'</div>':'')+
-    (configData.telefono?'<div class="rec-sub">Tel: '+configData.telefono+'</div>':'')+
-    '</div>'+
-    '<hr class="rec-divider">'+
-    '<div class="rec-row"><span class="rec-nro">Ticket: '+nroStr+'</span><span class="rec-nro">'+fechaStr+'</span></div>'+
-    '<hr class="rec-divider">'+
-    factHTML+
-    itemsHTML+
-    (data.descTicket>0?'<div class="rec-row"><span style="color:#ff9800;">Descuento '+data.descTicket+'%</span><span style="color:#ff9800;">-'+gs(data.descMonto)+'</span></div>':'')+
-    '<div class="rec-row total"><span>TOTAL</span><span>'+gs(data.total)+'</span></div>'+
-    '<div class="rec-row"><span>'+data.metodo+'</span><span>'+(data.metodo==='EFECTIVO'?data.efectivo:gs(data.total))+'</span></div>'+
-    vueltoHTML+
-    compHTML+
-    '<hr class="rec-divider">'+
-    (data.factura ? (
-      '<div class="rec-center" style="font-size:11px;font-weight:700;margin-bottom:4px;">FACTURA</div>'+
-      '<div class="rec-row"><span style="font-size:11px;">RUC/CI:</span><span style="font-size:11px;">'+data.factura.ruc+'</span></div>'+
-      '<div style="font-size:11px;margin:2px 0;">'+data.factura.nombre+'</div>'+
-      (data.factura.direccion?'<div style="font-size:11px;color:#555;">'+data.factura.direccion+'</div>':'')+
-      '<hr class="rec-divider">'
-    ) : '')+
-    '<hr class="rec-divider">'+
-    '<div class="rec-footer-text">'+(configData.pie_recibo||'¡Gracias por su compra!')+'</div>'+
-    (configData.telefono?'<div class="rec-footer-text">Tel: '+configData.telefono+'</div>':'')+
-    (configData.email?'<div class="rec-footer-text">'+configData.email+'</div>':'')+
-    '<div class="rec-footer-text" style="font-size:10px;color:#aaa;">'+
-      (configData.terminal||'Terminal')+(configData.sucursal?' — '+configData.sucursal:'')+
-    '</div>';
+  // Convertir HTML térmico a texto plano para previsualización
+  const preview = htmlToPreview(bodyHTML, size);
+  document.getElementById('reciboPapel').textContent = preview;
+
+  // Mostrar/ocultar botón comanda
+  const tieneComanda = data.items && data.items.length > 0;
+  const btnComanda = document.getElementById('btnComandaRecibo');
+  if(btnComanda){
+    btnComanda.style.display = tieneComanda ? 'flex' : 'none';
+  }
 }
+
+// Convertir HTML térmico a texto plano para preview
+function htmlToPreview(html, size){
+  const cols = size==='58' ? 32 : 42;
+  // Remover tags y convertir <p> a líneas
+  return html
+    .replace(/<hr[^>]*>/gi, '-'.repeat(cols))
+    .replace(/<br\s*\/?>/gi, '')
+    .replace(/<p[^>]*class="row"[^>]*>([\s\S]*?)<\/p>/gi, (m, inner) => {
+      // Extraer los dos spans de .row
+      const spans = inner.match(/<span[^>]*>([\s\S]*?)<\/span>/gi) || [];
+      const texts = spans.map(s => s.replace(/<[^>]+>/g,'').trim());
+      if(texts.length >= 2){
+        const left  = texts[0];
+        const right = texts.slice(1).join(' ');
+        const pad   = Math.max(1, cols - left.length - right.length);
+        return left + ' '.repeat(pad) + right;
+      }
+      return texts.join(' ');
+    })
+    .replace(/<[^>]+>/g, '')  // remover tags restantes
+    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&nbsp;/g,' ')
+    .split('\n')
+    .map(l => l.trimEnd())
+    .join('\n');
+}
+
+// Imprimir comanda del último recibo
+function imprimirComandaActual(){
+  if(!ultimoReciboData) return;
+  imprimirComanda(ultimoReciboData);
+}
+
 
 // ══════════════════════════════════════════════════════
 // IMPRESIÓN TÉRMICA — POS58 / POS80
@@ -3998,34 +4022,77 @@ function getPaperSize(tipo){ return printers[tipo]?.size || localStorage.getItem
 
 // CSS base para impresión térmica
 function getCSSTermico(size){
-  const w = size==='58' ? '48mm' : '72mm';
-  const fs = size==='58' ? '10px' : '11px';
+  const w  = size==='58' ? '58mm' : '80mm';
+  const pw = size==='58' ? '48mm' : '72mm'; // printable width
+  const fs = size==='58' ? '9pt'  : '10pt';
+  const ss = size==='58' ? '7pt'  : '8pt';
+  const ls = size==='58' ? '12pt' : '14pt';
   return `
-    @page { margin:0; size:${w} auto; }
-    *{ margin:0;padding:0;box-sizing:border-box; }
-    body{ font-family:"Courier New",Courier,monospace;font-size:${fs};width:${w};background:#fff;color:#000; }
-    .c{ text-align:center; }
-    .r{ text-align:right; }
-    .b{ font-weight:bold; }
-    .s{ font-size:${size==='58'?'8px':'9px'}; }
-    .l{ font-size:${size==='58'?'13px':'15px'};font-weight:bold; }
-    .hr{ border:none;border-top:1px dashed #000;margin:2px 0; }
-    .row{ display:flex;justify-content:space-between; }
-    .row .l1{ flex:1;padding-right:4px; }
-    .row .l2{ text-align:right;white-space:nowrap; }
-    .obs{ font-size:${size==='58'?'8px':'9px'};padding-left:8px; }
-    br{ display:block;margin:1px 0; }
+    @page {
+      size: ${w} auto !important;
+      margin: 0 !important;
+    }
+    @media print {
+      html, body {
+        width: ${w} !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html { width:${w}; }
+    body {
+      font-family: "Courier New", Courier, monospace;
+      font-size: ${fs};
+      width: ${pw};
+      max-width: ${pw};
+      margin: 0 auto;
+      padding: 2mm 0;
+      background: #fff;
+      color: #000;
+    }
+    p { margin: 0; padding: 0; line-height: 1.35; }
+    .c  { text-align: center; }
+    .r  { text-align: right; }
+    .b  { font-weight: bold; }
+    .s  { font-size: ${ss}; }
+    .l  { font-size: ${ls}; font-weight: bold; }
+    .hr { border:none; border-top:1px dashed #000; margin: 1mm 0; display:block; }
+    .row{ display:flex; justify-content:space-between; }
+    .row .l1 { flex:1; padding-right:3px; overflow:hidden; }
+    .row .l2 { text-align:right; white-space:nowrap; }
+    .obs { font-size:${ss}; padding-left:6px; }
   `;
 }
 
 // Abrir ventana e imprimir
 function abrirVentanaImpresion(html, size){
-  const w = size==='58' ? 320 : 420;
-  const win = window.open('','_blank','width='+w+',height=700');
-  win.document.write(html);
+  const mmW = size==='58' ? '58mm' : '80mm';
+  const pxW = size==='58' ? 230 : 310;
+
+  // Inject print instructions into HTML
+  const instruccion = `
+    <div id="printInfo" style="font-family:Arial,sans-serif;font-size:11px;color:#666;
+      background:#fff3cd;border:1px solid #ffc107;padding:8px 10px;margin-bottom:8px;
+      border-radius:4px;">
+      <b>⚠️ Configurar impresión:</b><br>
+      1. Más opciones → <b>Tamaño del papel: ${mmW}</b><br>
+      2. Márgenes: <b>Ninguno / Sin márgenes</b><br>
+      3. Desactivar "Encabezados y pies de página"
+    </div>`;
+
+  const htmlFinal = html.replace('<body>', '<body>'+instruccion);
+
+  const win = window.open('','_blank',
+    'width='+pxW+',height=700,menubar=no,toolbar=no,location=no');
+  win.document.write(htmlFinal);
   win.document.close();
   win.focus();
-  setTimeout(()=>{ win.print(); }, 400);
+  // Hide instructions when printing
+  const style = win.document.createElement('style');
+  style.textContent = '@media print { #printInfo { display:none !important; } }';
+  win.document.head.appendChild(style);
+  setTimeout(()=>{ win.print(); }, 500);
 }
 
 // Formatear número guaraní sin símbolo (para ticket)
