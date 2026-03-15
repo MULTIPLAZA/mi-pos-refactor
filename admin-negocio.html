@@ -1017,13 +1017,34 @@ async function abrirModalAsignar(timIdx){
   // Cargar terminales registradas desde activaciones
   let terminalesDisp = [];
   try {
+    // activaciones usa campo 'email' y puede tener nombre_terminal null
     const rows = await sg('activaciones',
-      'licencia_email=eq.'+encodeURIComponent(SE)+'&activa=eq.true&order=nombre_terminal.asc');
-    terminalesDisp = rows.map(r => ({
-      nombre:   r.nombre_terminal || r.device_id || 'Terminal',
-      sucursal: r.sucursal || '',
-      device_id: r.device_id
-    }));
+      'email=eq.'+encodeURIComponent(SE)+'&activa=eq.true&select=id,device_id,nombre_terminal,sucursal,nombre_negocio');
+    console.log('[Terminales] activaciones encontradas:', rows.length, rows);
+    terminalesDisp = rows
+      .filter(r => r.nombre_terminal || r.device_id)
+      .map(r => ({
+        id:       r.id,
+        nombre:   r.nombre_terminal || r.device_id || 'Terminal',
+        sucursal: r.sucursal || '',
+        device_id: r.device_id
+      }));
+    console.log('[Terminales] disponibles:', terminalesDisp);
+
+    // Si no encontró, intentar con licencia_email (campo alternativo)
+    if(!terminalesDisp.length){
+      try {
+        const rows2 = await sg('activaciones',
+          'licencia_email=eq.'+encodeURIComponent(SE)+'&activa=eq.true&select=id,device_id,nombre_terminal,sucursal');
+        if(rows2.length){
+          terminalesDisp = rows2.map(r=>({
+            id: r.id, nombre: r.nombre_terminal||r.device_id||'Terminal',
+            sucursal: r.sucursal||'', device_id: r.device_id
+          }));
+          console.log('[Terminales] fallback licencia_email:', terminalesDisp);
+        }
+      } catch(e2){ console.warn('[Terminales fallback]', e2.message); }
+    }
   } catch(e){ console.warn('[Terminales]', e.message); }
 
   // Timbrado actual
