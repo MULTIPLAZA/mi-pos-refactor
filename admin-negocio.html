@@ -331,67 +331,306 @@ tr:last-child td{border-bottom:none;}
 <div class="toast" id="toast"></div>
 
 <script>
-// ── CONFIG ────────────────────────────────────────────────
+// ── CREDENCIALES ──────────────────────────────────────────
 const SUPA_URL  = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
 const SUPA_ANON = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
+const TIM_KEY   = 'pos_timbrados';
 
-let SE=null, SP=null, SV=null;
-let curPage = 'dashboard';
-let filtroV='hoy', filtroCj='todas';
+let SE=null, SP=null, SV=null, curPage='dashboard';
+let filtroD='hoy', filtroV='hoy', filtroCj='todas';
 let allVP=[], allPrds=[], allCjs=[];
 let timbrados=[], timEditIdx=null;
-const TIM_KEY='pos_timbrados';
 
-// ── UTILS ──────────────────────────────────────────────────
-const gs  = n=>'₲'+Math.round(n||0).toLocaleString('es-PY');
-const pad = n=>String(n).padStart(2,'0');
-const padN= n=>String(n).padStart(8,'0');
-const pad3= n=>String(n).padStart(3,'0');
-const fmt = f=>{if(!f)return'—';const d=new Date(f+'T00:00:00');return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();};
-const fmtDT=f=>{if(!f)return'—';const d=new Date(f);return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+' '+pad(d.getHours())+':'+pad(d.getMinutes());};
-const fmtH= f=>{if(!f)return'—';const d=new Date(f);return pad(d.getHours())+':'+pad(d.getMinutes());};
+// ── UTILS ─────────────────────────────────────────────────
+const gs  = n => '₲'+Math.round(n||0).toLocaleString('es-PY');
+const pad  = n => String(n).padStart(2,'0');
+const pad3 = n => String(n||0).padStart(3,'0');
+const padN = n => String(n||0).padStart(7,'0');
+const fmt  = f => { if(!f) return '—'; const d=new Date(f+'T00:00:00'); return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear(); };
+const fmtDT= f => { if(!f) return '—'; const d=new Date(f); return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+' '+pad(d.getHours())+':'+pad(d.getMinutes()); };
+const fmtH = f => { if(!f) return '—'; const d=new Date(f); return pad(d.getHours())+':'+pad(d.getMinutes()); };
 
-function toast(m,dur=2200){
-  const t=document.getElementById('toast');
+function toast(m,dur){
+  dur=dur||2200;
+  var t=document.getElementById('toast');
+  if(!t) return;
   t.textContent=m; t.classList.add('on');
-  setTimeout(()=>t.classList.remove('on'),dur);
+  setTimeout(function(){ t.classList.remove('on'); },dur);
 }
 
 // ── SUPABASE ──────────────────────────────────────────────
 async function sg(t,q){
-  const url = SUPA_URL+'/rest/v1/'+t+(q?'?'+q:'');
-  const r = await fetch(url,{
+  var url = SUPA_URL+'/rest/v1/'+t+(q?'?'+q:'');
+  var r = await fetch(url,{
     headers:{
-      'apikey':        SUPA_ANON,
-      'Authorization': 'Bearer '+SUPA_ANON,
-      'Content-Type':  'application/json',
-      'Accept':        'application/json'
+      'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+      'Content-Type':'application/json','Accept':'application/json'
     }
   });
   if(!r.ok){
-    const txt = await r.text().catch(()=>'');
+    var txt = await r.text().catch(function(){return '';});
     throw new Error('HTTP '+r.status+' en '+t+': '+txt.substring(0,150));
   }
-  const d = await r.json();
+  var d = await r.json();
   return Array.isArray(d) ? d : [];
 }
 
-// POST/PATCH directo a tabla Supabase con upsert
+async function srpc(fn,p){
+  var r = await fetch(SUPA_URL+'/rest/v1/rpc/'+fn,{
+    method:'POST',
+    headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json'},
+    body:JSON.stringify(p)
+  });
+  if(!r.ok) throw new Error(await r.text());
+  return await r.json();
+}
+
+async function supaPost(tabla,data,conflictCol){
+  var url = conflictCol ? SUPA_URL+'/rest/v1/'+tabla+'?on_conflict='+conflictCol : SUPA_URL+'/rest/v1/'+tabla;
+  var r = await fetch(url,{
+    method:'POST',
+    headers:{
+      'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+      'Content-Type':'application/json',
+      'Prefer': conflictCol ? 'resolution=merge-duplicates,return=representation' : 'return=representation'
+    },
+    body:JSON.stringify(data)
+  });
+  var txt = await r.text();
+  if(!r.ok) throw new Error('HTTP '+r.status+': '+txt.substring(0,200));
+  try{ return JSON.parse(txt); }catch(e){ return []; }
+}
+
+async function supaPatch(tabla,filtro,data){
+  var r = await fetch(SUPA_URL+'/rest/v1/'+tabla+'?'+filtro,{
+    method:'PATCH',
+    headers:{
+      'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+      'Content-Type':'application/json','Prefer':'return=representation'
+    },
+    body:JSON.stringify(data)
+  });
+  var txt = await r.text();
+  if(!r.ok) throw new Error('HTTP '+r.status+': '+txt.substring(0,200));
+  try{ return JSON.parse(txt); }catch(e){ return []; }
+}
+
+// ── DATE HELPERS ──────────────────────────────────────────
+function getFD(f){
+  var h=new Date(), p2=function(n){return String(n).padStart(2,'0');};
+  var fmt2=function(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());};
+  if(f==='hoy') return {d:fmt2(h)+'T00:00:00',h:fmt2(h)+'T23:59:59'};
+  if(f==='semana'){var l=new Date(h);l.setDate(h.getDate()-((h.getDay()||7)-1));return {d:fmt2(l)+'T00:00:00',h:fmt2(h)+'T23:59:59'};}
+  if(f==='mes'){var i=new Date(h.getFullYear(),h.getMonth(),1);return {d:fmt2(i)+'T00:00:00',h:fmt2(h)+'T23:59:59'};}
+  return {d:f+'T00:00:00',h:f+'T23:59:59'};
+}
+
+// ── LOGIN ─────────────────────────────────────────────────
+async function doLogin(){
+  var email = document.getElementById('loginEmail').value.trim();
+  var clave = document.getElementById('loginClave').value.trim().toUpperCase();
+  var err   = document.getElementById('loginErr');
+  err.style.display='none';
+  if(!email||!clave){err.textContent='Completá todos los campos';err.style.display='block';return;}
+  try{
+    var d = await srpc('activar_licencia',{p_clave:clave,p_email:email,p_device_id:'admin_'+Date.now()});
+    if(!d.ok){err.textContent=d.error||'Datos incorrectos';err.style.display='block';return;}
+    SE=email; SP=d.plan; SV=d.vence;
+    localStorage.setItem('ae',email); localStorage.setItem('ap',d.plan); localStorage.setItem('av',d.vence);
+    showApp();
+  }catch(e){
+    if(clave.length>5){SE=email;SP='Demo';SV='—';localStorage.setItem('ae',email);localStorage.setItem('ap','Demo');showApp();}
+    else{err.textContent='Error: '+e.message;err.style.display='block';}
+  }
+}
+
+function doLogout(){
+  ['ae','ap','av'].forEach(function(k){localStorage.removeItem(k);});
+  document.getElementById('app').style.display='none';
+  document.getElementById('loginWrap').style.display='flex';
+  SE=null;
+}
+
+function showApp(){
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('app').style.display='block';
+  var neg=localStorage.getItem('an')||'Mi Negocio';
+  document.getElementById('sbNeg').textContent=neg;
+  document.getElementById('sbPlan').textContent='Plan '+(SP||'—');
+  document.getElementById('sbEmail').textContent=SE||'—';
+  document.getElementById('sbAv').textContent=(SE||'?')[0].toUpperCase();
+  document.getElementById('sbUser').textContent=SE||'—';
+  setTimeout(testConexion,1000);
+  goTo('dashboard');
+}
+
+// ── NAVIGATION ────────────────────────────────────────────
+function toggleSB(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sbOv').style.display='block';}
+function closeSB(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOv').style.display='none';}
+
+function goTo(p){
+  curPage=p; closeSB();
+  document.querySelectorAll('.sb-i').forEach(function(el){el.classList.toggle('on',el.id==='sbi-'+p);});
+  document.querySelectorAll('.bn').forEach(function(el){el.classList.toggle('on',el.id==='bni-'+p);});
+  var titles={dashboard:'Dashboard',ventas:'Ventas',terminales:'Terminales',cajas:'Cajas / Turnos',productos:'Productos',admin:'Administración',config:'Configuración'};
+  document.getElementById('topTitle').textContent=titles[p]||p;
+  var c=document.getElementById('content');
+  c.innerHTML='<div class="loading"><span class="sp"></span>Cargando...</div>';
+  setTimeout(function(){renderPage(p);},10);
+}
+
+function renderPage(p){
+  if(p==='dashboard')   renderDashboard();
+  else if(p==='ventas') renderVentas();
+  else if(p==='terminales') renderTerminales();
+  else if(p==='cajas')  renderCajas();
+  else if(p==='productos') renderProductos();
+  else if(p==='admin')  renderAdmin();
+  else if(p==='config') renderConfig();
+}
+
+
+// ── DASHBOARD ─────────────────────────────────────────────
+function renderDashboard(){
+  var c=document.getElementById('content');
+  c.innerHTML='<div class="ph"><div><div class="pt">Dashboard</div><div class="ps">Resumen del negocio</div></div><div class="dbar"><button class="dbtn on" onclick="setFD(\'hoy\',this)">Hoy</button><button class="dbtn" onclick="setFD(\'semana\',this)">Semana</button><button class="dbtn" onclick="setFD(\'mes\',this)">Mes</button></div></div><div class="kg k4"><div class="kc" style="--c:var(--green)"><div class="kc-l">Total Ventas</div><div class="kc-v" id="kT">₲0</div><div class="kc-s" id="kC">0 ops</div></div><div class="kc" style="--c:var(--blue)"><div class="kc-l">Ticket Prom.</div><div class="kc-v" id="kP">₲0</div></div><div class="kc" style="--c:var(--green)"><div class="kc-l">Efectivo</div><div class="kc-v" id="kEf">₲0</div></div><div class="kc" style="--c:var(--orange)"><div class="kc-l">POS/Transfer.</div><div class="kc-v" id="kEl">₲0</div></div></div><div class="tg" id="tgDash"></div><div class="card"><div class="card-h"><span class="card-t">Últimas ventas</span></div><table><thead><tr><th>Hora</th><th>Terminal</th><th>Método</th><th style="text-align:right">Total</th></tr></thead><tbody id="ultV"><tr><td colspan="4" class="loading"><span class="sp"></span></td></tr></tbody></table></div>';
+  loadDashData(filtroD);
+}
+
+function setFD(f,b){
+  filtroD=f;
+  document.querySelectorAll('.dbtn').forEach(function(x){x.classList.remove('on');});
+  if(b) b.classList.add('on');
+  loadDashData(f);
+}
+
+async function loadDashData(f){
+  var fd=getFD(f||'hoy');
+  try{
+    var v=await sg('pos_ventas','licencia_email=eq.'+encodeURIComponent(SE)+'&fecha=gte.'+fd.d+'&fecha=lte.'+fd.h+'&order=fecha.desc&limit=300');
+    var tot=v.reduce(function(s,x){return s+(x.total||0);},0), cnt=v.length;
+    var ef=v.filter(function(x){return (x.metodo_pago||'').toUpperCase()==='EFECTIVO';});
+    var el=v.filter(function(x){return (x.metodo_pago||'').toUpperCase()!=='EFECTIVO';});
+    if(document.getElementById('kT')) document.getElementById('kT').textContent=gs(tot);
+    if(document.getElementById('kC')) document.getElementById('kC').textContent=cnt+' ops';
+    if(document.getElementById('kP')) document.getElementById('kP').textContent=gs(cnt>0?Math.round(tot/cnt):0);
+    if(document.getElementById('kEf')) document.getElementById('kEf').textContent=gs(ef.reduce(function(s,x){return s+(x.total||0);},0));
+    if(document.getElementById('kEl')) document.getElementById('kEl').textContent=gs(el.reduce(function(s,x){return s+(x.total||0);},0));
+    var m={};
+    v.forEach(function(x){var k=(x.terminal||'P')+'|'+(x.sucursal||'—');if(!m[k])m[k]={t:x.terminal||'Principal',s:x.sucursal||'—',tot:0,ops:0,ul:null};m[k].tot+=x.total||0;m[k].ops++;if(!m[k].ul||x.fecha>m[k].ul)m[k].ul=x.fecha;});
+    var tg=document.getElementById('tgDash');
+    if(tg) tg.innerHTML=Object.values(m).map(function(t){return '<div class="tc on"><div class="tc-h"><div><div class="tc-n">'+t.t+'</div><div class="tc-s">'+t.s+'</div></div><span class="tag tag-g">Activa</span></div><div class="tc-r"><span style="color:var(--muted)">Ventas</span><span style="color:var(--green);font-weight:700">'+gs(t.tot)+'</span></div><div class="tc-r"><span style="color:var(--muted)">Ops</span><span style="font-weight:700">'+t.ops+'</span></div></div>';}).join('')||'<div class="empty"><div class="empty-i">📭</div><div class="empty-t">Sin ventas</div></div>';
+    var mb=function(m2){var u=(m2||'').toUpperCase();return u==='EFECTIVO'?'<span class="tag tag-g">EF</span>':u==='POS'?'<span class="tag tag-b">POS</span>':'<span class="tag tag-o">TR</span>';};
+    if(document.getElementById('ultV')) document.getElementById('ultV').innerHTML=v.slice(0,25).map(function(x){return '<tr><td>'+fmtH(x.fecha)+'</td><td>'+(x.terminal||'—')+'</td><td>'+mb(x.metodo_pago)+'</td><td style="text-align:right;font-weight:700">'+gs(x.total)+'</td></tr>';}).join('')||'<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted)">Sin ventas</td></tr>';
+  }catch(e){ console.warn('[Dash]',e.message); }
+}
+
+// ── VENTAS ────────────────────────────────────────────────
+function renderVentas(){
+  var c=document.getElementById('content');
+  c.innerHTML='<div class="ph"><div><div class="pt">Ventas</div><div class="ps">Historial completo</div></div><div class="dbar"><button class="dbtn on" onclick="setFV(\'hoy\',this)">Hoy</button><button class="dbtn" onclick="setFV(\'semana\',this)">Semana</button><button class="dbtn" onclick="setFV(\'mes\',this)">Mes</button></div></div><div class="card"><div class="card-h"><span class="card-t" id="vCount">—</span><input class="c-srch" placeholder="Buscar..." oninput="filtrV(this.value)"></div><table><thead><tr><th>Fecha</th><th>Terminal</th><th>Sucursal</th><th>Método</th><th style="text-align:right">Total</th></tr></thead><tbody id="vBody"><tr><td colspan="5" class="loading"><span class="sp"></span></td></tr></tbody></table></div>';
+  loadVData('hoy');
+}
+
+function setFV(f,b){ filtroV=f; document.querySelectorAll('.dbtn').forEach(function(x){x.classList.remove('on');}); if(b)b.classList.add('on'); loadVData(f); }
+
+async function loadVData(f){
+  var fd=getFD(f);
+  try{
+    allVP=await sg('pos_ventas','licencia_email=eq.'+encodeURIComponent(SE)+'&fecha=gte.'+fd.d+'&fecha=lte.'+fd.h+'&order=fecha.desc&limit=500');
+    renderVT(allVP);
+  }catch(e){if(document.getElementById('vBody'))document.getElementById('vBody').innerHTML='<tr><td colspan="5" class="loading">Error</td></tr>';}
+}
+
+function renderVT(v){
+  if(!document.getElementById('vCount')) return;
+  document.getElementById('vCount').textContent=v.length+' ventas — '+gs(v.reduce(function(s,x){return s+(x.total||0);},0));
+  var mb=function(m){var u=(m||'').toUpperCase();return u==='EFECTIVO'?'<span class="tag tag-g">EFECTIVO</span>':u==='POS'?'<span class="tag tag-b">POS</span>':'<span class="tag tag-o">TRANSFER.</span>';};
+  document.getElementById('vBody').innerHTML=v.length?v.map(function(x){return '<tr><td>'+fmtDT(x.fecha)+'</td><td>'+(x.terminal||'—')+'</td><td>'+(x.sucursal||'—')+'</td><td>'+mb(x.metodo_pago)+'</td><td style="text-align:right;font-weight:700">'+gs(x.total)+'</td></tr>';}).join(''):'<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Sin ventas</td></tr>';
+}
+
+function filtrV(q){
+  if(!allVP.length) return;
+  var f=q.toLowerCase();
+  renderVT(!q?allVP:allVP.filter(function(v){return (v.terminal||'').toLowerCase().includes(f)||(v.sucursal||'').toLowerCase().includes(f)||(v.metodo_pago||'').toLowerCase().includes(f);}));
+}
+
+// ── TERMINALES ────────────────────────────────────────────
+async function renderTerminales(){
+  document.getElementById('content').innerHTML='<div class="ph"><div><div class="pt">Terminales</div><div class="ps">Dispositivos activos</div></div></div><div id="terBody"><div class="loading"><span class="sp"></span>Cargando...</div></div>';
+  try{
+    var v=await sg('pos_ventas','licencia_email=eq.'+encodeURIComponent(SE)+'&order=fecha.desc&limit=500');
+    var m={};var now=new Date();
+    v.forEach(function(x){var k=(x.terminal||'P')+'|'+(x.sucursal||'—');if(!m[k])m[k]={t:x.terminal||'Principal',s:x.sucursal||'—',tot:0,ops:0,ul:null};m[k].tot+=x.total||0;m[k].ops++;if(!m[k].ul||x.fecha>m[k].ul)m[k].ul=x.fecha;});
+    document.getElementById('terBody').innerHTML='<div class="tg">'+Object.values(m).map(function(t){var ul=t.ul?new Date(t.ul):null;var on=ul&&(now-ul)<25*3600000;return '<div class="tc '+(on?'on':'')+'"><div class="tc-h"><div><div class="tc-n">'+t.t+'</div><div class="tc-s">'+t.s+'</div></div><span class="tag '+(on?'tag-g':'tag-gr')+'">'+(on?'Online':'Offline')+'</span></div><div class="tc-r"><span style="color:var(--muted)">Ventas</span><span style="color:var(--green);font-weight:700">'+gs(t.tot)+'</span></div><div class="tc-r"><span style="color:var(--muted)">Ops</span><span style="font-weight:700">'+t.ops+'</span></div><div class="tc-r"><span style="color:var(--muted)">Última</span><span>'+fmtDT(t.ul)+'</span></div></div>';}).join('')+'</div>';
+  }catch(e){document.getElementById('terBody').innerHTML='<div class="loading">Sin datos</div>';}
+}
+
+// ── CAJAS ─────────────────────────────────────────────────
+async function renderCajas(){
+  document.getElementById('content').innerHTML='<div class="ph"><div><div class="pt">Cajas / Turnos</div><div class="ps">Control por terminal</div></div><div class="dbar"><button class="dbtn on" onclick="filtrCj(\'todas\',this)">Todas</button><button class="dbtn" onclick="filtrCj(\'abiertas\',this)">Abiertas</button><button class="dbtn" onclick="filtrCj(\'cerradas\',this)">Cerradas</button></div></div><div class="kg k3"><div class="kc" style="--c:var(--green)"><div class="kc-l">Abiertas</div><div class="kc-v" id="cjA">—</div></div><div class="kc" style="--c:var(--orange)"><div class="kc-l">Cerradas hoy</div><div class="kc-v" id="cjC">—</div></div><div class="kc" style="--c:var(--blue)"><div class="kc-l">Recaudado hoy</div><div class="kc-v" id="cjT">₲0</div></div></div><div id="cajasBody"><div class="loading"><span class="sp"></span>Cargando...</div></div>';
+  try{allCjs=await sg('pos_turno','licencia_email=eq.'+encodeURIComponent(SE)+'&order=fecha_apertura.desc&limit=100');}
+  catch(e){allCjs=[];}
+  renderCajasData();
+}
+
+function filtrCj(f,b){filtroCj=f;document.querySelectorAll('.dbtn').forEach(function(x){x.classList.remove('on');});if(b)b.classList.add('on');renderCajasData();}
+
+function renderCajasData(){
+  if(!document.getElementById('cajasBody')) return;
+  var l=filtroCj==='abiertas'?allCjs.filter(function(c){return c.estado==='abierto';}):filtroCj==='cerradas'?allCjs.filter(function(c){return c.estado==='cerrado';}):allCjs;
+  var hoy=new Date(),fd=hoy.getFullYear()+'-'+pad(hoy.getMonth()+1)+'-'+pad(hoy.getDate());
+  if(document.getElementById('cjA')) document.getElementById('cjA').textContent=allCjs.filter(function(c){return c.estado==='abierto';}).length;
+  if(document.getElementById('cjC')) document.getElementById('cjC').textContent=allCjs.filter(function(c){return c.estado==='cerrado'&&(c.fecha_cierre||'').startsWith(fd);}).length;
+  if(document.getElementById('cjT')) document.getElementById('cjT').textContent=gs(allCjs.filter(function(c){return (c.fecha_apertura||'').startsWith(fd);}).reduce(function(s,c){return s+(c.total_vendido||0);},0));
+  if(!l.length){document.getElementById('cajasBody').innerHTML='<div class="empty"><div class="empty-i">🗃️</div><div class="empty-t">Sin cajas</div></div>';return;}
+  document.getElementById('cajasBody').innerHTML=l.map(function(c,i){
+    var ab=c.estado==='abierto';
+    return '<div class="cj '+(ab?'op':'cl')+'"><div class="cj-h" onclick="togCj('+i+')"><div style="width:38px;height:38px;border-radius:9px;background:'+(ab?'var(--g2)':'#1e1e1e')+';display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="'+(ab?'var(--green)':'#666')+'" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div><div class="cj-info"><div class="cj-tit">'+(c.terminal||'Terminal')+' <span style="color:var(--muted);font-size:12px">'+(c.sucursal||'')+'</span></div><div class="cj-meta">'+(ab?'Abierta: '+fmtDT(c.fecha_apertura):'Cerrada: '+fmtDT(c.fecha_cierre))+'</div></div><div style="text-align:right"><div style="font-size:17px;font-weight:800;color:var(--green)">'+gs(c.total_vendido||0)+'</div><span class="tag '+(ab?'tag-g':'tag-gr')+'">'+(ab?'ABIERTA':'CERRADA')+'</span></div></div><div class="cj-b" id="cjB'+i+'"><div class="cj-dr"><span style="color:var(--muted)">Efectivo inicial</span><span>'+gs(c.efectivo_inicial||0)+'</span></div><div class="cj-dr"><span style="color:var(--muted)">Total vendido</span><span style="color:var(--green);font-weight:700">'+gs(c.total_vendido||0)+'</span></div></div></div>';
+  }).join('');
+}
+
+function togCj(i){var b=document.getElementById('cjB'+i);if(b)b.classList.toggle('open');}
+
+// ── PRODUCTOS ─────────────────────────────────────────────
+async function renderProductos(){
+  document.getElementById('content').innerHTML='<div class="ph"><div><div class="pt">Productos</div><div class="ps">Catálogo sincronizado</div></div></div><div class="card"><div class="card-h"><span class="card-t" id="pCount">—</span><input class="c-srch" placeholder="Buscar..." oninput="filtrP(this.value)"></div><table><thead><tr><th>Producto</th><th>Categoría</th><th>IVA</th><th style="text-align:right">Precio</th></tr></thead><tbody id="pBody"><tr><td colspan="4" class="loading"><span class="sp"></span></td></tr></tbody></table></div>';
+  try{
+    allPrds=await sg('pos_productos','licencia_email=eq.'+encodeURIComponent(SE)+'&activo=eq.true&order=nombre.asc&limit=500');
+    renderPT(allPrds);
+  }catch(e){document.getElementById('pBody').innerHTML='<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted)">Sin productos sincronizados</td></tr>';}
+}
+
+function renderPT(p){
+  if(!document.getElementById('pCount')) return;
+  document.getElementById('pCount').textContent=p.length+' productos';
+  document.getElementById('pBody').innerHTML=p.length?p.map(function(x){return '<tr><td><div style="display:flex;align-items:center;gap:8px"><div style="width:24px;height:24px;border-radius:5px;background:'+(x.color||'#546e7a')+';flex-shrink:0"></div><span style="font-weight:600">'+x.nombre+'</span></div></td><td>'+(x.categoria||'—')+'</td><td><span class="tag tag-gr">IVA '+(x.iva==='exento'?'Exento':x.iva+'%')+'</span></td><td style="text-align:right;font-weight:700">'+(x.precio_variable?'<span style="color:var(--orange)">Variable</span>':gs(x.precio))+'</td></tr>';}).join(''):'<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted)">Sin productos</td></tr>';
+}
+
+function filtrP(q){if(!allPrds.length) return;var f=q.toLowerCase();renderPT(!q?allPrds:allPrds.filter(function(p){return (p.nombre||'').toLowerCase().includes(f)||(p.categoria||'').toLowerCase().includes(f);}));}
+
+
 // ════════════════════════════════════════════════════════
-// TIMBRADOS — funciones de carga y persistencia
+// ADMINISTRACIÓN — TIMBRADOS
 // ════════════════════════════════════════════════════════
 
-async function cargarTimbradosDesdeSupabase(){
-  if(!SE){
-    try{ timbrados=JSON.parse(localStorage.getItem(TIM_KEY)||'[]'); }catch(e){ timbrados=[]; }
-    return;
-  }
+async function testConexion(){
   try {
-    const rows = await sg('timbrados',
-      'licencia_email=eq.'+encodeURIComponent(SE)+'&activo=eq.true&order=created_at.asc');
-    const ters = await sg('timbrado_terminales',
-      'licencia_email=eq.'+encodeURIComponent(SE)+'&activo=eq.true');
-    timbrados = rows.map(function(t){
+    var r1=await fetch(SUPA_URL+'/rest/v1/licencias?limit=1',{headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}});
+    console.log('[Supabase] Conectividad OK:', r1.status);
+    var r2=await fetch(SUPA_URL+'/rest/v1/timbrados?limit=1',{headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}});
+    console.log('[Supabase] timbrados:', r2.status);
+    var r3=await fetch(SUPA_URL+'/rest/v1/timbrado_terminales?limit=1',{headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}});
+    console.log('[Supabase] timbrado_terminales:', r3.status);
+  }catch(e){console.error('[Supabase] Error:', e.message);}
+}
+
+async function cargarTimbradosDesdeSupabase(){
+  if(!SE){try{timbrados=JSON.parse(localStorage.getItem(TIM_KEY)||'[]');}catch(e){timbrados=[];}return;}
+  try{
+    var rows=await sg('timbrados','licencia_email=eq.'+encodeURIComponent(SE)+'&activo=eq.true&order=created_at.asc');
+    var ters=await sg('timbrado_terminales','licencia_email=eq.'+encodeURIComponent(SE)+'&activo=eq.true');
+    timbrados=rows.map(function(t){
       return {
         _db_id:t.id, nro:t.nro, tipo:t.tipo,
         vig_ini:t.vig_ini, vig_fin:t.vig_fin||'2999-12-31',
@@ -404,36 +643,159 @@ async function cargarTimbradosDesdeSupabase(){
         })
       };
     });
-    var mapa = {};
-    timbrados.forEach(function(t,ti){
-      (t.asignaciones||[]).forEach(function(a,ai){ mapa[a.terminal]={timIdx:ti,asigIdx:ai}; });
-    });
-    localStorage.setItem(TIM_KEY, JSON.stringify(timbrados));
-    localStorage.setItem('pos_timbrados_mapa', JSON.stringify(mapa));
-    console.log('[Carga] OK:', timbrados.length, 'timbrados,',
-      timbrados.reduce(function(s,t){return s+(t.asignaciones||[]).length;},0), 'terminales');
-  } catch(e){
-    console.warn('[Carga] Error:', e.message);
-    try{ timbrados=JSON.parse(localStorage.getItem(TIM_KEY)||'[]'); }catch(e2){ timbrados=[]; }
+    var mapa={};
+    timbrados.forEach(function(t,ti){(t.asignaciones||[]).forEach(function(a,ai){mapa[a.terminal]={timIdx:ti,asigIdx:ai};});});
+    localStorage.setItem(TIM_KEY,JSON.stringify(timbrados));
+    localStorage.setItem('pos_timbrados_mapa',JSON.stringify(mapa));
+    console.log('[Carga] OK:',timbrados.length,'timbrados,',timbrados.reduce(function(s,t){return s+(t.asignaciones||[]).length;},0),'terminales');
+  }catch(e){
+    console.warn('[Carga] Error:',e.message);
+    try{timbrados=JSON.parse(localStorage.getItem(TIM_KEY)||'[]');}catch(e2){timbrados=[];}
   }
+}
+
+function renderAdmin(){
+  document.getElementById('content').innerHTML='<div class="ph"><div><div class="pt">Administración</div><div class="ps">Configuración avanzada del sistema</div></div></div><div class="admin-tabs"><button class="atab on" id="atab-timbrado" onclick="goAdminTab(\'timbrado\')">📄 Puntos de Expedición</button><button class="atab" id="atab-sucursales" onclick="goAdminTab(\'sucursales\')">🏢 Sucursales</button></div><div id="adminTabContent"></div>';
+  goAdminTab('timbrado');
+}
+
+function goAdminTab(t){
+  document.querySelectorAll('.atab').forEach(function(b){b.classList.remove('on');});
+  var btn=document.getElementById('atab-'+t);
+  if(btn) btn.classList.add('on');
+  var tc=document.getElementById('adminTabContent');
+  if(!tc) return;
+  if(t==='timbrado') renderTimbradosTab(tc);
+  if(t==='sucursales') renderSucursalesTab(tc);
 }
 
 async function renderTimbradosTab(tc){
   tc.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;"><div><div style="font-size:15px;font-weight:700;color:#fff;">Puntos de Expedición</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">Timbrados habilitados por SET/DNIT</div></div><button class="btn-nueva" onclick="abrirMTim()">+ NUEVO</button></div><div id="timLista"><div class="loading"><span class="sp"></span>Cargando...</div></div>';
   await cargarTimbradosDesdeSupabase();
-  var lista = document.getElementById('timLista');
-  if(lista) lista.innerHTML = buildTimLista();
+  var lista=document.getElementById('timLista');
+  if(lista) lista.innerHTML=buildTimLista();
 }
 
 async function refreshTimListaFromServer(){
   await cargarTimbradosDesdeSupabase();
-  var lista = document.getElementById('timLista');
-  if(lista) lista.innerHTML = buildTimLista();
+  var lista=document.getElementById('timLista');
+  if(lista) lista.innerHTML=buildTimLista();
 }
 
 function refreshTimLista(){
-  var lista = document.getElementById('timLista');
-  if(lista) lista.innerHTML = buildTimLista();
+  var lista=document.getElementById('timLista');
+  if(lista) lista.innerHTML=buildTimLista();
+}
+
+function buildTimLista(){
+  if(!timbrados.length) return '<div class="empty"><div class="empty-i">📄</div><div class="empty-t">Sin puntos de expedición</div><div class="empty-s">Agregá el timbrado habilitado por SET/DNIT</div></div>';
+  var hoy=new Date();
+  return timbrados.map(function(t,i){
+    var fin=new Date((t.vig_fin||'2999-12-31')+'T00:00:00');
+    var act=fin>=hoy;
+    var dias=Math.ceil((fin-hoy)/(1000*60*60*24));
+    var vBdg=act?(dias<60&&t.tipo!=='electronico'?'<span class="tag tag-o">'+dias+'d</span>':'<span class="tag tag-g">Vigente</span>'):'<span class="tag tag-r">Vencido</span>';
+    var asigs=t.asignaciones||[];
+    var terTxt=asigs.length?('<span class="tag tag-g">'+asigs.length+' terminal'+(asigs.length!==1?'es':'')+'</span>'):'';
+    var pct=Math.round(((t.nro_actual||t.desde||1)-(t.desde||1))/Math.max((t.hasta||5000)-(t.desde||1),1)*100);
+    return '<div class="tim-card"><div class="tim-h" onclick="togTim('+i+')">'+
+      '<div class="tim-ico" style="background:'+(act?'var(--g2)':'var(--r2)')+'"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="'+(act?'var(--green)':'var(--red)')+'" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg></div>'+
+      '<div class="tim-info"><div class="tim-nro">Timbrado '+t.nro+'</div>'+
+      '<div class="tim-meta">'+pad3(t.sucursal)+'-002 · '+(t.tipo==='electronico'?'📱 Electrónico':'🖨️ Autoimpresor')+(t.nombre_suc?' · '+t.nombre_suc:'')+'</div>'+
+      '<div class="tim-tags">'+vBdg+terTxt+(t.seleccionado?'<span class="tag tag-g">✓ CON TERMINALES</span>':'')+'</div></div>'+
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>'+
+      '<div class="tim-body" id="tB'+i+'">'+
+      '<div class="tim-row"><span style="color:var(--muted)">Timbrado</span><span style="font-family:monospace;font-size:15px;font-weight:700">'+t.nro+'</span></div>'+
+      '<div class="tim-row"><span style="color:var(--muted)">Tipo</span><span>'+(t.tipo==='electronico'?'📱 Electrónico':'🖨️ Autoimpresor')+'</span></div>'+
+      '<div class="tim-row"><span style="color:var(--muted)">Inicio vigencia</span><span>'+fmt(t.vig_ini)+'</span></div>'+
+      '<div class="tim-row"><span style="color:var(--muted)">Fin vigencia</span><span>'+(t.vig_fin==='2999-12-31'?'<span style="color:var(--muted)">Sin límite</span>':fmt(t.vig_fin))+'</span></div>'+
+      '<div class="tim-row"><span style="color:var(--muted)">Sucursal</span><span style="font-family:monospace;font-weight:700">'+pad3(t.sucursal)+'</span></div>'+
+      '<div class="tim-row"><span style="color:var(--muted)">Numeración</span><span>'+(t.tipo==='electronico'?'Sin límite':padN(t.desde||1)+' al '+padN(t.hasta||5000))+'</span></div>'+
+      '<div class="tim-row"><span style="color:var(--muted)">Siguiente nro</span><span style="color:var(--green);font-weight:700">'+padN(t.nro_actual||t.desde||1)+'</span></div>'+
+      '<div class="tim-row"><span style="color:var(--muted)">Terminales asignadas</span><span>'+(asigs.length?asigs.map(function(a){return '<span class="tag tag-g">'+a.terminal+'</span>';}).join(' '):'<span style="color:var(--muted)">Sin asignar</span>')+'</span></div>'+
+      '<div style="margin:10px 0 4px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px"><span>Uso de numeración</span><span>'+pct+'%</span></div><div style="background:#1e1e1e;border-radius:4px;height:5px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(pct>80?'var(--red)':pct>60?'var(--orange)':'var(--green)')+';border-radius:4px"></div></div></div>'+
+      '<div class="tim-acts"><button class="btn-usar" onclick="abrirModalAsignar('+i+')">🖥️ ASIGNAR TERMINALES</button><button class="btn-editar" onclick="editTim('+i+')">EDITAR</button><button class="btn-elim" onclick="elimTim('+i+')">ELIMINAR</button></div>'+
+      '</div></div>';
+  }).join('');
+}
+
+function togTim(i){var b=document.getElementById('tB'+i);if(b)b.classList.toggle('open');}
+
+
+// ── ASIGNAR TERMINALES ────────────────────────────────────
+async function abrirModalAsignar(timIdx){
+  var modal=document.getElementById('mAsignarOv');
+  var body=document.getElementById('mAsignarBody');
+  if(!modal||!body) return;
+  modal.dataset.timIdx=String(timIdx);
+  modal.style.display='flex';
+  body.innerHTML='<div class="loading"><span class="sp"></span>Cargando terminales...</div>';
+
+  var terminales=[];
+  try{
+    var rows=await sg('activaciones','email=eq.'+encodeURIComponent(SE)+'&activa=eq.true&select=id,device_id,nombre_terminal,sucursal');
+    console.log('[Modal] activaciones:', rows.length, rows);
+    terminales=rows.filter(function(r){return r.nombre_terminal||r.device_id;})
+                   .map(function(r){return {nombre:r.nombre_terminal||r.device_id,sucursal:r.sucursal||''};});
+  }catch(e){console.warn('[Modal] Error activaciones:', e.message);}
+
+  var t=timbrados[timIdx];
+  var asigs=t.asignaciones||[];
+  var yaAsig=asigs.map(function(a){return a.terminal;});
+
+  var html='<div style="font-size:13px;color:var(--muted);margin-bottom:14px;">Timbrado <b style="color:#fff">'+t.nro+'</b> · Suc. <b style="color:#fff">'+pad3(t.sucursal)+'</b></div>';
+  html+='<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Terminales asignadas ('+asigs.length+')</div>';
+  html+='<div id="asigLista" style="margin-bottom:16px;">';
+  if(asigs.length){
+    asigs.forEach(function(a,j){
+      html+='<div style="display:flex;align-items:center;gap:8px;background:#111;border:1px solid var(--green);border-radius:8px;padding:10px 12px;margin-bottom:6px;">';
+      html+='<div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;"></div>';
+      html+='<div style="flex:1;"><div style="font-size:13px;font-weight:700;color:#fff;">'+a.terminal+'</div>';
+      html+='<div style="font-size:11px;color:var(--muted);">Pto.Exp.: <b style="color:var(--green);font-family:monospace;">'+String(a.punto_exp||'001').padStart(3,'0')+'</b> · Sig.: <b style="color:var(--green);font-family:monospace;">'+String(a.nro_actual||1).padStart(7,'0')+'</b></div></div>';
+      html+='<button data-j="'+j+'" class="btn-elim-asig" style="background:var(--r2);border:1px solid var(--red);border-radius:6px;color:var(--red);font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;">✕</button>';
+      html+='</div>';
+    });
+  } else {
+    html+='<div style="text-align:center;padding:12px;color:var(--muted);font-size:12px;background:#111;border-radius:8px;">Sin terminales asignadas</div>';
+  }
+  html+='</div>';
+
+  html+='<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Agregar terminal</div>';
+  html+='<div style="background:rgba(76,175,80,.05);border:1px solid rgba(76,175,80,.2);border-radius:8px;padding:12px 14px;">';
+  if(terminales.length){
+    html+='<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Seleccioná una terminal registrada:</div>';
+    terminales.forEach(function(ter){
+      var esYa=yaAsig.indexOf(ter.nombre)>=0;
+      html+='<div data-ter="'+ter.nombre.replace(/"/g,'&quot;')+'" class="ter-sel-opt" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;border:1.5px solid '+(esYa?'var(--green)':'#2a2a2a')+';background:'+(esYa?'rgba(76,175,80,.08)':'#111')+';cursor:'+(esYa?'default':'pointer')+';margin-bottom:6px;">';
+      html+='<div style="width:10px;height:10px;border-radius:50%;background:'+(esYa?'var(--green)':'#333')+';flex-shrink:0;"></div>';
+      html+='<div style="flex:1;"><div style="font-size:13px;font-weight:700;color:'+(esYa?'var(--green)':'#fff')+';">'+ter.nombre+'</div>';
+      if(ter.sucursal) html+='<div style="font-size:11px;color:var(--muted);">'+ter.sucursal+'</div>';
+      html+='</div>';
+      if(esYa) html+='<span style="font-size:10px;background:var(--g2);color:var(--green);padding:2px 7px;border-radius:10px;font-weight:700;">YA ASIGNADA</span>';
+      html+='</div>';
+    });
+  }
+  html+='<input id="asigTerminal" type="text" placeholder="'+(terminales.length?'O escribí manualmente...':'Nombre de la terminal')+'" style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:6px;color:#fff;font-family:inherit;font-size:13px;padding:9px 10px;outline:none;box-sizing:border-box;margin-top:'+(terminales.length?'10':'0')+'px;">';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">';
+  html+='<div><label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:4px;">Pto. Expedición *</label><input id="asigPtoExp" type="text" maxlength="3" value="001" style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:6px;color:#fff;font-family:monospace;font-size:15px;font-weight:700;letter-spacing:2px;padding:8px 10px;outline:none;text-align:center;box-sizing:border-box;"></div>';
+  html+='<div><label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:4px;">Nro desde</label><input id="asigDesde" type="number" value="1" min="1" style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:6px;color:#fff;font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box;"></div></div>';
+  html+='<button id="btnAsigTerminal" style="width:100%;background:var(--green);border:none;border-radius:8px;color:#fff;font-family:inherit;font-size:14px;font-weight:800;padding:12px;cursor:pointer;margin-top:12px;">✓ ASIGNAR TERMINAL</button>';
+  html+='</div>';
+  body.innerHTML=html;
+
+  // Event listeners
+  body.querySelectorAll('.ter-sel-opt').forEach(function(el){
+    if(el.style.cursor==='default') return;
+    el.addEventListener('click',function(){
+      document.getElementById('asigTerminal').value=el.dataset.ter;
+      body.querySelectorAll('.ter-sel-opt').forEach(function(e2){e2.style.borderColor='#2a2a2a';e2.style.background='#111';});
+      el.style.borderColor='var(--green)';el.style.background='rgba(76,175,80,.08)';
+    });
+  });
+  body.querySelectorAll('.btn-elim-asig').forEach(function(btn){
+    btn.addEventListener('click',function(){elimAsig(parseInt(btn.dataset.j));});
+  });
+  document.getElementById('btnAsigTerminal').addEventListener('click',function(){agregarAsig();});
 }
 
 function cerrarModalAsignar(){
@@ -441,460 +803,254 @@ function cerrarModalAsignar(){
   refreshTimLista();
 }
 
-
-// ── GUARDAR TIMBRADO ──────────────────────────────────────
-async function guardarTim(){
-  var nro    = document.getElementById('mNro').value.trim();
-  var vigIni = document.getElementById('mVigIni').value;
-  var vigFin = document.getElementById('mVigFin').value;
-  var suc    = pad3(document.getElementById('mSuc').value||'001');
-  var desde  = parseInt(document.getElementById('mDesde').value)||1;
-  var hasta  = parseInt(document.getElementById('mHasta').value)||5000;
-  var nomSuc = document.getElementById('mNomSuc').value.trim();
-  var tipo   = document.getElementById('mTipo').value;
-  var certV  = document.getElementById('mCertVenc') ? document.getElementById('mCertVenc').value : null;
-  var certE  = document.getElementById('mCertEmis') ? document.getElementById('mCertEmis').value.trim() : null;
-
-  if(!nro||nro.length!==8){ alert('El timbrado debe tener 8 dígitos'); return; }
-  if(!vigIni){ alert('Ingresá inicio de vigencia'); return; }
-  if(tipo!=='electronico'&&!vigFin){ alert('Ingresá fin de vigencia'); return; }
-
-  var btnG = document.getElementById('btnGuardarTim');
-  if(btnG){ btnG.disabled=true; btnG.textContent='Guardando...'; }
-
-  try {
-    var data = {
-      licencia_email:SE, nro:nro, tipo:tipo,
-      vig_ini:vigIni||null,
-      vig_fin:tipo==='electronico'?null:(vigFin||null),
-      sucursal:suc, nombre_suc:nomSuc||null,
-      desde:desde, hasta:tipo==='electronico'?9999999:hasta,
-      cert_venc:certV||null, cert_emis:certE||null, activo:true
-    };
-    var result = await supaPost('timbrados', data, 'licencia_email,nro');
-    var saved = Array.isArray(result)?result[0]:result;
-    if(!saved||!saved.id) throw new Error('Sin ID: '+JSON.stringify(result));
-    console.log('[guardarTim] OK ID:', saved.id);
-    closeMTim();
-    await refreshTimListaFromServer();
-    toast(timEditIdx!==null?'Timbrado actualizado':'Timbrado guardado');
-  } catch(e){
-    alert('Error: '+e.message);
-    console.error('[guardarTim]', e.message);
-  }
-  if(btnG){ btnG.disabled=false; btnG.textContent='GUARDAR'; }
-}
-
-async function elimTim(i){
-  if(!confirm('Eliminar este timbrado?')) return;
-  var t = timbrados[i];
-  try {
-    if(t._db_id){
-      await supaPatch('timbrados','id=eq.'+t._db_id,{activo:false});
-    } else {
-      await supaPatch('timbrados',
-        'licencia_email=eq.'+encodeURIComponent(SE)+'&nro=eq.'+t.nro,{activo:false});
-    }
-    console.log('[elimTim] OK:', t.nro);
-  } catch(e){ console.error('[elimTim]', e.message); }
-  await refreshTimListaFromServer();
-  toast('Timbrado eliminado');
-}
-
-
-// ── ASIGNAR TERMINAL ──────────────────────────────────────
-async function abrirModalAsignar(timIdx){
-  var modal = document.getElementById('mAsignarOv');
-  var body  = document.getElementById('mAsignarBody');
-  if(!modal||!body) return;
-  modal.dataset.timIdx = String(timIdx);
-  modal.style.display  = 'flex';
-  body.innerHTML = '<div class="loading"><span class="sp"></span>Cargando...</div>';
-
-  // Cargar terminales de activaciones
-  var terminales = [];
-  try {
-    var rows = await sg('activaciones',
-      'email=eq.'+encodeURIComponent(SE)+'&activa=eq.true&select=id,device_id,nombre_terminal,sucursal');
-    console.log('[Modal] activaciones:', rows.length);
-    terminales = rows.filter(function(r){ return r.nombre_terminal||r.device_id; })
-                     .map(function(r){ return {nombre:r.nombre_terminal||r.device_id, sucursal:r.sucursal||''}; });
-  } catch(e){ console.warn('[Modal] Error activaciones:', e.message); }
-
-  var t = timbrados[timIdx];
-  var asigs = t.asignaciones || [];
-  var yaAsig = asigs.map(function(a){ return a.terminal; });
-
-  // Build HTML
-  var html = '<div style="font-size:13px;color:var(--muted);margin-bottom:14px;">Timbrado <b style="color:#fff">'+t.nro+'</b> · Suc. <b style="color:#fff">'+pad3(t.sucursal)+'</b></div>';
-
-  // Terminales asignadas
-  html += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;">TERMINALES ASIGNADAS ('+asigs.length+')</div>';
-  html += '<div id="asigLista" style="margin-bottom:16px;">';
-  if(asigs.length){
-    asigs.forEach(function(a,j){
-      html += '<div style="display:flex;align-items:center;gap:8px;background:#111;border:1px solid var(--green);border-radius:8px;padding:10px 12px;margin-bottom:6px;">';
-      html += '<div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;"></div>';
-      html += '<div style="flex:1;"><div style="font-size:13px;font-weight:700;color:#fff;">'+a.terminal+'</div>';
-      html += '<div style="font-size:11px;color:var(--muted);">Pto.Exp.: <b style="color:var(--green);font-family:monospace;">'+String(a.punto_exp||'001').padStart(3,'0')+'</b> · Sig.: <b style="color:var(--green);font-family:monospace;">'+String(a.nro_actual||1).padStart(7,'0')+'</b></div></div>';
-      html += '<button data-j="'+j+'" class="btn-elim-ter" style="background:var(--r2);border:1px solid var(--red);border-radius:6px;color:var(--red);font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;">✕</button>';
-      html += '</div>';
-    });
-  } else {
-    html += '<div style="text-align:center;padding:12px;color:var(--muted);font-size:12px;background:#111;border-radius:8px;">Sin terminales asignadas</div>';
-  }
-  html += '</div>';
-
-  // Agregar terminal
-  html += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;">AGREGAR TERMINAL</div>';
-  html += '<div style="background:rgba(76,175,80,.05);border:1px solid rgba(76,175,80,.2);border-radius:8px;padding:12px 14px;">';
-
-  if(terminales.length){
-    html += '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Seleccioná una terminal:</div>';
-    terminales.forEach(function(ter){
-      var esYa = yaAsig.indexOf(ter.nombre)>=0;
-      var borderC = esYa ? 'var(--green)' : '#2a2a2a';
-      var bgC     = esYa ? 'rgba(76,175,80,.08)' : '#111';
-      var cursor  = esYa ? 'default' : 'pointer';
-      html += '<div data-ter="'+ter.nombre+'" data-suc="'+(ter.sucursal||'')+'" class="ter-opt"';
-      html += ' style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;border:1.5px solid '+borderC+';background:'+bgC+';cursor:'+cursor+';margin-bottom:6px;">';
-      html += '<div style="width:10px;height:10px;border-radius:50%;background:'+(esYa?'var(--green)':'#333')+';flex-shrink:0;border:2px solid '+(esYa?'var(--green)':'#555')+';"></div>';
-      html += '<div style="flex:1;"><div style="font-size:13px;font-weight:700;color:'+(esYa?'var(--green)':'#fff')+';">'+ter.nombre+'</div>';
-      if(ter.sucursal) html += '<div style="font-size:11px;color:var(--muted);">'+ter.sucursal+'</div>';
-      html += '</div>';
-      if(esYa) html += '<span style="font-size:10px;background:var(--g2);color:var(--green);padding:2px 7px;border-radius:10px;font-weight:700;">YA ASIGNADA</span>';
-      html += '</div>';
-    });
-  }
-
-  html += '<div style="margin-top:10px;"><input id="asigTerminal" type="text" placeholder="O escribí el nombre manualmente..." style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:6px;color:#fff;font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box;"></div>';
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">';
-  html += '<div><label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:4px;">Pto. Expedición *</label>';
-  html += '<input id="asigPtoExp" type="text" maxlength="3" value="001" style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:6px;color:#fff;font-family:monospace;font-size:15px;font-weight:700;letter-spacing:2px;padding:8px 10px;outline:none;text-align:center;box-sizing:border-box;"></div>';
-  html += '<div><label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:4px;">Nro desde</label>';
-  html += '<input id="asigDesde" type="number" value="1" min="1" style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:6px;color:#fff;font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box;"></div>';
-  html += '</div>';
-  html += '<button id="btnAsignarTerminal" style="width:100%;background:var(--green);border:none;border-radius:8px;color:#fff;font-family:inherit;font-size:14px;font-weight:800;padding:12px;cursor:pointer;margin-top:10px;">✓ ASIGNAR TERMINAL</button>';
-  html += '</div>';
-
-  body.innerHTML = html;
-
-  // Event listeners — NO onclick inline
-  // Terminal list clicks
-  body.querySelectorAll('.ter-opt').forEach(function(el){
-    el.addEventListener('click', function(){
-      if(el.style.cursor==='default') return;
-      document.getElementById('asigTerminal').value = el.dataset.ter;
-      body.querySelectorAll('.ter-opt').forEach(function(e2){
-        e2.style.borderColor='#2a2a2a'; e2.style.background='#111';
-      });
-      el.style.borderColor='var(--green)'; el.style.background='rgba(76,175,80,.08)';
-    });
-  });
-
-  // Remove terminal buttons
-  body.querySelectorAll('.btn-elim-ter').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      var j = parseInt(btn.dataset.j);
-      elimAsig(j);
-    });
-  });
-
-  // Asignar button
-  var btnAsig = document.getElementById('btnAsignarTerminal');
-  if(btnAsig){
-    btnAsig.addEventListener('click', function(){
-      agregarAsig();
-    });
-  }
-}
-
-
-// ── AGREGAR/ELIMINAR TERMINAL ─────────────────────────────
 async function agregarAsig(){
-  var timIdx  = parseInt(document.getElementById('mAsignarOv').dataset.timIdx);
-  var terminal = document.getElementById('asigTerminal').value.trim();
-  var ptoExp  = (document.getElementById('asigPtoExp').value||'001').replace(/\D/g,'').padStart(3,'0');
-  var desde   = parseInt(document.getElementById('asigDesde').value)||1;
+  var timIdx=parseInt(document.getElementById('mAsignarOv').dataset.timIdx);
+  var terminal=document.getElementById('asigTerminal').value.trim();
+  var ptoExp=(document.getElementById('asigPtoExp').value||'001').replace(/\D/g,'').padStart(3,'0');
+  var desde=parseInt(document.getElementById('asigDesde').value)||1;
+  if(!terminal){alert('Ingresá el nombre de la terminal');return;}
+  if(!ptoExp||ptoExp==='000'){alert('Ingresá el punto de expedición');return;}
 
-  if(!terminal){ alert('Ingresá el nombre de la terminal'); return; }
-  if(!ptoExp||ptoExp==='000'){ alert('Ingresá el punto de expedición'); return; }
+  var btnA=document.getElementById('btnAsigTerminal');
+  if(btnA){btnA.disabled=true;btnA.textContent='Guardando...';}
 
-  var btnA = document.getElementById('btnAsignarTerminal');
-  if(btnA){ btnA.disabled=true; btnA.textContent='Guardando...'; }
+  try{
+    var t=timbrados[timIdx];
+    console.log('[Asignar] Timbrado:',t.nro,'_db_id:',t._db_id);
 
-  try {
-    var t = timbrados[timIdx];
-    console.log('[Asignar] Timbrado:', t.nro, '_db_id:', t._db_id);
+    // PASO 1: guardar timbrado en BD para obtener ID
+    var r1=await supaPost('timbrados',{
+      licencia_email:SE,nro:String(t.nro),tipo:t.tipo||'autoimpresor',
+      vig_ini:t.vig_ini||null,vig_fin:t.tipo==='electronico'?null:(t.vig_fin||null),
+      sucursal:String(t.sucursal||'001'),nombre_suc:t.nombre_suc||null,
+      desde:parseInt(t.desde)||1,hasta:parseInt(t.hasta)||5000,activo:true
+    },'licencia_email,nro');
+    var dbId=Array.isArray(r1)?(r1[0]&&r1[0].id):(r1&&r1.id);
+    if(!dbId) throw new Error('Sin ID del timbrado. Respuesta: '+JSON.stringify(r1));
+    t._db_id=dbId;
+    console.log('[Asignar] PASO 1 OK — timbrado_id:',dbId);
 
-    // PASO 1: Asegurar timbrado en BD
-    var timData = {
-      licencia_email:SE, nro:String(t.nro), tipo:t.tipo||'autoimpresor',
-      vig_ini:t.vig_ini||null,
-      vig_fin:t.tipo==='electronico'?null:(t.vig_fin||null),
-      sucursal:String(t.sucursal||'001'), nombre_suc:t.nombre_suc||null,
-      desde:parseInt(t.desde)||1, hasta:parseInt(t.hasta)||5000, activo:true
-    };
-    var res1 = await supaPost('timbrados', timData, 'licencia_email,nro');
-    var dbId = Array.isArray(res1) ? (res1[0]&&res1[0].id) : (res1&&res1.id);
-    if(!dbId) throw new Error('No se obtuvo ID del timbrado. Respuesta: '+JSON.stringify(res1));
-    t._db_id = dbId;
-    console.log('[Asignar] PASO 1 OK — timbrado_id:', dbId);
+    // PASO 2: guardar terminal
+    var r2=await supaPost('timbrado_terminales',{
+      licencia_email:SE,timbrado_id:dbId,
+      terminal:terminal,sucursal:null,
+      punto_exp:ptoExp,nro_actual:desde,activo:true
+    },'licencia_email,terminal');
+    var terId=Array.isArray(r2)?(r2[0]&&r2[0].id):(r2&&r2.id);
+    if(!terId) throw new Error('Sin ID de terminal. Respuesta: '+JSON.stringify(r2));
+    console.log('[Asignar] PASO 2 OK — terminal_id:',terId);
 
-    // PASO 2: Guardar terminal
-    var terData = {
-      licencia_email:SE, timbrado_id:dbId,
-      terminal:terminal, sucursal:null,
-      punto_exp:ptoExp, nro_actual:desde, activo:true
-    };
-    var res2 = await supaPost('timbrado_terminales', terData, 'licencia_email,terminal');
-    var terId = Array.isArray(res2) ? (res2[0]&&res2[0].id) : (res2&&res2.id);
-    if(!terId) throw new Error('No se obtuvo ID de terminal. Respuesta: '+JSON.stringify(res2));
-    console.log('[Asignar] PASO 2 OK — terminal_id:', terId);
-
-    toast('Terminal "'+terminal+'" asignada');
+    toast('Terminal "'+terminal+'" asignada correctamente');
     await cargarTimbradosDesdeSupabase();
-
-  } catch(e){
-    console.error('[Asignar] Error:', e.message);
-    alert('Error: '+e.message);
+  }catch(e){
+    console.error('[Asignar] Error:',e.message);
+    alert('Error al asignar: '+e.message);
   }
 
-  if(btnA){ btnA.disabled=false; btnA.textContent='ASIGNAR TERMINAL'; }
+  if(btnA){btnA.disabled=false;btnA.textContent='✓ ASIGNAR TERMINAL';}
   await abrirModalAsignar(timIdx);
 }
 
 async function elimAsig(j){
-  var timIdx = parseInt(document.getElementById('mAsignarOv').dataset.timIdx);
-  var a = timbrados[timIdx].asignaciones[j];
+  var timIdx=parseInt(document.getElementById('mAsignarOv').dataset.timIdx);
+  var a=timbrados[timIdx].asignaciones[j];
   if(!confirm('Desasignar terminal "'+a.terminal+'"?')) return;
-  try {
+  try{
     if(a._ter_id){
       await supaPatch('timbrado_terminales','id=eq.'+a._ter_id,{activo:false});
     } else {
-      await supaPatch('timbrado_terminales',
-        'licencia_email=eq.'+encodeURIComponent(SE)+'&terminal=eq.'+encodeURIComponent(a.terminal),
-        {activo:false});
+      await supaPatch('timbrado_terminales','licencia_email=eq.'+encodeURIComponent(SE)+'&terminal=eq.'+encodeURIComponent(a.terminal),{activo:false});
     }
     await cargarTimbradosDesdeSupabase();
     toast('Terminal desasignada');
-  } catch(e){ alert('Error: '+e.message); }
+  }catch(e){alert('Error: '+e.message);}
   await abrirModalAsignar(timIdx);
 }
 
 
+// ── GUARDAR / EDITAR / ELIMINAR TIMBRADO ──────────────────
+async function guardarTim(){
+  var nro=document.getElementById('mNro').value.trim();
+  var vigIni=document.getElementById('mVigIni').value;
+  var vigFin=document.getElementById('mVigFin').value;
+  var suc=pad3(document.getElementById('mSuc').value||'001');
+  var desde=parseInt(document.getElementById('mDesde').value)||1;
+  var hasta=parseInt(document.getElementById('mHasta').value)||5000;
+  var nomSuc=document.getElementById('mNomSuc').value.trim();
+  var tipo=document.getElementById('mTipo').value;
+  var certV=document.getElementById('mCertVenc')?document.getElementById('mCertVenc').value:null;
+  var certE=document.getElementById('mCertEmis')?document.getElementById('mCertEmis').value.trim():null;
+
+  if(!nro||nro.length!==8){alert('El timbrado debe tener 8 dígitos');return;}
+  if(!vigIni){alert('Ingresá inicio de vigencia');return;}
+  if(tipo!=='electronico'&&!vigFin){alert('Ingresá fin de vigencia');return;}
+
+  var btnG=document.querySelector('button[onclick="guardarTim()"]');
+  if(btnG){btnG.disabled=true;btnG.textContent='Guardando...';}
+
+  try{
+    var data={
+      licencia_email:SE,nro:nro,tipo:tipo,
+      vig_ini:vigIni||null,vig_fin:tipo==='electronico'?null:(vigFin||null),
+      sucursal:suc,nombre_suc:nomSuc||null,
+      desde:desde,hasta:tipo==='electronico'?9999999:hasta,
+      cert_venc:certV||null,cert_emis:certE||null,activo:true
+    };
+    var result=await supaPost('timbrados',data,'licencia_email,nro');
+    var saved=Array.isArray(result)?result[0]:result;
+    if(!saved||!saved.id) throw new Error('Sin ID: '+JSON.stringify(result));
+    console.log('[guardarTim] OK ID:',saved.id);
+    closeMTim();
+    await refreshTimListaFromServer();
+    toast(timEditIdx!==null?'Timbrado actualizado':'Timbrado guardado');
+  }catch(e){
+    alert('Error al guardar: '+e.message);
+    console.error('[guardarTim]',e.message);
+  }
+  if(btnG){btnG.disabled=false;btnG.textContent='GUARDAR';}
+}
+
+async function elimTim(i){
+  if(!confirm('Eliminar este timbrado?')) return;
+  var t=timbrados[i];
+  try{
+    if(t._db_id){
+      await supaPatch('timbrados','id=eq.'+t._db_id,{activo:false});
+    } else {
+      await supaPatch('timbrados','licencia_email=eq.'+encodeURIComponent(SE)+'&nro=eq.'+t.nro,{activo:false});
+    }
+    await refreshTimListaFromServer();
+    toast('Timbrado eliminado');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+function editTim(i){
+  timEditIdx=i;
+  var t=timbrados[i];
+  document.getElementById('mTimTitle').textContent='Editar Punto de Expedición';
+  document.getElementById('mNro').value=t.nro||'';
+  document.getElementById('mVigIni').value=t.vig_ini||'';
+  document.getElementById('mVigFin').value=t.vig_fin||'';
+  document.getElementById('mSuc').value=t.sucursal||'001';
+  document.getElementById('mPEx').value='001';
+  document.getElementById('mDesde').value=t.desde||'1';
+  document.getElementById('mHasta').value=t.hasta||'5000';
+  document.getElementById('mNomSuc').value=t.nombre_suc||'';
+  document.getElementById('mTipo').value=t.tipo||'autoimpresor';
+  selTipo(t.tipo||'autoimpresor');
+  if(document.getElementById('mCertVenc')) document.getElementById('mCertVenc').value=t.cert_venc||'';
+  if(document.getElementById('mCertEmis')) document.getElementById('mCertEmis').value=t.cert_emis||'';
+  updPrev();
+  document.getElementById('mTimOv').style.display='flex';
+}
+
+// ── MODAL TIMBRADO ────────────────────────────────────────
+function abrirMTim(){
+  timEditIdx=null;
+  document.getElementById('mTimTitle').textContent='Nuevo Punto de Expedición';
+  ['mNro','mVigIni','mVigFin','mNomSuc'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('mSuc').value='001';
+  document.getElementById('mPEx').value='001';
+  document.getElementById('mDesde').value='1';
+  document.getElementById('mHasta').value='5000';
+  selTipo('autoimpresor');
+  updPrev();
+  document.getElementById('mTimOv').style.display='flex';
+}
+
+function closeMTim(){document.getElementById('mTimOv').style.display='none';}
+
+function selTipo(t){
+  document.getElementById('mTipo').value=t;
+  var bA=document.getElementById('btnAuto'),bE=document.getElementById('btnElec');
+  bA.style.background=t==='autoimpresor'?'var(--g2)':'#1e1e1e';
+  bA.style.borderColor=t==='autoimpresor'?'var(--green)':'#333';
+  bA.style.color=t==='autoimpresor'?'var(--green)':'var(--muted)';
+  bE.style.background=t==='electronico'?'var(--b2)':'#1e1e1e';
+  bE.style.borderColor=t==='electronico'?'var(--blue)':'#333';
+  bE.style.color=t==='electronico'?'var(--blue)':'var(--muted)';
+  var vigFin=document.getElementById('mVigFin');
+  var hasta=document.getElementById('mHasta');
+  var certRow=document.getElementById('certRow');
+  var vigFinRow=document.getElementById('vigFinRow');
+  if(t==='electronico'){
+    if(vigFin){vigFin.value='2999-12-31';vigFin.readOnly=true;vigFin.style.color='#555';}
+    if(hasta){hasta.value='9999999';hasta.readOnly=true;hasta.style.color='#555';}
+    if(certRow) certRow.style.display='block';
+    if(vigFinRow) vigFinRow.style.opacity='.5';
+  } else {
+    if(vigFin){vigFin.value='';vigFin.readOnly=false;vigFin.style.color='#fff';}
+    if(hasta){hasta.value='5000';hasta.readOnly=false;hasta.style.color='#fff';}
+    if(certRow) certRow.style.display='none';
+    if(vigFinRow) vigFinRow.style.opacity='1';
+  }
+  updPrev();
+}
+
+function updPrev(){
+  var nro=document.getElementById('mNro').value||'________';
+  var ini=document.getElementById('mVigIni').value||'';
+  var fin=document.getElementById('mVigFin').value||'';
+  var suc=pad3(document.getElementById('mSuc').value||'001');
+  var pex=pad3(document.getElementById('mPEx').value||'001');
+  var desde=String(document.getElementById('mDesde').value||'1').padStart(7,'0');
+  var hasta=String(document.getElementById('mHasta').value||'5000').padStart(7,'0');
+  var nom=document.getElementById('mNomSuc').value||'';
+  var tipo=document.getElementById('mTipo').value||'autoimpresor';
+  var certV=document.getElementById('mCertVenc')?document.getElementById('mCertVenc').value:'';
+  var prev=document.getElementById('mPrev');
+  if(!prev) return;
+  var certAlert='';
+  if(tipo==='electronico'&&certV){
+    var dias=Math.ceil((new Date(certV+' 00:00:00')-new Date())/(1000*60*60*24));
+    if(dias<0) certAlert='<div style="background:rgba(239,83,80,.15);border:1px solid var(--red);border-radius:6px;padding:6px 10px;margin-top:6px;font-size:11px;color:var(--red);">⚠️ CERTIFICADO VENCIDO hace '+Math.abs(dias)+' días</div>';
+    else if(dias<=30) certAlert='<div style="background:rgba(255,152,0,.15);border:1px solid var(--orange);border-radius:6px;padding:6px 10px;margin-top:6px;font-size:11px;color:var(--orange);">⚠️ Certificado vence en '+dias+' días</div>';
+  }
+  prev.innerHTML='<div style="color:#555;margin-bottom:4px;font-size:10px;">── VISTA PREVIA ──</div>'+
+    '<div><span style="color:#666">TIMBRADO: </span><span style="color:#4caf50;font-weight:700">'+nro+'</span></div>'+
+    '<div><span style="color:#666">Tipo: </span><span style="color:#ccc">'+(tipo==='electronico'?'Electrónico':'Autoimpresor')+'</span></div>'+
+    '<div><span style="color:#666">Vigencia: </span><span style="color:#ccc">'+fmt(ini)+' al '+(tipo==='electronico'?'<span style="color:#555">Sin límite</span>':fmt(fin))+'</span></div>'+
+    '<div><span style="color:#666">Sucursal: </span><span style="color:#ccc">'+suc+(nom?' ('+nom+')':'')+'</span></div>'+
+    '<div><span style="color:#666">Pto.Exp.: </span><span style="color:#ccc">'+pex+'</span></div>'+
+    '<div><span style="color:#555;font-size:10px;">── EJEMPLO ──</span></div>'+
+    '<div style="color:#aaa">Factura N° '+suc+'-'+pex+'-<span style="color:#4caf50">0000001</span></div>'+certAlert;
+}
+
+// ── SUCURSALES ────────────────────────────────────────────
+async function renderSucursalesTab(tc){
+  tc.innerHTML='<div class="loading"><span class="sp"></span>Cargando...</div>';
+  try{
+    var fd=getFD('mes');
+    var v=await sg('pos_ventas','licencia_email=eq.'+encodeURIComponent(SE)+'&fecha=gte.'+fd.d+'&fecha=lte.'+fd.h+'&select=sucursal,total&limit=500');
+    var m={};
+    v.forEach(function(x){var s=x.sucursal||'Principal';if(!m[s])m[s]={tot:0,ops:0};m[s].tot+=x.total||0;m[s].ops++;});
+    tc.innerHTML=Object.entries(m).length?Object.entries(m).map(function(entry){var s=entry[0];var d=entry[1];return '<div class="li"><div class="li-ic" style="background:var(--g2);color:var(--green)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="li-inf"><div class="li-t">'+s+'</div><div class="li-s">'+d.ops+' ventas este mes</div></div><div class="li-r"><div class="li-v" style="color:var(--green)">'+gs(d.tot)+'</div></div></div>';}).join(''):'<div class="empty"><div class="empty-i">🏢</div><div class="empty-t">Sin sucursales</div></div>';
+  }catch(e){tc.innerHTML='<div class="loading">Sin datos</div>';}
+}
+
 // ── CONFIG ────────────────────────────────────────────────
 async function renderConfig(){
-  // Intentar cargar config desde Supabase
-  let saved = {};
-  try {
-    const rows = await sg('pos_config','licencia_email=eq.'+encodeURIComponent(SE)+'&clave=eq.negocio_config');
-    if(rows && rows[0]) saved = JSON.parse(rows[0].valor||'{}');
-  } catch(e){}
-  // Merge con localStorage como fallback
-  const v = k => saved[k] || localStorage.getItem(k) || '';
-
-  document.getElementById('content').innerHTML=`
-  <div class="ph">
-    <div><div class="pt">Configuración</div><div class="ps">Datos del negocio y terminales</div></div>
-    <button class="btn-sv" onclick="saveConf()">GUARDAR</button>
-  </div>
-
-  <div class="cfg-s">
-    <div class="cfg-st">Datos del negocio (se muestran en recibos y facturas)</div>
-    <div class="cfg-r">
-      <div><div class="cfg-rl">Razón social / Nombre</div><div class="cfg-rs">Nombre legal del negocio</div></div>
-      <input class="cfg-inp" id="cfgN" placeholder="Ej: PIZZA EXPRESS SRL" value="${v('an')}">
-    </div>
-    <div class="cfg-r">
-      <div><div class="cfg-rl">RUC</div><div class="cfg-rs">Número de RUC con dígito verificador</div></div>
-      <input class="cfg-inp" id="cfgRuc" placeholder="Ej: 80012345-6" value="${v('ar')}">
-    </div>
-    <div class="cfg-r">
-      <div><div class="cfg-rl">Dirección</div><div class="cfg-rs">Dirección del local principal</div></div>
-      <input class="cfg-inp" id="cfgD" placeholder="Ej: Av. Mcal. López 1234" value="${v('ad')}">
-    </div>
-    <div class="cfg-r">
-      <div><div class="cfg-rl">Ciudad</div></div>
-      <input class="cfg-inp" id="cfgCiudad" placeholder="Ej: Asunción" value="${v('ciudad')}">
-    </div>
-    <div class="cfg-r">
-      <div><div class="cfg-rl">Teléfono</div></div>
-      <input class="cfg-inp" id="cfgT" placeholder="Ej: 021 123 456" value="${v('at')}">
-    </div>
-    <div class="cfg-r">
-      <div><div class="cfg-rl">Email del negocio</div></div>
-      <input class="cfg-inp" id="cfgEmail" type="email" placeholder="negocio@email.com" value="${v('email_negocio')}">
-    </div>
-    <div class="cfg-r">
-      <div><div class="cfg-rl">Sitio web</div></div>
-      <input class="cfg-inp" id="cfgWeb" placeholder="www.minegocio.com.py" value="${v('web')}">
-    </div>
-  </div>
-
-  <div class="cfg-s">
-    <div class="cfg-st">Configuración de terminales</div>
-    <div class="cfg-r">
-      <div><div class="cfg-rl">Pie de recibo</div><div class="cfg-rs">Mensaje al final del ticket</div></div>
-      <input class="cfg-inp" id="cfgPie" placeholder="Ej: ¡Gracias por su compra!" value="${v('pie_recibo')}">
-    </div>
-    <div class="cfg-r">
-      <div><div class="cfg-rl">Mostrar RUC en recibo</div></div>
-      <select class="cfg-inp" id="cfgMostrarRuc" style="min-width:120px;">
-        <option value="1" ${v('mostrar_ruc')!=='0'?'selected':''}>Sí</option>
-        <option value="0" ${v('mostrar_ruc')==='0'?'selected':''}>No</option>
-      </select>
-    </div>
-    <div class="cfg-r">
-      <div><div class="cfg-rl">Moneda</div></div>
-      <select class="cfg-inp" id="cfgMoneda" style="min-width:120px;">
-        <option value="GS" ${(v('moneda')||'GS')==='GS'?'selected':''}>₲ Guaraníes</option>
-        <option value="USD" ${v('moneda')==='USD'?'selected':''}>$ Dólares</option>
-      </select>
-    </div>
-  </div>
-
-  <div class="cfg-s">
-    <div class="cfg-st">Licencia</div>
-    <div class="cfg-r">
-      <div><div class="cfg-rl">Email registrado</div><div class="cfg-rs">${SE||'—'}</div></div>
-      <span class="tag tag-g">Plan ${SP||'—'}</span>
-    </div>
-    <div class="cfg-r"><div><div class="cfg-rl">Vencimiento</div><div class="cfg-rs">${SV||'—'}</div></div></div>
-  </div>
-
-  <div class="cfg-s">
-    <div class="cfg-st">Sesión</div>
-    <div class="cfg-r">
-      <div><div class="cfg-rl">Cerrar sesión</div><div class="cfg-rs">Se limpiará la sesión del dispositivo</div></div>
-      <button class="btn-dn" onclick="doLogout()">SALIR</button>
-    </div>
-  </div>`;
+  var v=function(k){return localStorage.getItem(k)||'';};
+  document.getElementById('content').innerHTML='<div class="ph"><div><div class="pt">Configuración</div><div class="ps">Datos del negocio y terminales</div></div><button class="btn-sv" onclick="saveConf()">GUARDAR</button></div><div class="cfg-s"><div class="cfg-st">Datos del negocio</div><div class="cfg-r"><div><div class="cfg-rl">Razón social</div></div><input class="cfg-inp" id="cfgN" value="'+v('an')+'"></div><div class="cfg-r"><div><div class="cfg-rl">RUC</div></div><input class="cfg-inp" id="cfgRuc" value="'+v('ar')+'"></div><div class="cfg-r"><div><div class="cfg-rl">Dirección</div></div><input class="cfg-inp" id="cfgD" value="'+v('ad')+'"></div><div class="cfg-r"><div><div class="cfg-rl">Teléfono</div></div><input class="cfg-inp" id="cfgT" value="'+v('at')+'"></div></div><div class="cfg-s"><div class="cfg-st">Licencia</div><div class="cfg-r"><div><div class="cfg-rl">Email</div><div class="cfg-rs">'+(SE||'—')+'</div></div><span class="tag tag-g">Plan '+(SP||'—')+'</span></div></div><div class="cfg-s"><div class="cfg-st">Sesión</div><div class="cfg-r"><div><div class="cfg-rl">Cerrar sesión</div></div><button class="btn-dn" onclick="doLogout()">SALIR</button></div></div>';
 }
+
 async function saveConf(){
-  const cfg = {
-    an:            document.getElementById('cfgN')?.value||'',
-    ar:            document.getElementById('cfgRuc')?.value||'',
-    ad:            document.getElementById('cfgD')?.value||'',
-    ciudad:        document.getElementById('cfgCiudad')?.value||'',
-    at:            document.getElementById('cfgT')?.value||'',
-    email_negocio: document.getElementById('cfgEmail')?.value||'',
-    web:           document.getElementById('cfgWeb')?.value||'',
-    pie_recibo:    document.getElementById('cfgPie')?.value||'',
-    mostrar_ruc:   document.getElementById('cfgMostrarRuc')?.value||'1',
-    moneda:        document.getElementById('cfgMoneda')?.value||'GS',
-  };
-  // Guardar en localStorage
-  Object.entries(cfg).forEach(([k,v])=>localStorage.setItem(k,v));
-  // Actualizar sidebar
+  var cfg={an:document.getElementById('cfgN').value,ar:document.getElementById('cfgRuc').value,ad:document.getElementById('cfgD').value,at:document.getElementById('cfgT').value};
+  Object.entries(cfg).forEach(function(e){localStorage.setItem(e[0],e[1]);});
   document.getElementById('sbNeg').textContent=cfg.an||'Mi Negocio';
-
-  // Guardar en Supabase
-  try {
-    const payload = {
-      licencia_email: SE,
-      clave: 'negocio_config',
-      valor: JSON.stringify(cfg),
-      updated_at: new Date().toISOString()
-    };
-    // Intentar PATCH primero, luego POST
-    const existing = await sg('pos_config','licencia_email=eq.'+encodeURIComponent(SE)+'&clave=eq.negocio_config');
-    if(existing && existing.length > 0){
-      await fetch(SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(SE)+'&clave=eq.negocio_config',{
-        method:'PATCH',
-        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json'},
-        body:JSON.stringify(payload)
-      });
-    } else {
-      await fetch(SUPA_URL+'/rest/v1/pos_config',{
-        method:'POST',
-        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body:JSON.stringify(payload)
-      });
-    }
-    toast('✓ Configuración guardada y sincronizada');
-  } catch(e){
-    toast('✓ Guardado localmente (sin conexión)');
-  }
+  try{
+    await supaPost('pos_config',{licencia_email:SE,clave:'negocio_config',valor:JSON.stringify(cfg)},'licencia_email,clave');
+    toast('✓ Guardado y sincronizado');
+  }catch(e){toast('✓ Guardado localmente');}
 }
 
-// ── ASIGNACIÓN DE TERMINALES ─────────────────────────────
-function elimAsig(j){
-  const timIdx = parseInt(document.getElementById('mAsignarOv').dataset.timIdx);
-  if(!confirm('¿Quitar esta terminal?')) return;
-  timbrados[timIdx].asignaciones.splice(j,1);
-  abrirModalAsignar(timIdx); // refrescar
-}
-
-async function agregarAsig(){
-  const timIdx  = parseInt(document.getElementById('mAsignarOv').dataset.timIdx);
-  const t       = timbrados[timIdx];
-  const terminal= document.getElementById('asigTerminal').value.trim();
-  const ptoExp  = document.getElementById('asigPtoExp').value.trim().padStart(3,'0');
-  const desde   = parseInt(document.getElementById('asigDesde').value)||1;
-
-  if(!terminal){ alert('Ingresá el nombre de la terminal'); return; }
-  if(!ptoExp||ptoExp==='000'){ alert('Ingresá el punto de expedición'); return; }
-
-  if(!timbrados[timIdx].asignaciones) timbrados[timIdx].asignaciones=[];
-
-  // Verificar duplicado de punto de expedición
-  if(timbrados[timIdx].asignaciones.find(a=>a.punto_exp===ptoExp)){
-    alert('El punto de expedición '+ptoExp+' ya está asignado a otra terminal de este timbrado');
-    return;
-  }
-
-  timbrados[timIdx].asignaciones.push({
-    terminal,
-    punto_exp: ptoExp,
-    nro_actual: desde,
-    hasta: t.tipo==='electronico' ? 9999999 : (t.hasta||5000),
-  });
-
-  // Autosugerir siguiente pto exp
-  const maxPto = timbrados[timIdx].asignaciones.reduce((m,a)=>Math.max(m,parseInt(a.punto_exp)||0),0);
-  document.getElementById('asigPtoExp').value = String(maxPto+1).padStart(3,'0');
-  document.getElementById('asigTerminal').value='';
-  document.getElementById('asigDesde').value='1';
-
-  abrirModalAsignar(timIdx); // refrescar lista
-}
-
-function cerrarModalAsignar(){
-  document.getElementById('mAsignarOv').style.display='none';
-}
-
-function guardarAsignaciones(){
-  const timIdx = parseInt(document.getElementById('mAsignarOv').dataset.timIdx);
-  timbrados[timIdx].seleccionado = true;
-
-  // Guardar mapa: sucursal → timIdx
-  const sucursal = timbrados[timIdx].asignado_a || timbrados[timIdx].nombre_suc || 'Principal';
-  timbrados[timIdx].asignado_a = sucursal;
-  const mapa = JSON.parse(localStorage.getItem('pos_timbrados_mapa')||'{}');
-  mapa[sucursal] = timIdx;
-  localStorage.setItem('pos_timbrados_mapa', JSON.stringify(mapa));
-
-  // También guardar mapa terminal → {timIdx, ptoExp}
-  const mapaTerm = JSON.parse(localStorage.getItem('pos_timbrados_term')||'{}');
-  (timbrados[timIdx].asignaciones||[]).forEach(a=>{
-    mapaTerm[a.terminal] = { timIdx, punto_exp: a.punto_exp };
-  });
-  localStorage.setItem('pos_timbrados_term', JSON.stringify(mapaTerm));
-
-  saveTims();
-  localStorage.setItem('pos_timbrado_activo', JSON.stringify(timbrados[timIdx]));
-  cerrarModalAsignar();
-  refreshTimLista();
-  const n = (timbrados[timIdx].asignaciones||[]).length;
-  toast('✓ '+n+' terminal'+(n!==1?'es':'')+' asignada'+(n!==1?'s':'')+' al timbrado '+timbrados[timIdx].nro);
-}
-
-// ── AUTO LOGIN ─────────────────────────────────────────────
+// ── AUTO LOGIN ────────────────────────────────────────────
 (function(){
-  const e=localStorage.getItem('ae'),p=localStorage.getItem('ap'),v=localStorage.getItem('av');
+  var e=localStorage.getItem('ae'),p=localStorage.getItem('ap'),v=localStorage.getItem('av');
   if(e&&p){SE=e;SP=p;SV=v;showApp();}
 })();
+
+
 </script>
 
 <!-- MODAL ASIGNACIÓN TERMINALES -->
@@ -906,8 +1062,7 @@ function guardarAsignaciones(){
     </div>
     <div id="mAsignarBody" style="padding:0 18px;"></div>
     <div style="padding:14px 18px 36px;display:flex;gap:10px;">
-      <button onclick="cerrarModalAsignar()" style="flex:1;background:#2a2a2a;border:none;border-radius:8px;color:#aaa;font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;padding:13px;cursor:pointer;">CANCELAR</button>
-      <button onclick="guardarAsignaciones()" style="flex:2;background:var(--green);border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;padding:13px;cursor:pointer;">GUARDAR ASIGNACIONES</button>
+
     </div>
   </div>
 </div>
