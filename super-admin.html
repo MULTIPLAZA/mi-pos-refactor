@@ -230,6 +230,7 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
       <div class="sb-i" onclick="nav('cli',this,'Clientes')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Clientes</div>
       <div class="sb-i" onclick="nav('ter',this,'Terminales')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Terminales</div>
       <div class="sb-i" onclick="nav('rep',this,'Reportes')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reportes</div>
+      <div class="sb-i" onclick="nav('ruc',this,'Contribuyentes')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>Contribuyentes</div>
     </div>
     <div class="sb-ft">
       <div class="sb-av">A</div>
@@ -293,6 +294,74 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
     <!-- REPORTES -->
     <div class="page" id="pRep">
       <div class="ph"><div><div class="ph-t">Reportes</div><div class="ph-s">Visión global del negocio</div></div></div>
+
+  <!-- PAGE: CONTRIBUYENTES RUC -->
+  <div class="page" id="pRuc" style="display:none;">
+    <div class="ph">
+      <div>
+        <div class="pt">Contribuyentes RUC</div>
+        <div class="ps">Importar y consultar base de datos del SET/DNIT</div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="kg" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;">
+      <div class="kc" style="--c:var(--green)"><div class="kc-l">Total registros</div><div class="kc-v" id="rucTotal">—</div><div class="kc-s">en base de datos</div></div>
+      <div class="kc" style="--c:var(--blue)"><div class="kc-l">Activos</div><div class="kc-v" id="rucActivos">—</div></div>
+      <div class="kc" style="--c:var(--muted)"><div class="kc-l">Última importación</div><div class="kc-v" id="rucUltima" style="font-size:14px;">—</div></div>
+    </div>
+
+    <!-- Importar archivos -->
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-h"><span class="card-t">📥 Importar archivos TXT del SET</span></div>
+      <div style="padding:16px;">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6;">
+          Seleccioná uno o varios archivos TXT del SET (ruc1.txt, ruc2.txt... ruc9.txt).<br>
+          El formato esperado es: <code style="background:#1e1e1e;padding:2px 6px;border-radius:4px;">RUC|RAZON_SOCIAL|DV|CODIGO|ESTADO|</code>
+        </div>
+
+        <!-- Drop zone -->
+        <div id="rucDropZone" style="border:2px dashed #2a2a2a;border-radius:10px;padding:30px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:14px;"
+          onclick="document.getElementById('rucFileInput').click()"
+          ondragover="event.preventDefault();this.style.borderColor='var(--green)'"
+          ondragleave="this.style.borderColor='#2a2a2a'"
+          ondrop="event.preventDefault();this.style.borderColor='#2a2a2a';handleRucFiles(event.dataTransfer.files)">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.5" style="margin-bottom:8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div style="font-size:14px;font-weight:700;color:#aaa;margin-bottom:4px;">Arrastrá los archivos acá</div>
+          <div style="font-size:12px;color:#555;">o hacé click para seleccionar</div>
+          <input type="file" id="rucFileInput" accept=".txt" multiple style="display:none" onchange="handleRucFiles(this.files)">
+        </div>
+
+        <!-- Progress -->
+        <div id="rucProgress" style="display:none;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-size:13px;font-weight:700;" id="rucProgressLabel">Procesando...</span>
+            <span style="font-size:12px;color:var(--muted);" id="rucProgressPct">0%</span>
+          </div>
+          <div style="background:#1e1e1e;border-radius:4px;height:8px;overflow:hidden;margin-bottom:8px;">
+            <div id="rucProgressBar" style="height:100%;width:0%;background:var(--green);border-radius:4px;transition:width .3s;"></div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);" id="rucProgressDetail"></div>
+        </div>
+
+        <!-- Log -->
+        <div id="rucLog" style="display:none;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;max-height:200px;overflow-y:auto;color:#aaa;"></div>
+      </div>
+    </div>
+
+    <!-- Buscar contribuyente -->
+    <div class="card">
+      <div class="card-h"><span class="card-t">🔍 Consultar contribuyente</span></div>
+      <div style="padding:16px;">
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <input id="rucBuscarInput" type="text" placeholder="Ingresá RUC o nombre..." 
+            style="flex:1;background:#1e1e1e;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:10px 14px;outline:none;"
+            oninput="buscarRucAdmin(this.value)">
+        </div>
+        <div id="rucResultados"></div>
+      </div>
+    </div>
+  </div>
       <div class="kg k4">
         <div class="kc" style="--c:var(--green)"><div class="kc-l">Activas</div><div class="kc-v" id="rA">—</div></div>
         <div class="kc" style="--c:var(--blue)"><div class="kc-l">Terminales</div><div class="kc-v" id="rT">—</div></div>
@@ -336,7 +405,7 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
     <div class="bn" onclick="nav('ter',this,'Terminales')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Terminales</div>
     <div class="bn" onclick="nav('rep',this,'Reportes')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reportes</div>
     <div class="bn" onclick="nav('ruc',this,'RUC')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg><span>RUC</span></div>
-      <div class="sb-i" onclick="nav('ruc',this,'Contribuyentes')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>Contribuyentes</div>
+      
   </div>
 
 </div><!-- /app -->
@@ -444,73 +513,7 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
   </div>
 
 
-  <!-- PAGE: CONTRIBUYENTES RUC -->
-  <div class="page" id="pRuc">
-    <div class="ph">
-      <div>
-        <div class="pt">Contribuyentes RUC</div>
-        <div class="ps">Importar y consultar base de datos del SET/DNIT</div>
-      </div>
-    </div>
-
-    <!-- Stats -->
-    <div class="kg" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;">
-      <div class="kc" style="--c:var(--green)"><div class="kc-l">Total registros</div><div class="kc-v" id="rucTotal">—</div><div class="kc-s">en base de datos</div></div>
-      <div class="kc" style="--c:var(--blue)"><div class="kc-l">Activos</div><div class="kc-v" id="rucActivos">—</div></div>
-      <div class="kc" style="--c:var(--muted)"><div class="kc-l">Última importación</div><div class="kc-v" id="rucUltima" style="font-size:14px;">—</div></div>
-    </div>
-
-    <!-- Importar archivos -->
-    <div class="card" style="margin-bottom:20px;">
-      <div class="card-h"><span class="card-t">📥 Importar archivos TXT del SET</span></div>
-      <div style="padding:16px;">
-        <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6;">
-          Seleccioná uno o varios archivos TXT del SET (ruc1.txt, ruc2.txt... ruc9.txt).<br>
-          El formato esperado es: <code style="background:#1e1e1e;padding:2px 6px;border-radius:4px;">RUC|RAZON_SOCIAL|DV|CODIGO|ESTADO|</code>
-        </div>
-
-        <!-- Drop zone -->
-        <div id="rucDropZone" style="border:2px dashed #2a2a2a;border-radius:10px;padding:30px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:14px;"
-          onclick="document.getElementById('rucFileInput').click()"
-          ondragover="event.preventDefault();this.style.borderColor='var(--green)'"
-          ondragleave="this.style.borderColor='#2a2a2a'"
-          ondrop="event.preventDefault();this.style.borderColor='#2a2a2a';handleRucFiles(event.dataTransfer.files)">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.5" style="margin-bottom:8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <div style="font-size:14px;font-weight:700;color:#aaa;margin-bottom:4px;">Arrastrá los archivos acá</div>
-          <div style="font-size:12px;color:#555;">o hacé click para seleccionar</div>
-          <input type="file" id="rucFileInput" accept=".txt" multiple style="display:none" onchange="handleRucFiles(this.files)">
-        </div>
-
-        <!-- Progress -->
-        <div id="rucProgress" style="display:none;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <span style="font-size:13px;font-weight:700;" id="rucProgressLabel">Procesando...</span>
-            <span style="font-size:12px;color:var(--muted);" id="rucProgressPct">0%</span>
-          </div>
-          <div style="background:#1e1e1e;border-radius:4px;height:8px;overflow:hidden;margin-bottom:8px;">
-            <div id="rucProgressBar" style="height:100%;width:0%;background:var(--green);border-radius:4px;transition:width .3s;"></div>
-          </div>
-          <div style="font-size:12px;color:var(--muted);" id="rucProgressDetail"></div>
-        </div>
-
-        <!-- Log -->
-        <div id="rucLog" style="display:none;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;max-height:200px;overflow-y:auto;color:#aaa;"></div>
-      </div>
-    </div>
-
-    <!-- Buscar contribuyente -->
-    <div class="card">
-      <div class="card-h"><span class="card-t">🔍 Consultar contribuyente</span></div>
-      <div style="padding:16px;">
-        <div style="display:flex;gap:8px;margin-bottom:12px;">
-          <input id="rucBuscarInput" type="text" placeholder="Ingresá RUC o nombre..." 
-            style="flex:1;background:#1e1e1e;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:10px 14px;outline:none;"
-            oninput="buscarRucAdmin(this.value)">
-        </div>
-        <div id="rucResultados"></div>
-      </div>
-    </div>
-  </div></div>
+</div>
 
 <!-- TOAST -->
 <div class="toast" id="toast">
@@ -592,20 +595,30 @@ function logout(){
 
 // ── NAV ──────────────────────────────────────────────────
 function nav(p,el,title){
-  document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));
-  document.querySelectorAll('.bn,.sb-i').forEach(x=>x.classList.remove('on'));
-  const pid={lic:'pLic',cli:'pCli',ter:'pTer',rep:'pRep',ruc:'pRuc'}[p];
-  if(pid) document.getElementById(pid).classList.add('on');
-  // Activate matching nav items
-  document.querySelectorAll('.bn,.sb-i').forEach(x=>{
+  // Hide all pages
+  ['pLic','pCli','pTer','pRep','pRuc'].forEach(function(id){
+    var el2 = document.getElementById(id);
+    if(el2) el2.style.display='none';
+  });
+  // Show target page
+  var pageMap = {lic:'pLic',cli:'pCli',ter:'pTer',rep:'pRep',ruc:'pRuc'};
+  var pid = pageMap[p];
+  if(pid){
+    var page = document.getElementById(pid);
+    if(page) page.style.display='block';
+  }
+  // Nav highlights
+  document.querySelectorAll('.bn,.sb-i').forEach(function(x){ x.classList.remove('on'); });
+  document.querySelectorAll('.bn,.sb-i').forEach(function(x){
     if(x.getAttribute('onclick')&&x.getAttribute('onclick').includes("'"+p+"'")) x.classList.add('on');
   });
-  document.getElementById('tbPage').textContent=title||p;
+  var tb = document.getElementById('tbPage');
+  if(tb) tb.textContent = title||p;
   if(p==='lic') loadL();
   if(p==='cli') loadCli();
   if(p==='ter') loadTer();
   if(p==='rep') loadRep();
-  if(p==='ruc'){ loadRuc(); document.getElementById('pRuc').classList.add('on'); }
+  if(p==='ruc') loadRuc();
 }
 
 // ── LICENCIAS ────────────────────────────────────────────
