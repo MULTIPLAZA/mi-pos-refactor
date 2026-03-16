@@ -963,11 +963,29 @@
   .npb.npok:active { background:var(--green-btn); }
 
   /* CATEGORY SHEET */
-  .cat-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:100; align-items:flex-end; }
+  /* ── CATEGORY OVERLAY ── */
+  .cat-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:100; align-items:flex-end; justify-content:center; }
   .cat-overlay.open { display:flex; }
-  .cat-sheet { background:#2a2a2a; width:100%; border-radius:14px 14px 0 0; padding:12px; animation:su .25s ease; max-height:55vh; overflow-y:auto; }
-  .cat-item { padding:15px 12px; font-size:15px; font-weight:600; cursor:pointer; border-radius:6px; }
-  .cat-item:active { background:#3a3a3a; }
+  .cat-sheet { background:var(--card); width:100%; max-width:600px; border-radius:16px 16px 0 0; padding:0 0 24px; animation:su .22s ease; max-height:70vh; overflow-y:auto; }
+  .cat-sheet-hdr { display:flex; align-items:center; justify-content:space-between; padding:14px 16px 10px; border-bottom:1px solid #222; }
+  .cat-sheet-ttl { font-size:12px; font-weight:700; color:var(--muted); letter-spacing:.8px; text-transform:uppercase; }
+  .cat-sheet-cls { background:none; border:none; color:var(--muted); cursor:pointer; font-size:20px; line-height:1; padding:0; }
+  .cat-item { display:flex; align-items:center; gap:10px; padding:14px 16px; font-size:15px; font-weight:600; cursor:pointer; color:#ccc; border-left:3px solid transparent; }
+  .cat-item:active { background:rgba(255,255,255,.04); }
+  .cat-item.sel { color:var(--green); border-left-color:var(--green); background:rgba(76,175,80,.07); }
+  .cat-item-ic { width:8px; height:8px; border-radius:50%; background:#444; flex-shrink:0; transition:background .15s; }
+  .cat-item.sel .cat-item-ic { background:var(--green); }
+
+  /* Desktop: pill bar */
+  @media(min-width:900px){
+    #catPillBar { display:flex !important; }
+    .cat-pill-bar { display:flex; gap:6px; padding:10px 16px 4px; overflow-x:auto; scrollbar-width:none; flex-shrink:0; }
+    .cat-pill-bar::-webkit-scrollbar { display:none; }
+    .cat-pill { flex-shrink:0; padding:6px 16px; border-radius:20px; font-size:13px; font-weight:700; cursor:pointer; border:1.5px solid #2a2a2a; background:transparent; color:#888; white-space:nowrap; font-family:inherit; transition:all .15s; }
+    .cat-pill.sel { background:var(--green); border-color:var(--green); color:#fff; }
+    .cat-pill:hover:not(.sel) { border-color:#555; color:#ddd; }
+    .filter-bar { display:none; }
+  }
   .cat-item.sel { color:var(--green); }
 
   @keyframes su { from{transform:translateY(100%)} to{transform:translateY(0)} }
@@ -2359,7 +2377,7 @@
     <button class="btn-cobrar"><span>COBRAR</span><span class="camount">₲0</span></button>
   </div>
   <div class="filter-bar">
-    <div class="fdrop"><span>Todos los artículos</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></div>
+    <div class="fdrop" onclick="openCat()"><span id="catLbl">Todos los artículos</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></div>
     <button class="fsearch"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
   </div>
   <div class="ccontent">
@@ -2414,7 +2432,9 @@
 
     <!-- Products view -->
     <div id="prodView" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
-      <div class="filter-bar">
+      <!-- Desktop pill bar -->
+  <div class="cat-pill-bar" id="catPillBar" style="display:none;"></div>
+  <div class="filter-bar">
         <div class="fdrop" onclick="openCat()"><span id="catLbl">Todos los artículos</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></div>
         <button class="fsearch" onclick="toggleSearch()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
       </div>
@@ -2678,7 +2698,13 @@
 
 <!-- CATEGORY SHEET -->
 <div class="cat-overlay" id="catOv" onclick="closeCat(event)">
-  <div class="cat-sheet" id="catSheetContent"></div>
+  <div class="cat-sheet">
+    <div class="cat-sheet-hdr">
+      <span class="cat-sheet-ttl">Categorías</span>
+      <button class="cat-sheet-cls" onclick="document.getElementById('catOv').classList.remove('open')">✕</button>
+    </div>
+    <div id="catSheetContent"></div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -2913,19 +2939,45 @@ function renderTkt(){
 function openCat(){
   const sheet = document.getElementById('catSheetContent');
   const todos = 'Todos los artículos';
-  let html = '<div class="cat-item ' + (curCat===todos?'sel':'') + '" onclick="pickCat(this)">' + todos + '</div>';
-  CATEGORIAS.forEach(c => {
-    html += '<div class="cat-item ' + (curCat===c.nombre?'sel':'') + '" onclick="pickCat(this)">' + c.nombre + '</div>';
-  });
-  // Agregar Descuentos si hay alguno creado
+
+  function catItem(nombre, color){
+    const sel = curCat===nombre;
+    const style = color ? 'color:'+color+';border-left-color:'+color+';' : '';
+    return '<div class="cat-item'+(sel?' sel':'')+'" onclick="pickCat(this)" style="'+style+'">'+
+      '<div class="cat-item-ic"></div>'+nombre+'</div>';
+  }
+
+  let html = catItem(todos);
+  CATEGORIAS.forEach(c => { html += catItem(c.nombre); });
+
+  // Descuentos si hay
   const hasDescs = DESCUENTOS.filter(d=>d.activo!==false).length ||
     PRODS.filter(p=>p.cat==='Descuentos'&&p.activo!==false).length;
   if(hasDescs){
-    html += '<div class="cat-item ' + (curCat==='Descuentos'?'sel':'') +
-      '" onclick="pickCat(this)" style="color:#ef5350;border-left:3px solid #ef5350;">🏷️ Descuentos</div>';
+    html += catItem('🏷️ Descuentos', '#ef5350');
   }
+
   sheet.innerHTML = html;
   document.getElementById('catOv').classList.add('open');
+
+  // Desktop: also update pill bar
+  renderCatPills();
+}
+
+function renderCatPills(){
+  const bar = document.getElementById('catPillBar');
+  if(!bar) return;
+  const todos = 'Todos los artículos';
+  const cats = [todos, ...CATEGORIAS.map(c=>c.nombre)];
+  const hasDescs = DESCUENTOS.filter(d=>d.activo!==false).length ||
+    PRODS.filter(p=>p.cat==='Descuentos'&&p.activo!==false).length;
+  if(hasDescs) cats.push('🏷️ Descuentos');
+
+  bar.innerHTML = cats.map(function(c){
+    const sel = curCat===c ? ' sel' : '';
+    const safe = c.replace(/"/g,'&quot;');
+    return '<button class="cat-pill'+sel+'" onclick="pickCat(this)">'+c+'</button>';
+  }).join('');
 }
 
 function renderCategoriasVenta(){
@@ -2935,8 +2987,11 @@ function renderCategoriasVenta(){
 function closeCat(e){ if(e.target===document.getElementById('catOv'))document.getElementById('catOv').classList.remove('open'); }
 function pickCat(el){
   const cat = typeof el === 'string' ? el : el.textContent.trim();
-  curCat=cat; document.getElementById('catLbl').textContent=cat;
+  curCat = cat;
+  const lbl = document.getElementById('catLbl');
+  if(lbl) lbl.textContent = cat;
   document.getElementById('catOv').classList.remove('open');
+  renderCatPills();
   filterP();
 }
 
@@ -5618,16 +5673,19 @@ async function onArtImgChange(input){
     console.log('[Imagen] Subida OK:', publicUrl);
 
   } catch(e){
-    console.error('[Imagen] Error:', e.message);
-    toast('⚠️ Storage falló, guardando local: '+e.message.substring(0,40));
-    // Fallback: guardar como base64
-    const reader = new FileReader();
-    reader.onload = function(ev){
-      artImagenBase64 = ev.target.result;
-      mostrarPreviewImagen(artImagenBase64, false);
-      console.log('[Imagen] Guardada como base64 (fallback), tamaño:', Math.round(ev.target.result.length/1024)+'KB');
-    };
-    reader.readAsDataURL(file);
+    console.error('[Imagen] Error Storage:', e.message);
+    toast('⚠️ Usando imagen local (ejecutá supabase_storage.sql)');
+    // Fallback: comprimir mucho y guardar como base64 pequeño
+    try {
+      const tiny = await comprimirImagen(file, 300, 0.6);
+      const reader = new FileReader();
+      reader.onload = function(ev){
+        artImagenBase64 = ev.target.result;
+        mostrarPreviewImagen(artImagenBase64, false);
+        console.log('[Imagen] Base64 fallback:', Math.round(ev.target.result.length/1024)+'KB');
+      };
+      reader.readAsDataURL(tiny);
+    } catch(e2){ console.error('[Imagen] Fallback error:', e2.message); }
   }
 }
 
@@ -6699,6 +6757,7 @@ async function supaLoadProductos(){
     curCat = 'Todos los artículos';
     const catLblEl = document.getElementById('catLbl');
     if(catLblEl) catLblEl.textContent = 'Todos los artículos';
+    renderCatPills();
     filterP();
     // Cargar descuentos en background
     try { await cargarDescuentosConfig(); } catch(ed){ console.warn('[Desc]', ed.message); }
