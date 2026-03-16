@@ -798,11 +798,10 @@
   /* FILTER */
   .filter-bar {
     background:var(--bg); display:flex; align-items:center;
-    height:48px; border-bottom:1px solid #3a3a3a; flex-shrink:0;
+    height:44px; border-bottom:1px solid #2a2a2a; flex-shrink:0;
   }
   .fdrop {
-    flex:1; display:flex; align-items:center; justify-content:space-between;
-    padding:0 14px; cursor:pointer; height:100%; border-right:1px solid #3a3a3a;
+    display:none !important;
   }
   .fdrop span { font-size:15px; color:#ddd; }
   .fsearch {
@@ -979,10 +978,38 @@
   /* Desktop: pill bar */
   @media(min-width:900px){
     #catPillBar { display:flex !important; }
-    .cat-pill-bar { display:flex; gap:6px; padding:10px 16px 4px; overflow-x:auto; scrollbar-width:none; flex-shrink:0; }
+    .cat-pill-bar {
+      display:flex !important;
+      gap:8px;
+      padding:10px 14px 8px;
+      overflow-x:auto;
+      scrollbar-width:none;
+      flex-shrink:0;
+      background:var(--bg);
+      border-bottom:1px solid #252525;
+    }
     .cat-pill-bar::-webkit-scrollbar { display:none; }
-    .cat-pill { flex-shrink:0; padding:6px 16px; border-radius:20px; font-size:13px; font-weight:700; cursor:pointer; border:1.5px solid #2a2a2a; background:transparent; color:#888; white-space:nowrap; font-family:inherit; transition:all .15s; }
-    .cat-pill.sel { background:var(--green); border-color:var(--green); color:#fff; }
+    .cat-pill {
+    flex-shrink:0;
+    padding:6px 16px;
+    border-radius:20px;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    border:1.5px solid #333;
+    background:transparent;
+    color:#999;
+    white-space:nowrap;
+    font-family:inherit;
+    transition:all .15s ease;
+    letter-spacing:.2px;
+  }
+    .cat-pill.sel {
+    background:var(--green);
+    border-color:var(--green);
+    color:#fff;
+    font-weight:700;
+  }
     .cat-pill:hover:not(.sel) { border-color:#555; color:#ddd; }
     .filter-bar { display:none; }
   }
@@ -2436,7 +2463,7 @@
     <!-- Products view -->
     <div id="prodView" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
       <!-- Desktop pill bar -->
-  <div class="cat-pill-bar" id="catPillBar" style="display:none;"></div>
+  <div class="cat-pill-bar" id="catPillBar"></div>
   <div class="filter-bar">
         <div class="fdrop" onclick="openCat()"><span id="catLbl">Todos los artículos</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></div>
         <button class="fsearch" onclick="toggleSearch()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
@@ -2836,8 +2863,8 @@ function filterP(){
            .filter(p=>!p.itemLibre && p.activo!==false && p.activo!==0);
   if(q) l = l.filter(p=>p.name.toLowerCase().includes(q));
 
-  // Ítem libre siempre al final (solo en vista de todos, sin búsqueda)
-  if(!q && (curCat==='Todos los artículos' || CATEGORIAS.some(c=>c.nombre===curCat))){
+  // Ítem libre siempre al final (en todas las vistas, sin búsqueda activa)
+  if(!q){
     const libre = PRODS.find(p=>p.itemLibre);
     if(libre) l = [...l, libre];
   }
@@ -2988,7 +3015,6 @@ function renderCatPills(){
 
   bar.innerHTML = cats.map(function(c){
     const sel = curCat===c ? ' sel' : '';
-    const safe = c.replace(/"/g,'&quot;');
     return '<button class="cat-pill'+sel+'" onclick="pickCat(this)">'+c+'</button>';
   }).join('');
 }
