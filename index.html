@@ -3201,33 +3201,56 @@ function onRucInput(){
 
 async function consultarRuc(){
   const rucRaw = document.getElementById('factRuc').value.trim();
-  const ruc = rucRaw.replace(/-/g,'').replace(/\./g,'');
+  const ruc = rucRaw.replace(/-/g,'').replace(/\./g,'').replace(/\s/g,'');
   if(!ruc){ setRucStatus('Ingresá un RUC o CI válido', 'error'); return; }
 
   setRucStatus('Consultando...', 'loading');
   document.getElementById('btnBuscarRuc').disabled = true;
 
   try {
-    // Intentar API real primero (cuando esté disponible en backend)
-    // Por ahora usar datos demo
-    await new Promise(r => setTimeout(r, 700)); // simular delay de red
-
-    // Buscar en demo data
-    const data = RUC_DEMO[ruc] || RUC_DEMO[ruc.slice(0,-1)];
-
-    if(data){
-      document.getElementById('factNombre').value = data.nombre;
-      if(data.direccion && !document.getElementById('factDireccion').value){
-        document.getElementById('factDireccion').value = data.direccion;
+    // Buscar en tabla contribuyentes de Supabase
+    const url = SUPA_URL + '/rest/v1/contribuyentes?ruc=eq.' + encodeURIComponent(ruc) + '&limit=1&select=ruc,nombre,tipo';
+    const resp = await fetch(url, {
+      headers: {
+        'apikey': SUPA_ANON,
+        'Authorization': 'Bearer ' + SUPA_ANON,
+        'Accept': 'application/json'
       }
-      setRucStatus('✓ Contribuyente encontrado', 'ok');
+    });
+
+    if(resp.ok){
+      const data = await resp.json();
+      if(data && data.length > 0){
+        const contrib = data[0];
+        document.getElementById('factNombre').value = contrib.nombre || '';
+        setRucStatus('✓ ' + (contrib.nombre || 'Contribuyente encontrado'), 'ok');
+      } else {
+        // No encontrado en Supabase — intentar con dígito verificador
+        const rucSinDv = ruc.length > 1 ? ruc.slice(0,-1) : ruc;
+        const url2 = SUPA_URL + '/rest/v1/contribuyentes?ruc=eq.' + encodeURIComponent(rucSinDv) + '&limit=1&select=ruc,nombre,tipo';
+        const resp2 = await fetch(url2, {
+          headers: {'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON, 'Accept': 'application/json'}
+        });
+        if(resp2.ok){
+          const data2 = await resp2.json();
+          if(data2 && data2.length > 0){
+            document.getElementById('factNombre').value = data2[0].nombre || '';
+            setRucStatus('✓ ' + (data2[0].nombre || 'Contribuyente encontrado'), 'ok');
+          } else {
+            setRucStatus('No encontrado — ingresá los datos manualmente', 'warn');
+            document.getElementById('factNombre').focus();
+          }
+        } else {
+          setRucStatus('No encontrado — ingresá los datos manualmente', 'warn');
+          document.getElementById('factNombre').focus();
+        }
+      }
     } else {
-      // Si no está en demo, dejar campos para ingreso manual
-      setRucStatus('No encontrado — ingresá los datos manualmente', 'warn');
-      document.getElementById('factNombre').focus();
+      setRucStatus('Error al consultar — ingresá los datos manualmente', 'error');
     }
   } catch(e) {
-    setRucStatus('Error de conexión — ingresá los datos manualmente', 'error');
+    setRucStatus('Sin conexión — ingresá los datos manualmente', 'warn');
+    document.getElementById('factNombre').focus();
   } finally {
     document.getElementById('btnBuscarRuc').disabled = false;
   }
@@ -3876,30 +3899,49 @@ function renderArtList(filter){
   filter = filter || '';
   const list = document.getElementById('artList');
   if(!list) return;
-  let items = PRODS.filter(p =>
-    !filter || p.name.toLowerCase().includes(filter.toLowerCase()) ||
-    (p.codigo && p.codigo.includes(filter))
-  );
-  if(!items.length){
-    list.innerHTML = '<div class="art-empty"><p>No hay artículos</p></div>';
-    return;
-  }
+
+  const activos = PRODS.filter(p => !p.itemLibre && p.activo !== false &&
+    (!filter || p.name.toLowerCase().includes(filter.toLowerCase()) ||
+     (p.codigo && p.codigo.includes(filter))));
+
+  const inactivos = PRODS.filter(p => !p.itemLibre && (p.activo === false || p.activo === 0) &&
+    (!filter || p.name.toLowerCase().includes(filter.toLowerCase()) ||
+     (p.codigo && p.codigo.includes(filter))));
+
   list.innerHTML = '';
-  items.forEach(p => {
+
+  function makeItem(p, inactive){
     const priceStr = p.precioVariable ? '<span style="color:#ff9800;font-size:12px;">Precio variable</span>' : gs(p.price);
     const ivaStr = p.iva==='exento' ? 'Exento' : 'IVA '+p.iva+'%';
     const div = document.createElement('div');
-    div.className = 'art-item';
-    div.onclick = () => editarArticulo(PRODS.indexOf(p));
+    div.className = 'art-item' + (inactive ? ' art-item-inactive' : '');
+    if(!inactive) div.onclick = () => editarArticulo(PRODS.indexOf(p));
     div.innerHTML =
-      '<div class="art-item-color" style="background:'+getProductColor(p)+'">'+p.name.substring(0,2)+'</div>'+
+      '<div class="art-item-color" style="background:'+(inactive?'#444':getProductColor(p))+';opacity:'+(inactive?'0.5':'1')+'">'+p.name.substring(0,2)+'</div>'+
       '<div class="art-item-info">'+
-        '<div class="art-item-name">'+p.name+'</div>'+
+        '<div class="art-item-name" style="'+(inactive?'color:#666;text-decoration:line-through;':'')+'">'+p.name+'</div>'+
         '<div class="art-item-meta"><span>'+p.cat+'</span><span>·</span><span>'+ivaStr+'</span>'+(p.codigo?'<span>·</span><span style="color:#666">'+p.codigo+'</span>':'')+'</div>'+
       '</div>'+
-      '<div class="art-item-price">'+priceStr+'</div>';
+      (inactive
+        ? '<button class="btn-reactivar" onclick="event.stopPropagation();reactivarArticulo('+PRODS.indexOf(p)+')">Activar</button>'
+        : '<div class="art-item-price">'+priceStr+'</div>');
     list.appendChild(div);
-  });
+  }
+
+  if(!activos.length && !inactivos.length){
+    list.innerHTML = '<div class="art-empty"><p>No hay artículos</p></div>';
+    return;
+  }
+
+  activos.forEach(p => makeItem(p, false));
+
+  if(inactivos.length){
+    const sep = document.createElement('div');
+    sep.style.cssText = 'padding:12px 16px 6px;font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;';
+    sep.textContent = 'Desactivados (' + inactivos.length + ')';
+    list.appendChild(sep);
+    inactivos.forEach(p => makeItem(p, true));
+  }
 }
 
 function filterArts(){
@@ -4040,13 +4082,18 @@ function guardarArticulo(){
   goTo('scArticulosList');
 }
 
-function eliminarArticulo(){
+async function eliminarArticulo(){
   if(artEditIdx < 0) return;
-  const nombre = PRODS[artEditIdx].name;
-  PRODS.splice(artEditIdx, 1);
+  const p = PRODS[artEditIdx];
+  if(!p) return;
+  if(!confirm('¿Desactivar "'+p.name+'"? Seguirá en el historial pero no aparecerá en el POS.')) return;
+  p.activo = false;
+  p.deleted_at = new Date().toISOString();
+  if(db) try{ await db.productos.update(p.id, {activo:false, updatedAt:new Date().toISOString()}); }catch(e){}
+  await supaDeleteProducto(p.id);
   filterP(); renderArtList();
   goTo('scArticulosList');
-  toast('Eliminado: ' + nombre.substring(0,20));
+  toast('"'+p.name.substring(0,20)+'" desactivado');
 }
 
 // ── PRECIO VARIABLE ──────────────────────────────────────────────────────────
@@ -5241,9 +5288,12 @@ async function supaDeleteProducto(id){
     body:JSON.stringify({activo:false})});}catch(e){}
 }
 async function reactivarArticulo(prodIdx){
-  const p=PRODS[prodIdx];if(!p)return;p.activo=true;delete p.deleted_at;
-  if(db)await db.productos.update(p.id,{activo:true,updatedAt:new Date().toISOString()});
-  await supaUpsertProducto(p);filterP();renderArtList();toast('"'+p.name+'" reactivado');
+  const p=PRODS[prodIdx];if(!p)return;
+  p.activo=true; delete p.deleted_at;
+  if(db) try{ await db.productos.update(p.id,{activo:true,updatedAt:new Date().toISOString()}); }catch(e){}
+  await supaUpsertProducto(p);
+  filterP(); renderArtList();
+  toast('"'+p.name+'" reactivado ✓');
 }
 async function cargarDescuentosConfig(){
   const email=localStorage.getItem(SK.email);if(!email||USAR_DEMO)return;
