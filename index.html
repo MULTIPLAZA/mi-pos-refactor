@@ -5078,8 +5078,24 @@ const DEMO_KEYS = {
 const USAR_DEMO = (SUPA_URL === 'https://XXXXXXXXXXXXXXXX.supabase.co');
 
 function licGetDeviceId(){
-  let id=localStorage.getItem(SK.deviceId);
-  if(!id){ id='dev_'+Date.now()+'_'+Math.random().toString(36).slice(2,10); localStorage.setItem(SK.deviceId,id); }
+  // Try localStorage first
+  let id = localStorage.getItem(SK.deviceId);
+  if(id) return id;
+  // Try sessionStorage as backup
+  id = sessionStorage.getItem(SK.deviceId);
+  if(id){ localStorage.setItem(SK.deviceId, id); return id; }
+  // Generate new stable ID from browser fingerprint
+  const fp = [
+    navigator.userAgent.length,
+    screen.width, screen.height, screen.colorDepth,
+    navigator.hardwareConcurrency || 0,
+    navigator.language,
+    new Date().getTimezoneOffset()
+  ].join('_');
+  const hash = fp.split('').reduce((a,c)=>((a<<5)-a+c.charCodeAt(0))|0, 0);
+  id = 'dev_' + Math.abs(hash).toString(36) + '_' + Math.random().toString(36).slice(2,8);
+  localStorage.setItem(SK.deviceId, id);
+  sessionStorage.setItem(SK.deviceId, id);
   return id;
 }
 function licIsActivated(){ return !!localStorage.getItem(SK.activated); }
@@ -5173,6 +5189,21 @@ async function licInit(){
   await licCheckPeriodico();
   const neg=localStorage.getItem(SK.negocio);
   if(neg&&typeof configData!=='undefined') configData.negocio=neg;
+
+  // Si faltan datos de terminal, recuperarlos de Supabase
+  const hasTerminal = localStorage.getItem('pos_terminal');
+  const hasSucursal = localStorage.getItem('pos_sucursal');
+  if(!hasTerminal || !hasSucursal){
+    console.log('[licInit] Faltan datos de terminal, recuperando de Supabase...');
+    try {
+      const cfg = await recuperarConfigTerminalSupabase();
+      if(cfg){
+        aplicarConfigTerminal(cfg);
+        console.log('[licInit] Configuración de terminal recuperada automáticamente');
+      }
+    } catch(e){ console.warn('[licInit] No se pudo recuperar config:', e.message); }
+  }
+
   return true;
 }
 
@@ -5199,6 +5230,22 @@ async function doActivar(){
   document.getElementById('activadoPlan').textContent='Plan '+res.plan;
   document.getElementById('activadoSub').textContent='Licencia activa hasta '+res.vence+'. Bienvenido.';
   document.getElementById('activadoNegocio').value='';
+
+  // Intentar recuperar config previa de Supabase
+  try {
+    const cfg = await recuperarConfigTerminalSupabase();
+    if(cfg && cfg.terminal && cfg.sucursal){
+      // ¡Ya existe config para esta cuenta! Restaurar y saltar setup
+      aplicarConfigTerminal(cfg);
+      // Guardar con el nuevo device_id también
+      await guardarConfigTerminalSupabase(cfg);
+      document.getElementById('scActivado').style.display='none';
+      await iniciarApp();
+      return;
+    }
+  } catch(e){ console.warn('[Activar] No se pudo recuperar config previa:', e.message); }
+
+  // No hay config previa → mostrar formulario de setup
   document.getElementById('scActivado').style.display='flex';
 }
 
@@ -5270,6 +5317,9 @@ async function doEntrar(){
       }
     } catch(e){ console.log('Setup Supabase:', e.message); }
   }
+
+  // ── GUARDAR CONFIG EN SUPABASE (sobrevive al borrar cookies) ──
+  await guardarConfigTerminalSupabase({negocio, terminal, sucursal, deposito});
 
   document.getElementById('scActivado').style.display='none';
   await iniciarApp();
@@ -5822,6 +5872,77 @@ function animAddToCart(tileEl, color){
       badge.style.transform = 'scale(1)';
     }, 150);
   }, 400);
+}
+
+// ── CONFIGURACIÓN DE TERMINAL (persiste en Supabase) ──────────────────
+async function guardarConfigTerminalSupabase(cfg){
+  if(USAR_DEMO) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+  try {
+    const deviceId = licGetDeviceId();
+    const data = {
+      clave: 'terminal_config_' + deviceId,
+      valor: JSON.stringify({
+        negocio:   cfg.negocio,
+        terminal:  cfg.terminal,
+        sucursal:  cfg.sucursal,
+        deposito:  cfg.deposito,
+        deviceId:  deviceId,
+        savedAt:   new Date().toISOString()
+      }),
+      licencia_email: email
+    };
+    await fetch(SUPA_URL+'/rest/v1/pos_config', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPA_ANON, 'Authorization': 'Bearer '+SUPA_ANON,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify(data)
+    });
+    console.log('[Terminal] Config guardada en Supabase');
+  } catch(e){ console.warn('[Terminal] Error guardando config:', e.message); }
+}
+
+async function recuperarConfigTerminalSupabase(){
+  if(USAR_DEMO) return null;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return null;
+  try {
+    const deviceId = licGetDeviceId();
+    // Intentar recuperar por device_id específico primero
+    const r1 = await fetch(
+      SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+
+      '&clave=eq.terminal_config_'+encodeURIComponent(deviceId)+'&select=valor',
+      { headers: {'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'} }
+    );
+    const d1 = await r1.json();
+    if(d1 && d1[0]) return JSON.parse(d1[0].valor);
+
+    // Si no hay config para este device_id, buscar cualquier config de terminal del email
+    const r2 = await fetch(
+      SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+
+      '&clave=like.terminal_config_*&select=valor&order=id.desc&limit=1',
+      { headers: {'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'} }
+    );
+    const d2 = await r2.json();
+    if(d2 && d2[0]) return JSON.parse(d2[0].valor);
+    return null;
+  } catch(e){ console.warn('[Terminal] Error recuperando config:', e.message); return null; }
+}
+
+function aplicarConfigTerminal(cfg){
+  if(!cfg) return false;
+  // Aplicar a localStorage
+  if(cfg.negocio)   { localStorage.setItem(SK.negocio, cfg.negocio); if(typeof configData!=='undefined') configData.negocio = cfg.negocio; }
+  if(cfg.terminal)  { localStorage.setItem('pos_terminal', cfg.terminal); if(typeof configData!=='undefined') configData.terminal = cfg.terminal; }
+  if(cfg.sucursal)  { localStorage.setItem('pos_sucursal', cfg.sucursal); if(typeof configData!=='undefined') configData.sucursal = cfg.sucursal; }
+  if(cfg.deposito)  { localStorage.setItem('pos_deposito', cfg.deposito); if(typeof configData!=='undefined') configData.deposito = cfg.deposito; }
+  if(cfg.deviceId)  { localStorage.setItem(SK.deviceId, cfg.deviceId); sessionStorage.setItem(SK.deviceId, cfg.deviceId); }
+  console.log('[Terminal] Config restaurada:', cfg.terminal, '/', cfg.sucursal);
+  return true;
 }
 
 (async function(){
