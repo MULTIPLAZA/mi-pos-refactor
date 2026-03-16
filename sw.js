@@ -1,21 +1,41 @@
-const CACHE = 'ampersand-pos-v1';
-const ASSETS = ['./index.html', './manifest.json', './icon.png'];
+const CACHE = 'ampersand-pos-v2';
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // Pre-cache the main page
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.add('/')).then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(
-    keys.filter(k => k !== CACHE).map(k => caches.delete(k))
-  )).then(() => self.clients.claim()));
+  e.waitUntil(
+    caches.keys().then(keys => Promise.all(
+      keys.filter(k => k !== CACHE).map(k => caches.delete(k))
+    )).then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener('fetch', e => {
+  // Skip Supabase and external requests
+  const url = new URL(e.request.url);
+  if(!url.hostname.includes('workers.dev') && !url.hostname.includes('localhost')) return;
   if(e.request.url.includes('supabase.co')) return;
+
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request)
-      .then(res => { caches.open(CACHE).then(c => c.put(e.request, res.clone())); return res; })
-    )
+    // Network first, fallback to cache
+    fetch(e.request)
+      .then(res => {
+        // Cache successful responses
+        if(res.ok){
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      })
+      .catch(() => {
+        // Offline fallback: return cached version
+        return caches.match(e.request)
+          .then(cached => cached || caches.match('/'));
+      })
   );
 });

@@ -9,9 +9,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Ampersand POS">
-  <link rel="manifest" href="./manifest.json">
-  <link rel="icon" type="image/svg+xml" href="./icon.png">
-  <link rel="apple-touch-icon" href="./icon.png">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="/icon.png">
+  <link rel="apple-touch-icon" href="/icon.png">
 <meta name="theme-color" content="#1e1e1e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -4591,7 +4591,7 @@ function generarHTMLTicket(data, size){
 // ── PWA SERVICE WORKER ─────────────────────────────────────
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
+    navigator.serviceWorker.register('/sw.js')
       .then(r => console.log('[PWA] SW OK:', r.scope))
       .catch(e => console.warn('[PWA] SW error:', e.message));
   });
@@ -4600,7 +4600,7 @@ if('serviceWorker' in navigator){
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('./sw.js')
+    navigator.serviceWorker.register('/sw.js')
       .then(r => console.log('[SW] Registrado:', r.scope))
       .catch(e => console.warn('[SW] Error:', e.message));
   });
@@ -4729,7 +4729,7 @@ function generarHTMLFactura(data, size){
 // ── PWA SERVICE WORKER ─────────────────────────────────────
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
+    navigator.serviceWorker.register('/sw.js')
       .then(r => console.log('[PWA] SW OK:', r.scope))
       .catch(e => console.warn('[PWA] SW error:', e.message));
   });
@@ -4774,7 +4774,7 @@ function generarHTMLComanda(data, size){
 // ── PWA SERVICE WORKER ─────────────────────────────────────
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
+    navigator.serviceWorker.register('/sw.js')
       .then(r => console.log('[PWA] SW OK:', r.scope))
       .catch(e => console.warn('[PWA] SW error:', e.message));
   });
@@ -7786,7 +7786,7 @@ async function iniciarApp(){
 // ── PWA SERVICE WORKER ─────────────────────────────────────
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
+    navigator.serviceWorker.register('/sw.js')
       .then(r => console.log('[PWA] SW OK:', r.scope))
       .catch(e => console.warn('[PWA] SW error:', e.message));
   });
