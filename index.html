@@ -974,63 +974,28 @@
   /* ── CATEGORY OVERLAY ── */
   .cat-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:100; align-items:flex-end; justify-content:center; }
   .cat-overlay.open { display:flex; }
-  /* Category overlay — bottom sheet */
-  #catOv {
-    display:none;
-    position:fixed;
-    inset:0;
-    z-index:300;
-    background:rgba(0,0,0,0);
-    align-items:flex-end;
-    justify-content:center;
-    transition:background .22s ease;
-  }
-  #catOv.open {
-    display:flex;
-    background:rgba(0,0,0,.55);
-  }
   .cat-sheet {
     background:#1e1e1e;
-    width:100%;
+    width:100%; max-width:600px;
     border-radius:20px 20px 0 0;
-    padding:0 0 env(safe-area-inset-bottom,20px);
-    animation:su .25s cubic-bezier(.32,1,.32,1);
-    max-height:70vh;
+    padding:0 0 env(safe-area-inset-bottom,16px);
+    animation:su .22s ease;
+    max-height:75vh;
     overflow-y:auto;
-    box-shadow:0 -4px 32px rgba(0,0,0,.5);
   }
-  .cat-sheet-hdr {
-    display:flex; align-items:center; justify-content:space-between;
-    padding:16px 20px 12px; border-bottom:1px solid #2a2a2a;
-    position:sticky; top:0; background:#1e1e1e; z-index:1;
-  }
-  .cat-sheet-ttl { font-size:13px; font-weight:700; color:#666; letter-spacing:.8px; text-transform:uppercase; }
-  .cat-sheet-cls {
-    width:32px; height:32px; border-radius:50%;
-    background:#2a2a2a; border:none; color:#aaa;
-    font-size:16px; cursor:pointer; display:flex;
-    align-items:center; justify-content:center; font-family:inherit;
-  }
-  .cat-sheet-cls:active { background:#333; }
+  .cat-sheet-hdr { display:flex; align-items:center; justify-content:space-between; padding:14px 16px 10px; border-bottom:1px solid #222; }
   .cat-sheet-ttl { font-size:12px; font-weight:700; color:var(--muted); letter-spacing:.8px; text-transform:uppercase; }
   .cat-sheet-cls { background:none; border:none; color:var(--muted); cursor:pointer; font-size:20px; line-height:1; padding:0; }
   .cat-item {
-    display:flex; align-items:center; gap:14px;
-    padding:15px 20px; font-size:15px; font-weight:600;
-    cursor:pointer; color:#bbb; border-left:none;
-    transition:background .1s;
-    border-bottom:1px solid #252525;
+    display:flex; align-items:center; gap:12px;
+    padding:14px 20px; font-size:15px; font-weight:600;
+    cursor:pointer; color:#bbb; border-left:4px solid transparent;
+    transition:background .12s, color .12s;
   }
-  .cat-item:last-child { border-bottom:none; }
-  .cat-item:active { background:rgba(255,255,255,.05); }
-  .cat-item.sel { color:#fff; background:rgba(76,175,80,.1); }
-  .cat-item-ic {
-    width:12px; height:12px; border-radius:50%;
-    background:#444; flex-shrink:0;
-    transition:background .15s;
-  }
-  .cat-item.sel .cat-item-ic { background:var(--green); box-shadow:0 0 6px var(--green); }
-  .cat-check { margin-left:auto; color:var(--green); }
+  .cat-item:active { background:rgba(255,255,255,.04); }
+  .cat-item.sel { color:#fff; border-left-color:var(--green); background:rgba(76,175,80,.08); }
+  .cat-item-ic { width:10px; height:10px; border-radius:50%; background:#555; flex-shrink:0; }
+  .cat-item.sel .cat-item-ic { background:var(--green); }
   .cat-item:active { background:rgba(255,255,255,.04); }
   .cat-item.sel { color:var(--green); border-left-color:var(--green); background:rgba(76,175,80,.07); }
   .cat-item-ic { width:8px; height:8px; border-radius:50%; background:#444; flex-shrink:0; transition:background .15s; }
@@ -1045,7 +1010,7 @@
   }
   .cat-item.sel { color:var(--green); }
 
-  @keyframes su { from{transform:translateY(100%); opacity:.5} to{transform:translateY(0); opacity:1} }
+  @keyframes su { from{transform:translateY(100%)} to{transform:translateY(0)} }
 
   /* TOAST */
   .toast {
@@ -3011,11 +2976,12 @@ function openCat(){
 
   function catItem(nombre, color){
     const sel = curCat===nombre;
-    const ic = (color||sel) ? 'background:'+(color||'var(--green)')+';' : '';
-    return '<div class="cat-item'+(sel?' sel':'')+'" onclick="pickCat(this)">'
+    const colorStyle = color ? 'color:'+color+';border-left-color:'+color+';' : '';
+    const ic = color ? 'background:'+color+';' : '';
+    return '<div class="cat-item'+(sel?' sel':'')+'" onclick="pickCat(this)" style="'+colorStyle+'">'
       +'<div class="cat-item-ic" style="'+ic+'"></div>'
-      +'<span style="flex:1">'+nombre+'</span>'
-      +(sel?'<svg class="cat-check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>':'')
+      +nombre
+      +(sel?'<svg style="margin-left:auto" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>':'')
       +'</div>';
   }
 
@@ -7340,46 +7306,52 @@ const DEMO_KEYS = {
 const USAR_DEMO = (SUPA_URL === 'https://XXXXXXXXXXXXXXXX.supabase.co');
 
 function licGetDeviceId(){
-  // Try all storage layers - most persistent first
+  // Priority: localStorage → sessionStorage → generate NEW unique ID
   let id = localStorage.getItem(SK.deviceId)
          || sessionStorage.getItem(SK.deviceId);
   if(!id){
-    // Generate stable ID based on browser fingerprint + random
-    const fp = [navigator.userAgent.length, screen.width, screen.height,
-                screen.colorDepth, navigator.hardwareConcurrency||0,
-                navigator.language, new Date().getTimezoneOffset()].join('_');
-    const hash = Math.abs(fp.split('').reduce((a,c)=>((a<<5)-a+c.charCodeAt(0))|0,0));
-    id = 'dev_' + hash.toString(36) + '_' + Math.random().toString(36).slice(2,8);
+    // Generate cryptographically random ID — never based on fingerprint alone
+    // so two identical devices ALWAYS get different IDs
+    const rand = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2);
+    id = 'dev_' + rand.replace(/-/g,'').slice(0, 20);
   }
-  // Persist in all layers
+  // Persist in all layers (but NEVER overwrite with someone else's ID)
   localStorage.setItem(SK.deviceId, id);
   sessionStorage.setItem(SK.deviceId, id);
-  // Also save in IndexedDB via dbSaveConfig if available
-  if(typeof db !== 'undefined' && db) {
+  if(typeof db !== 'undefined' && db){
     try { db.config.put({key:'device_id', value:id}); } catch(e){}
   }
   return id;
 }
 
 async function licGetDeviceIdAsync(){
-  // Try localStorage/sessionStorage first (fast)
+  // 1. Try fastest layers first
   let id = localStorage.getItem(SK.deviceId) || sessionStorage.getItem(SK.deviceId);
   if(id) return id;
-  // Try IndexedDB (survives localStorage clear)
+
+  // 2. Try IndexedDB — survives localStorage.clear()
   try {
     if(typeof db !== 'undefined' && db){
       const row = await db.config.get('device_id');
-      if(row && row.value){ id = row.value; }
+      if(row && row.value){
+        id = row.value;
+        // Restore to localStorage/sessionStorage
+        localStorage.setItem(SK.deviceId, id);
+        sessionStorage.setItem(SK.deviceId, id);
+        return id;
+      }
     }
   } catch(e){}
-  if(!id){
-    // Generate new ID
-    const fp = [navigator.userAgent.length, screen.width, screen.height,
-                screen.colorDepth, navigator.hardwareConcurrency||0,
-                navigator.language, new Date().getTimezoneOffset()].join('_');
-    const hash = Math.abs(fp.split('').reduce((a,c)=>((a<<5)-a+c.charCodeAt(0))|0,0));
-    id = 'dev_' + hash.toString(36) + '_' + Math.random().toString(36).slice(2,8);
-  }
+
+  // 3. No ID found anywhere — generate a NEW unique one for THIS device
+  const rand = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2);
+  id = 'dev_' + rand.replace(/-/g,'').slice(0, 20);
+
+  // Persist everywhere
   localStorage.setItem(SK.deviceId, id);
   sessionStorage.setItem(SK.deviceId, id);
   if(typeof db !== 'undefined' && db){
@@ -7502,12 +7474,17 @@ async function licInit(){
   }
   const neg=localStorage.getItem(SK.negocio);
   if(neg&&typeof configData!=='undefined') configData.negocio=neg;
-  if(!localStorage.getItem('pos_terminal')||!localStorage.getItem('pos_sucursal')){
+  // Si faltan datos de terminal, intentar recuperar de Supabase
+  // SOLO si el dispositivo ya fue registrado antes (tiene config propia)
+  if(!localStorage.getItem('pos_terminal') || !localStorage.getItem('pos_sucursal')){
     try{
-      await licGetDeviceIdAsync();
-      const cfg=await recuperarConfigTerminalSupabase();
-      if(cfg){ aplicarConfigTerminal(cfg); console.log('[licInit] Terminal recuperada:', cfg.terminal); }
-    }catch(e){}
+      await licGetDeviceIdAsync(); // asegurar que tenemos el ID correcto
+      const cfg = await recuperarConfigTerminalSupabase(); // solo devuelve config de ESTE device
+      if(cfg){
+        aplicarConfigTerminal(cfg);
+        console.log('[licInit] Terminal recuperada:', cfg.terminal, '/', cfg.sucursal);
+      }
+    }catch(e){ console.warn('[licInit] No se pudo recuperar config:', e.message); }
   }
   return true;
 }
@@ -7537,20 +7514,23 @@ async function doActivar(){
   document.getElementById('activadoNegocio').value='';
   // Mostrar spinner mientras buscamos config previa
   const btnEntrar = document.getElementById('scActivado');
+  // Intentar recuperar config de ESTE dispositivo específico
   try{
-    // Asegurar que tenemos el deviceId correcto (incluyendo IndexedDB)
-    await licGetDeviceIdAsync();
-    const cfg = await recuperarConfigTerminalSupabase();
+    const deviceId = await licGetDeviceIdAsync();
+    const cfg = await recuperarConfigTerminalSupabase(); // ya usa el deviceId correcto
     if(cfg && cfg.terminal && cfg.sucursal){
-      // ✅ Dispositivo ya registrado — restaurar config y entrar directo
+      // ✅ Este dispositivo ya fue configurado antes — entrar directo
       aplicarConfigTerminal(cfg);
-      await guardarConfigTerminalSupabase(cfg); // actualizar con nuevo deviceId si cambió
+      console.log('[Activar] Terminal restaurada:', cfg.terminal, '/', cfg.sucursal);
       document.getElementById('scActivado').style.display='none';
       await iniciarApp();
       return;
     }
   }catch(e){ console.warn('[Activar] No se pudo recuperar config:', e.message); }
-  // No hay config previa → mostrar formulario de setup
+  // Este dispositivo no tiene config → mostrar formulario de setup
+  // Pre-llenar nombre del negocio si lo tenemos
+  const negGuardado = localStorage.getItem(SK.negocio);
+  if(negGuardado) document.getElementById('activadoNegocio').value = negGuardado;
   document.getElementById('scActivado').style.display='flex';
 }
 
@@ -7744,38 +7724,71 @@ function animAddToCart(tileEl, color){
 
 async function guardarConfigTerminalSupabase(cfg){
   if(USAR_DEMO) return;
-  const email=localStorage.getItem(SK.email); if(!email) return;
+  const email = localStorage.getItem(SK.email); if(!email) return;
+  const deviceId = await licGetDeviceIdAsync(); // siempre usar el ID de ESTE dispositivo
   try{
-    await fetch(SUPA_URL+'/rest/v1/pos_config',{method:'POST',
+    await fetch(SUPA_URL+'/rest/v1/pos_config',{
+      method:'POST',
       headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-      body:JSON.stringify({clave:'terminal_config_'+licGetDeviceId(),
-        valor:JSON.stringify({negocio:cfg.negocio,terminal:cfg.terminal,sucursal:cfg.sucursal,deposito:cfg.deposito,deviceId:licGetDeviceId()}),
-        licencia_email:email})});
-    console.log('[Terminal] Config guardada en Supabase');
-  }catch(e){console.warn('[Terminal]',e.message);}
+      body:JSON.stringify({
+        clave: 'terminal_config_'+deviceId,
+        valor: JSON.stringify({
+          negocio:  cfg.negocio,
+          terminal: cfg.terminal,
+          sucursal: cfg.sucursal,
+          deposito: cfg.deposito,
+          deviceId: deviceId,  // guardamos el deviceId para validar al recuperar
+          savedAt:  new Date().toISOString()
+        }),
+        licencia_email: email
+      })
+    });
+    console.log('[Terminal] Config guardada — device:', deviceId.slice(0,12));
+  }catch(e){console.warn('[Terminal] Error guardando:', e.message);}
 }
 
 async function recuperarConfigTerminalSupabase(){
+  // IMPORTANTE: solo recupera config del device_id de ESTE dispositivo.
+  // NO usa fallback al último registro — eso causaría que un nuevo dispositivo
+  // adopte la configuración de otro.
   if(USAR_DEMO) return null;
-  const email=localStorage.getItem(SK.email); if(!email) return null;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return null;
+  const deviceId = await licGetDeviceIdAsync();
+  if(!deviceId) return null;
   try{
-    const r1=await fetch(SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+'&clave=eq.terminal_config_'+encodeURIComponent(licGetDeviceId())+'&select=valor',
-      {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
-    const d1=await r1.json(); if(d1&&d1[0]) return JSON.parse(d1[0].valor);
-    const r2=await fetch(SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+'&clave=like.terminal_config_*&select=valor&order=id.desc&limit=1',
-      {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
-    const d2=await r2.json(); if(d2&&d2[0]) return JSON.parse(d2[0].valor);
+    const r = await fetch(
+      SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)
+      +'&clave=eq.terminal_config_'+encodeURIComponent(deviceId)+'&select=valor',
+      {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}}
+    );
+    const data = await r.json();
+    if(data && data[0]){
+      const cfg = JSON.parse(data[0].valor);
+      // Verificar que el deviceId guardado coincide con este dispositivo
+      // Si no coincide, ignorar (puede pasar si se copió la DB)
+      if(cfg.deviceId && cfg.deviceId !== deviceId){
+        console.warn('[Terminal] deviceId mismatch — ignoring config from other device');
+        return null;
+      }
+      return cfg;
+    }
     return null;
-  }catch(e){return null;}
+  }catch(e){
+    console.warn('[Terminal] Error recuperando config:', e.message);
+    return null;
+  }
 }
 
 function aplicarConfigTerminal(cfg){
   if(!cfg) return false;
-  if(cfg.negocio) {localStorage.setItem(SK.negocio,cfg.negocio);if(typeof configData!=='undefined')configData.negocio=cfg.negocio;}
-  if(cfg.terminal){localStorage.setItem('pos_terminal',cfg.terminal);if(typeof configData!=='undefined')configData.terminal=cfg.terminal;}
-  if(cfg.sucursal){localStorage.setItem('pos_sucursal',cfg.sucursal);if(typeof configData!=='undefined')configData.sucursal=cfg.sucursal;}
-  if(cfg.deposito){localStorage.setItem('pos_deposito',cfg.deposito);if(typeof configData!=='undefined')configData.deposito=cfg.deposito;}
-  if(cfg.deviceId){localStorage.setItem(SK.deviceId,cfg.deviceId);sessionStorage.setItem(SK.deviceId,cfg.deviceId);}
+  // Aplica negocio, terminal, sucursal, depósito — pero NUNCA el deviceId
+  // El deviceId pertenece a este dispositivo y no debe copiarse de otro
+  if(cfg.negocio)  { localStorage.setItem(SK.negocio,cfg.negocio);   if(typeof configData!=='undefined') configData.negocio=cfg.negocio; }
+  if(cfg.terminal) { localStorage.setItem('pos_terminal',cfg.terminal); if(typeof configData!=='undefined') configData.terminal=cfg.terminal; }
+  if(cfg.sucursal) { localStorage.setItem('pos_sucursal',cfg.sucursal); if(typeof configData!=='undefined') configData.sucursal=cfg.sucursal; }
+  if(cfg.deposito) { localStorage.setItem('pos_deposito',cfg.deposito); if(typeof configData!=='undefined') configData.deposito=cfg.deposito; }
+  // ⚠️ NUNCA copiar cfg.deviceId — cada dispositivo tiene su propio ID único
   return true;
 }
 
