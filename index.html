@@ -4,13 +4,32 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>POS - Punto de Venta</title>
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1e1e1e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="POS">
 <link rel="apple-touch-icon" href="icon-192.png">
-<script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+<script>
+// Cargar Dexie con múltiples CDN de fallback
+(function(){
+  var cdns = [
+    'https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js',
+    'https://unpkg.com/dexie@3.2.4/dist/dexie.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/dexie/3.2.4/dexie.min.js'
+  ];
+  var idx = 0;
+  function loadNext(){
+    if(idx >= cdns.length){ console.warn('[Dexie] No se pudo cargar desde ningún CDN — modo sin BD local'); return; }
+    var s = document.createElement('script');
+    s.src = cdns[idx++];
+    s.onerror = function(){ console.warn('[Dexie] Falló CDN, probando siguiente...'); loadNext(); };
+    s.onload  = function(){ console.log('[Dexie] Cargado desde:', s.src); };
+    document.head.appendChild(s);
+  }
+  loadNext();
+})();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -944,11 +963,29 @@
   .npb.npok:active { background:var(--green-btn); }
 
   /* CATEGORY SHEET */
-  .cat-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:100; align-items:flex-end; }
+  /* ── CATEGORY OVERLAY ── */
+  .cat-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:100; align-items:flex-end; justify-content:center; }
   .cat-overlay.open { display:flex; }
-  .cat-sheet { background:#2a2a2a; width:100%; border-radius:14px 14px 0 0; padding:12px; animation:su .25s ease; max-height:55vh; overflow-y:auto; }
-  .cat-item { padding:15px 12px; font-size:15px; font-weight:600; cursor:pointer; border-radius:6px; }
-  .cat-item:active { background:#3a3a3a; }
+  .cat-sheet { background:var(--card); width:100%; max-width:600px; border-radius:16px 16px 0 0; padding:0 0 24px; animation:su .22s ease; max-height:70vh; overflow-y:auto; }
+  .cat-sheet-hdr { display:flex; align-items:center; justify-content:space-between; padding:14px 16px 10px; border-bottom:1px solid #222; }
+  .cat-sheet-ttl { font-size:12px; font-weight:700; color:var(--muted); letter-spacing:.8px; text-transform:uppercase; }
+  .cat-sheet-cls { background:none; border:none; color:var(--muted); cursor:pointer; font-size:20px; line-height:1; padding:0; }
+  .cat-item { display:flex; align-items:center; gap:10px; padding:14px 16px; font-size:15px; font-weight:600; cursor:pointer; color:#ccc; border-left:3px solid transparent; }
+  .cat-item:active { background:rgba(255,255,255,.04); }
+  .cat-item.sel { color:var(--green); border-left-color:var(--green); background:rgba(76,175,80,.07); }
+  .cat-item-ic { width:8px; height:8px; border-radius:50%; background:#444; flex-shrink:0; transition:background .15s; }
+  .cat-item.sel .cat-item-ic { background:var(--green); }
+
+  /* Desktop: pill bar */
+  @media(min-width:900px){
+    #catPillBar { display:flex !important; }
+    .cat-pill-bar { display:flex; gap:6px; padding:10px 16px 4px; overflow-x:auto; scrollbar-width:none; flex-shrink:0; }
+    .cat-pill-bar::-webkit-scrollbar { display:none; }
+    .cat-pill { flex-shrink:0; padding:6px 16px; border-radius:20px; font-size:13px; font-weight:700; cursor:pointer; border:1.5px solid #2a2a2a; background:transparent; color:#888; white-space:nowrap; font-family:inherit; transition:all .15s; }
+    .cat-pill.sel { background:var(--green); border-color:var(--green); color:#fff; }
+    .cat-pill:hover:not(.sel) { border-color:#555; color:#ddd; }
+    .filter-bar { display:none; }
+  }
   .cat-item.sel { color:var(--green); }
 
   @keyframes su { from{transform:translateY(100%)} to{transform:translateY(0)} }
@@ -1403,11 +1440,6 @@
 
   ::-webkit-scrollbar { width:2px; }
   ::-webkit-scrollbar-thumb { background:#444; border-radius:2px; }
-
-  .cat-pill-bar{display:flex;gap:6px;padding:8px 12px 4px;overflow-x:auto;flex-shrink:0;}
-  .cat-pill{flex-shrink:0;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid #333;background:transparent;color:#888;white-space:nowrap;font-family:inherit;}
-  .cat-pill.sel{background:var(--green);border-color:var(--green);color:#fff;}
-  @media(min-width:900px){#catPillBar{display:flex !important;}.filter-bar{display:none;}.search-bar{display:flex !important;}.fsearch{display:none !important;}#prodView{flex:1 1 0 !important;min-width:0 !important;max-width:calc(100% - 300px) !important;}.tablet-right{width:300px !important;flex-shrink:0 !important;}}
 </style>
 </head>
 <body>
@@ -1418,21 +1450,40 @@
     <button class="cbk" onclick="finalizarRecibo()">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
-    <div style="flex:1;font-size:17px;font-weight:700;">Recibo</div>
-    <button class="cbk" onclick="imprimirRecibo()">
+    <div style="flex:1;font-size:17px;font-weight:700;" id="reciboTitulo">Comprobante</div>
+    <button class="cbk" onclick="imprimirRecibo()" title="Imprimir">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
     </button>
   </div>
   <div class="recibo-body">
-    <div class="recibo-papel" id="reciboPapel">
-      <!-- contenido generado por JS -->
+    <!-- Vista previa tipo ticket real -->
+    <div style="display:flex;justify-content:center;padding:12px 0;">
+      <div id="reciboPapel" style="background:#fff;color:#000;font-family:'Courier New',monospace;font-size:12px;line-height:1.4;width:280px;padding:14px 10px;box-shadow:0 2px 16px rgba(0,0,0,.5);white-space:pre-wrap;word-break:break-all;"></div>
     </div>
-    <div class="recibo-btns">
-      <button class="rec-btn-print" onclick="imprimirRecibo()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-        IMPRIMIR
+
+    <!-- Botones de acción -->
+    <div style="padding:0 14px 12px;display:flex;flex-direction:column;gap:10px;">
+
+      <!-- Fila 1: Ticket + Factura -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button onclick="imprimirRecibo()" style="background:var(--green);border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;padding:14px 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          IMPRIMIR
+        </button>
+        <button id="btnComandaRecibo" onclick="imprimirComandaActual()" style="display:none;background:rgba(255,152,0,.15);border:1.5px solid var(--orange);border-radius:8px;color:var(--orange);font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;padding:14px 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
+          COMANDA
+        </button>
+      </div>
+
+      <!-- WhatsApp -->
+      <button onclick="compartirWhatsApp()" style="background:rgba(37,211,102,.15);border:1.5px solid #25d366;border-radius:8px;color:#25d366;font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;padding:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M11.5 2.5C6.253 2.5 2 6.753 2 12c0 1.821.487 3.53 1.338 5L2 22l5.15-1.316A9.454 9.454 0 0011.5 21.5c5.247 0 9.5-4.253 9.5-9.5S16.747 2.5 11.5 2.5z"/></svg>
+        COMPARTIR WHATSAPP
       </button>
-      <button class="rec-btn-new" onclick="finalizarRecibo()">
+
+      <!-- Nueva venta -->
+      <button onclick="finalizarRecibo()" style="background:transparent;border:1.5px solid #333;border-radius:8px;color:#888;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;padding:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         NUEVA VENTA
       </button>
@@ -1445,22 +1496,38 @@
   <header class="header">
     <button class="hbtn" onclick="openDrawer()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
     <div class="htitle"><span class="htitle-text">Configuración</span></div>
+    <button class="hbtn" onclick="sincronizarConfigNegocio().then(()=>{renderConfigInfo();toast('✓ Sincronizado');})" title="Sincronizar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+    </button>
   </header>
-  <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;">
-    <div class="config-menu-item" onclick="goTo('scConfigImpresoras')">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      <span>Impresoras</span>
+  <div style="flex:1;overflow-y:auto;">
+
+    <!-- INFO DEL NEGOCIO -->
+    <div id="configInfoPanel" style="margin:14px 14px 0;">
+      <!-- Se rellena con renderConfigInfo() -->
     </div>
-    <div class="config-menu-item" onclick="goTo('scConfigImpuestos')">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
-      <span>Impuestos</span>
+
+    <!-- MENÚ CONFIGURACIÓN -->
+    <div style="padding:8px 0;">
+      <div class="config-menu-item" onclick="goTo('scConfigImpresoras')">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        <span>Impresoras</span>
+        <svg style="margin-left:auto;color:#555" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="config-menu-item" onclick="goTo('scConfigImpuestos')">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        <span>Impuestos</span>
+        <svg style="margin-left:auto;color:#555" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="config-menu-item" onclick="goTo('scConfigGeneral')">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M16.24 7.76a6 6 0 0 1 0 8.49M6.34 17.66a6 6 0 0 1 0-8.49M4.93 19.07a10 10 0 0 1 0-14.14"/></svg>
+        <span>General</span>
+        <svg style="margin-left:auto;color:#555" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
     </div>
-    <div class="config-menu-item" onclick="goTo('scConfigGeneral')">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M16.24 7.76a6 6 0 0 1 0 8.49M6.34 17.66a6 6 0 0 1 0-8.49M4.93 19.07a10 10 0 0 1 0-14.14"/></svg>
-      <span>General</span>
-    </div>
+
     <div class="config-footer">
-      <span class="config-email" id="configEmail"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="2356505642514a4c63464e424a4f0d404c4e">[email&#160;protected]</a></span>
+      <span class="config-email" id="configEmail"></span>
       <button class="config-logout-btn" onclick="cerrarSesion()">CERRAR SESIÓN</button>
     </div>
   </div>
@@ -1586,16 +1653,25 @@
   <header class="header">
     <button class="hbtn" onclick="goTo('scConfig')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
     <div class="htitle"><span class="htitle-text">General</span></div>
+    <button class="hbtn" onclick="sincronizarConfigNegocio().then(()=>{renderGeneralInfo();toast('✓ Sincronizado');})" title="Sincronizar desde admin">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+    </button>
   </header>
-  <div style="flex:1;overflow-y:auto;">
-    <div style="background:#2a2a2a;border-radius:8px;border:1px solid #333;overflow:hidden;margin:12px;">
+  <div style="flex:1;overflow-y:auto;padding:12px;">
+
+    <!-- INFO TERMINAL Y TIMBRADO -->
+    <div id="generalInfoPanel"></div>
+
+    <!-- DATOS NEGOCIO -->
+    <div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;font-weight:700;padding:4px 0 8px;">Datos del negocio</div>
+    <div style="background:#1e1e1e;border-radius:8px;border:1px solid #2a2a2a;overflow:hidden;margin-bottom:14px;">
       <div class="general-field">
         <span class="general-field-label">Nombre del negocio</span>
         <input class="general-field-input" id="cfgNegocio" type="text" placeholder="Mi Negocio" oninput="saveGeneralConfig()">
       </div>
       <div class="general-field">
-        <span class="general-field-label">Sucursal / Dirección</span>
-        <input class="general-field-input" id="cfgDireccion" type="text" placeholder="Ej: Asunción - Local 1" oninput="saveGeneralConfig()">
+        <span class="general-field-label">Dirección</span>
+        <input class="general-field-input" id="cfgDireccion" type="text" placeholder="Ej: Av. Principal 123" oninput="saveGeneralConfig()">
       </div>
       <div class="general-field">
         <span class="general-field-label">Teléfono</span>
@@ -1610,6 +1686,7 @@
         <input class="general-field-input" id="cfgMoneda" type="text" value="₲ (Guaraní)" readonly style="color:#777;">
       </div>
     </div>
+
   </div>
 </div>
 
@@ -1821,8 +1898,8 @@
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><circle cx="11" cy="14" r="3"/><line x1="11" y1="11" x2="11" y2="8"/></svg>
     <span>Modificadores</span>
   </div>
-  <div class="art-menu-item" onclick="toast('Descuentos — próximamente')">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+  <div class="art-menu-item" onclick="goTo('scDescuentos')">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
     <span>Descuentos</span>
   </div>
   <div class="art-menu-footer">
@@ -1848,6 +1925,73 @@
   </div>
   <div class="art-list" id="artList"></div>
 </div>
+
+<!-- ======== SCREEN: DESCUENTOS ======== -->
+<div id="scDescuentos" class="screen">
+  <header class="header">
+    <button class="hbtn" onclick="goTo('scArticulos')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="htitle"><span class="htitle-text">Descuentos</span></div>
+    <button class="hbtn" onclick="abrirNuevoDesc()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+  </header>
+  <div style="flex:1;overflow-y:auto;padding:12px;">
+
+    <!-- Info -->
+    <div style="background:rgba(76,175,80,.08);border:1px solid rgba(76,175,80,.2);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#aaa;line-height:1.6;">
+      Los descuentos aparecen como una <b style="color:#fff;">categoría especial</b> en la pantalla de ventas.<br>
+      Al seleccionarlo se aplica al ticket como ítem — sin valores negativos, compatible con facturas SET.
+    </div>
+
+    <!-- Lista de descuentos -->
+    <div id="descList"></div>
+
+  </div>
+
+  <!-- Modal nuevo/editar descuento -->
+  <div id="mDescOv" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:flex-end;justify-content:center;">
+    <div style="background:var(--card);border-radius:16px 16px 0 0;width:100%;max-width:480px;padding:20px 18px 32px;">
+      <div style="font-size:16px;font-weight:800;margin-bottom:16px;" id="mDescTitulo">Nuevo Descuento</div>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:5px;">NOMBRE</label>
+        <input id="mDescNombre" type="text" placeholder="Ej: Descuento Cliente VIP" maxlength="40"
+          style="width:100%;background:#1e1e1e;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:inherit;font-size:15px;padding:11px 14px;outline:none;box-sizing:border-box;">
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:5px;">TIPO</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <button id="mDescTipoPct" onclick="selDescTipo('%')"
+            style="padding:12px;border-radius:8px;border:2px solid var(--green);background:rgba(76,175,80,.1);color:var(--green);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">
+            % Porcentaje
+          </button>
+          <button id="mDescTipoMonto" onclick="selDescTipo('monto')"
+            style="padding:12px;border-radius:8px;border:2px solid #2a2a2a;background:transparent;color:#aaa;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">
+            ₲ Monto fijo
+          </button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:5px;">
+          VALOR <span style="color:#555;font-weight:400;">(dejar vacío para ingresar en el momento)</span>
+        </label>
+        <input id="mDescValor" type="number" min="0" placeholder="Dejar vacío = se ingresa al vender"
+          style="width:100%;background:#1e1e1e;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:inherit;font-size:18px;font-weight:700;padding:11px 14px;outline:none;box-sizing:border-box;text-align:center;">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <button onclick="cerrarMDesc()" style="padding:14px;border-radius:8px;border:1.5px solid #333;background:transparent;color:#888;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">CANCELAR</button>
+        <button onclick="guardarDesc()" style="padding:14px;border-radius:8px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">GUARDAR</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
 
 <!-- ======== SCREEN: NUEVO / EDITAR ARTICULO ======== -->
 <div id="scArticuloNuevo" class="screen">
@@ -1941,6 +2085,21 @@
           <span class="toggle-slider"></span>
         </label>
       </div>
+    </div>
+
+    <!-- Imagen del producto -->
+    <div class="art-section-title">Imagen</div>
+    <div style="padding:0 14px 14px;">
+      <div id="artImgPreview" style="display:none;position:relative;margin-bottom:10px;">
+        <img id="artImgPreviewImg" src="" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px;display:block;">
+        <button onclick="quitarImagen()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);border:none;border-radius:50%;width:28px;height:28px;color:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;">✕</button>
+      </div>
+      <div id="artImgUpload" style="border:2px dashed #2a2a2a;border-radius:10px;padding:20px;text-align:center;cursor:pointer;" onclick="document.getElementById('artImgInput').click()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.5" style="margin-bottom:6px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <div style="font-size:13px;color:#555;">Tocá para subir imagen</div>
+        <div style="font-size:11px;color:#333;margin-top:2px;">JPG, PNG — se recorta a cuadrado</div>
+      </div>
+      <input type="file" id="artImgInput" accept="image/*" style="display:none" onchange="onArtImgChange(this)">
     </div>
 
   </div>
@@ -2218,7 +2377,7 @@
     <button class="btn-cobrar"><span>COBRAR</span><span class="camount">₲0</span></button>
   </div>
   <div class="filter-bar">
-    <div class="fdrop"><span>Todos los artículos</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></div>
+    <div class="fdrop" onclick="openCat()"><span id="catLbl">Todos los artículos</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></div>
     <button class="fsearch"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
   </div>
   <div class="ccontent">
@@ -2273,12 +2432,14 @@
 
     <!-- Products view -->
     <div id="prodView" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
-      <div class="filter-bar">
+      <!-- Desktop pill bar -->
+  <div class="cat-pill-bar" id="catPillBar" style="display:none;"></div>
+  <div class="filter-bar">
         <div class="fdrop" onclick="openCat()"><span id="catLbl">Todos los artículos</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></div>
         <button class="fsearch" onclick="toggleSearch()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
       </div>
       <div class="search-bar" id="sbar"><input class="sinput" id="sinput" placeholder="Buscar producto..." oninput="filterP()"></div>
-      <div class="products-grid" id="pgrid"></div>
+<div class="products-grid" id="pgrid"></div>
     </div>
 
     <!-- Ticket panel (móvil) -->
@@ -2339,6 +2500,7 @@
     </div>
     <div class="det-footer-btns">
       <button class="det-guardar-btn" onclick="goGuardar()">GUARDAR</button>
+      <button class="det-cobrar-btn" onclick="imprimirComandaPreCobro()" style="background:#1565c0;margin-right:6px;padding:14px 12px;" title="Comanda cocina">🍳</button>
       <button class="det-cobrar-btn" onclick="goCobrar()">COBRAR</button>
     </div>
   </div>
@@ -2349,10 +2511,17 @@
   <div class="cobrar-hdr">
     <button class="cbk" onclick="goTo('scSale')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
     <button class="cdividir" onclick="goDividir()">DIVIDIR</button>
+    <button class="cdividir" onclick="abrirDescTicket()" id="btnDescTicket" style="background:var(--orange);color:#fff;">% DESC</button>
+    <button class="cdividir" onclick="imprimirComandaPreCobro()" style="background:#1565c0;color:#fff;" title="Imprimir comanda cocina">🍳</button>
   </div>
   <div class="cbody">
     <div class="ctotal" id="ctotal">₲0</div>
     <p class="ctotal-lbl">Importe total adeudado</p>
+    <!-- Descuento en ticket -->
+    <div id="descTicketRow" style="display:none;background:rgba(255,152,0,.1);border:1px solid rgba(255,152,0,.3);border-radius:8px;padding:8px 14px;margin:0 16px 8px;display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:12px;color:var(--orange);">Descuento aplicado</span>
+      <span style="font-size:13px;font-weight:700;color:var(--orange);" id="descTicketMonto">-₲0</span>
+    </div>
     <div class="efec-sec" id="efecSec">
       <p class="efec-lbl">Efectivo recibido</p>
       <div class="efec-row" onclick="openNP('cobrar')">
@@ -2399,6 +2568,8 @@
         <span class="ftag" id="facturaBadge">OPCIONAL</span>
       </button>
       <div class="factura-form" id="facturaForm">
+        <!-- Timbrado info banner -->
+        <div id="timbradoInfo" style="display:none;background:rgba(255,255,255,.04);border:1px solid #2a2a2a;border-radius:8px;padding:10px 12px;margin-bottom:10px;"></div>
         <div class="factura-field">
           <span class="factura-label">RUC / C.I.</span>
           <div style="display:flex;align-items:center;gap:8px;">
@@ -2527,50 +2698,86 @@
 
 <!-- CATEGORY SHEET -->
 <div class="cat-overlay" id="catOv" onclick="closeCat(event)">
-  <div class="cat-sheet" id="catSheetContent"></div>
+  <div class="cat-sheet">
+    <div class="cat-sheet-hdr">
+      <span class="cat-sheet-ttl">Categorías</span>
+      <button class="cat-sheet-cls" onclick="document.getElementById('catOv').classList.remove('open')">✕</button>
+    </div>
+    <div id="catSheetContent"></div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 const PRODS = [
-  {id:1,name:'ASADITO',price:35000,color:'#e65100',cat:'Comidas'},
-  {id:2,name:'COCA COLA 1,5L',price:8000,color:'#c62828',cat:'Bebidas'},
-  {id:3,name:'COCA COLA 500ML',price:5000,color:'#b71c1c',cat:'Bebidas'},
-  {id:4,name:'LOMITO ÁRABE POLLO',price:28000,color:'#2e7d32',cat:'Minutas'},
-  {id:5,name:'LOMITOS ÁRABE CARNE',price:30000,color:'#1b5e20',cat:'Minutas'},
-  {id:6,name:'PAPAS CON CHEDAR',price:15000,color:'#827717',cat:'Extras'},
-  {id:7,name:'PAPAS FRITAS G',price:12000,color:'#6d6f1a',cat:'Extras'},
-  {id:8,name:'PAPAS FRITAS P',price:8000,color:'#6d6f1a',cat:'Extras'},
-  {id:9,name:'SÁNDWICH LOMITO C.',price:32000,color:'#33691e',cat:'Minutas'},
-  {id:10,name:'AGUA MINERAL',price:3000,color:'#01579b',cat:'Bebidas'},
-  {id:11,name:'SPRITE 500ML',price:5000,color:'#2e7d32',cat:'Bebidas'},
-  {id:12,name:'MILANESA COMPLETA',price:38000,color:'#bf360c',cat:'Comidas'},
-  {id:99,name:'ÍTEM LIBRE',price:0,color:'#546e7a',cat:'Otros',precioVariable:true,itemLibre:true,iva:'10'},
-];
+  // El ítem libre siempre existe (id:99) — no se guarda en Supabase
+  {id:99,name:'ÍTEM LIBRE',price:0,color:'#546e7a',cat:'Otros',
+   precioVariable:true,itemLibre:true,iva:'10',colorPropio:false},
+]
 
 let cart=[], curCat='Todos los artículos', showTkt=false, npCtx='', npVal='';
+let ticketDescuento=0; // % descuento en ticket total
 
 // NAV
-function goTo(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+function goTo(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); if(id==='scConfig') setTimeout(renderConfigInfo,50); if(id==='scConfigGeneral') setTimeout(renderGeneralInfo,50); if(id==='scDescuentos') setTimeout(renderDescList,50); if(id==='scArticulosList') setTimeout(renderArtList,50); }
 async function doOpenShift(){
   const v = parseInt(document.getElementById('shiftDisp').textContent.replace(/[₲.,]/g,''))||0;
+
+  // Verificar licencia antes de abrir turno (si hay internet)
   if(navigator.onLine){
-    try{const ok=await Promise.race([licVerificarAhora(),new Promise(r=>setTimeout(()=>r(true),3000))]);if(!ok)return;}catch(e){}
+    const btn = document.querySelector('#scShift .shift-open-btn') || document.querySelector('[onclick="doOpenShift()"]');
+    if(btn){ btn.textContent='Verificando...'; btn.disabled=true; }
+    const ok = await licVerificarAhora();
+    if(btn){ btn.textContent='ABRIR EL TURNO'; btn.disabled=false; }
+    if(!ok) return; // licMostrarBloqueo ya fue llamado
   }
+
   turnoData.fechaApertura = new Date();
-  turnoData.supaId = null;
   turnoData.efectivoInicial = v;
   turnoData.ventas = [];
   turnoData.egresos = [];
   turnoData.ingresos = [];
+  turnoData.supaId = null;
+  // Persistir apertura en localStorage
   turnoGuardar();
+  // Guardar apertura en Supabase
+  supaInsertTurno('abierto', v);
+  if(db) dbAbrirTurno(v);
   goTo('scSale'); renderP(PRODS); toast('Turno abierto ✓');
+}
+
+function supaInsertTurno(estado, efectivoInicial){
+  const email = localStorage.getItem('lic_email');
+  if(!email) return;
+  const data = {
+    fecha_apertura:   new Date().toISOString(),
+    efectivo_inicial: efectivoInicial || 0,
+    estado:           estado,
+    terminal:         localStorage.getItem('pos_terminal') || 'Terminal 1',
+    sucursal:         localStorage.getItem('pos_sucursal') || 'Principal',
+    licencia_email:   email,
+    total_vendido:    0,
+  };
+  fetch(SUPA_URL+'/rest/v1/pos_turno',{
+    method:'POST',
+    headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=representation'},
+    body: JSON.stringify(data)
+  }).then(r=>r.json()).then(rows=>{
+    if(rows&&rows[0]) turnoData.supaId = rows[0].id;
+  }).catch(e=>console.warn('[Turno] Error Supabase:', e.message));
 }
 function goCobrar(){
   const t=calcTotal(); if(!t){toast('Agregá productos primero');return;}
   document.getElementById('ctotal').textContent=gs(t);
   document.getElementById('efecVal').textContent=gs(t);
+  // Show discount row if active
+  const row = document.getElementById('descTicketRow');
+  const montoEl = document.getElementById('descTicketMonto');
+  if(row) row.style.display = ticketDescuento>0 ? 'flex' : 'none';
+  if(montoEl) montoEl.textContent = '-'+gs(calcDescuentoMonto());
+  const btn = document.getElementById('btnDescTicket');
+  if(btn) btn.textContent = ticketDescuento>0 ? ticketDescuento+'% DESC' : '% DESC';
   document.querySelectorAll('.pay-btn').forEach((b,i)=>b.classList.toggle('sel',i===0));
   document.getElementById('efecSec').style.display='block';
   document.getElementById('vueltoRow').classList.remove('show');
@@ -2581,10 +2788,22 @@ function goCobrar(){
 }
 
 // PRODUCTS
+function diag(msg){ /* diag disabled */ }
+
 function renderP(list){
   const g=document.getElementById('pgrid');
   if(!list.length){g.innerHTML='<div style="grid-column:span 3;padding:40px;text-align:center;color:#555;font-size:14px;">Sin resultados</div>';return;}
-  g.innerHTML=list.map(p=>`<div class="ptile" style="background:${getProductColor(p)}" onclick="addCart(${p.id})"><span class="pname">${p.name}</span></div>`).join('');
+  g.innerHTML=list.map(p=>{
+    if(p.imagen){
+      return '<div class="ptile" style="background:'+getProductColor(p)+';position:relative;overflow:hidden;" onclick="addCart('+p.id+')">'+
+        '<img src="'+p.imagen+'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;" onerror="this.remove()">'+
+        '<div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.75));padding:6px 4px 4px;">'+
+          '<span class="pname" style="text-shadow:0 1px 3px rgba(0,0,0,.9);">'+p.name+'</span>'+
+        '</div>'+
+      '</div>';
+    }
+    return '<div class="ptile" style="background:'+getProductColor(p)+'" onclick="addCart('+p.id+')"><span class="pname">'+p.name+'</span></div>';
+  }).join('');
 }
 function filterP(){
   const q = document.getElementById('sinput').value.toLowerCase();
@@ -2612,6 +2831,31 @@ function filterP(){
   if(q) l = l.filter(p=>p.name.toLowerCase().includes(q));
   renderP(l);
 }
+
+function renderDescuentosTiles(){
+  const g = document.getElementById('pgrid');
+  const descIds2 = new Set(DESCUENTOS.map(d=>String(d.id)));
+  const prodsDesc2 = PRODS.filter(p=>
+    p.cat==='Descuentos' && p.activo!==false && !descIds2.has(String(p.id))
+  );
+  const descs = [
+    ...DESCUENTOS.filter(d=>d.activo!==false),
+    ...prodsDesc2.map(p=>({id:p.id,name:p.name,tipo:p.descTipo||'%',valor:p.descValor||null}))
+  ];
+  if(!descs.length){
+    g.innerHTML = '<div style="grid-column:span 3;padding:40px;text-align:center;color:#555;font-size:14px;">Sin descuentos — creá uno en Artículos → Descuentos</div>';
+    return;
+  }
+  g.innerHTML = descs.map(d => {
+    const valStr = d.valor!=null
+      ? (d.tipo==='%' ? d.valor+'%' : gs(d.valor))
+      : 'valor al vender';
+    return '<div class="ptile" style="background:#b71c1c;" onclick="addDescuento('+d.id+')">'+
+      '<span class="pname" style="font-size:11px;">'+d.name+'<br>'+
+      '<span style="font-size:13px;font-weight:800;">'+valStr+'</span></span>'+
+    '</div>';
+  }).join('');
+}
 function toggleSearch(){
   const sb=document.getElementById('sbar'); sb.classList.toggle('open');
   if(sb.classList.contains('open'))document.getElementById('sinput').focus();
@@ -2636,7 +2880,28 @@ function chgQty(lineId,d){
   if(cart[idx].qty<=0) cart.splice(idx,1);
   updUI(); updBtnGuardar(); renderTkt();
 }
-function calcTotal(){ return cart.reduce((s,i)=>s+i.price*i.qty,0); }
+function calcItemTotal(item){
+  if(item.esDescuento) return item.price; // ya es negativo
+  const base = item.price * item.qty;
+  if(item.desc && item.desc > 0) return Math.round(base * (1 - item.desc/100));
+  return base;
+}
+function calcSubtotal(){
+  // Solo ítems normales (sin descuentos)
+  return cart.filter(i=>!i.esDescuento).reduce((s,i)=>s+calcItemTotal(i),0);
+}
+function calcTotalDescuentos(){
+  // Suma de descuentos aplicados (montoDesc positivo)
+  return cart.filter(i=>i.esDescuento).reduce((s,i)=>s+(i.montoDesc||0),0);
+}
+function calcTotal(){
+  const sub  = calcSubtotal();
+  const desc = calcTotalDescuentos();
+  // Aplicar descuento de ticket si hay
+  const conTicketDesc = ticketDescuento>0 ? Math.round(sub*(1-ticketDescuento/100)) : sub;
+  return conTicketDesc - desc;
+}
+function calcDescuentoMonto(){ return calcSubtotal() - calcTotal(); }
 function updUI(){
   const t=calcTotal(), c=cart.reduce((s,i)=>s+i.qty,0);
   document.getElementById('sAmt').textContent=gs(t);
@@ -2660,25 +2925,73 @@ function toggleTicket(){
 function renderTkt(){
   const tl=document.getElementById('tlist');
   if(!cart.length){tl.innerHTML='<div class="tempty"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg><p>Ticket vacío</p></div>';return;}
-  tl.innerHTML=cart.map(i=>`<div class="titem"><div class="tiname">${i.name}${i.obs?'<div style="font-size:11px;color:#888;font-weight:400;text-transform:none;margin-top:2px;">'+i.obs+'</div>':''}</div><div class="tictrl"><button class="qbtn" onclick="chgQty(${i.lineId},-1)">−</button><span class="qnum">${i.qty}</span><button class="qbtn" onclick="chgQty(${i.lineId},1)">+</button></div><div class="tiprice">${gs(i.price*i.qty)}</div></div>`).join('');
+  tl.innerHTML=cart.map(i=>i.esDescuento
+    ? `<div class="titem" style="border-left:2px solid #ef5350;">
+        <div class="tiname" style="color:#ef9a9a;">${i.name}</div>
+        <div class="tictrl"><button class="qbtn" onclick="chgQty(${i.lineId},-1)">✕</button></div>
+        <div class="tiprice" style="color:#ef5350;">-${gs(i.montoDesc)}</div>
+       </div>`
+    : `<div class="titem"><div class="tiname">${i.name}${i.obs?'<div style="font-size:11px;color:#888;font-weight:400;text-transform:none;margin-top:2px;">'+i.obs+'</div>':''}</div><div class="tictrl"><button class="qbtn" onclick="chgQty(${i.lineId},-1)">−</button><span class="qnum">${i.qty}</span><button class="qbtn" onclick="chgQty(${i.lineId},1)">+</button></div><div class="tiprice">${gs(i.price*i.qty)}</div></div>`
+  ).join('');
 }
 
 // CATEGORIES
 function openCat(){
   const sheet = document.getElementById('catSheetContent');
   const todos = 'Todos los artículos';
-  let html = '<div class="cat-item ' + (curCat===todos?'sel':'') + '" onclick="pickCat(this)">' + todos + '</div>';
-  CATEGORIAS.forEach(c => {
-    html += '<div class="cat-item ' + (curCat===c.nombre?'sel':'') + '" onclick="pickCat(this)">' + c.nombre + '</div>';
-  });
+
+  function catItem(nombre, color){
+    const sel = curCat===nombre;
+    const style = color ? 'color:'+color+';border-left-color:'+color+';' : '';
+    return '<div class="cat-item'+(sel?' sel':'')+'" onclick="pickCat(this)" style="'+style+'">'+
+      '<div class="cat-item-ic"></div>'+nombre+'</div>';
+  }
+
+  let html = catItem(todos);
+  CATEGORIAS.forEach(c => { html += catItem(c.nombre); });
+
+  // Descuentos si hay
+  const hasDescs = DESCUENTOS.filter(d=>d.activo!==false).length ||
+    PRODS.filter(p=>p.cat==='Descuentos'&&p.activo!==false).length;
+  if(hasDescs){
+    html += catItem('🏷️ Descuentos', '#ef5350');
+  }
+
   sheet.innerHTML = html;
   document.getElementById('catOv').classList.add('open');
+
+  // Desktop: also update pill bar
+  renderCatPills();
+}
+
+function renderCatPills(){
+  const bar = document.getElementById('catPillBar');
+  if(!bar) return;
+  const todos = 'Todos los artículos';
+  const cats = [todos, ...CATEGORIAS.map(c=>c.nombre)];
+  const hasDescs = DESCUENTOS.filter(d=>d.activo!==false).length ||
+    PRODS.filter(p=>p.cat==='Descuentos'&&p.activo!==false).length;
+  if(hasDescs) cats.push('🏷️ Descuentos');
+
+  bar.innerHTML = cats.map(function(c){
+    const sel = curCat===c ? ' sel' : '';
+    const safe = c.replace(/"/g,'&quot;');
+    return '<button class="cat-pill'+sel+'" onclick="pickCat(this)">'+c+'</button>';
+  }).join('');
+}
+
+function renderCategoriasVenta(){
+  // Refrescar el catOv si está abierto
+  if(document.getElementById('catOv')?.classList.contains('open')) openCat();
 }
 function closeCat(e){ if(e.target===document.getElementById('catOv'))document.getElementById('catOv').classList.remove('open'); }
 function pickCat(el){
   const cat = typeof el === 'string' ? el : el.textContent.trim();
-  curCat=cat; document.getElementById('catLbl').textContent=cat;
+  curCat = cat;
+  const lbl = document.getElementById('catLbl');
+  if(lbl) lbl.textContent = cat;
   document.getElementById('catOv').classList.remove('open');
+  renderCatPills();
   filterP();
 }
 
@@ -2724,6 +3037,22 @@ function renderDetalle(){
 
     const delIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
 
+    // Ítem de descuento — renderizado especial
+    if(item.esDescuento){
+      div.style.borderLeft = '3px solid #ef5350';
+      div.innerHTML =
+        '<div class="det-item-main">' +
+          '<div class="det-item-color" style="background:#e53935;font-size:9px;font-weight:800;">%</div>' +
+          '<div class="det-item-name" style="color:#ef9a9a;">' + item.name + '</div>' +
+          '<div class="det-item-subtotal" style="color:#ef5350;">-' + gs(item.montoDesc) + '</div>' +
+        '</div>' +
+        '<div class="det-item-controls">' +
+          '<button class="det-qbtn del" onclick="detChgQty(' + item.lineId + ',-1)">' + delIcon + '</button>' +
+        '</div>';
+      list.appendChild(div);
+      return;
+    }
+
     div.innerHTML =
       '<div class="det-item-main">' +
         '<div class="det-item-color" style="background:' + item.color + '"></div>' +
@@ -2741,9 +3070,20 @@ function renderDetalle(){
           '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
           (item.obs ? 'Obs: ' + item.obs.substring(0,20) : 'Observación') +
         '</button>' +
+        '<button class="det-obs-toggle" style="color:' + (item.desc>0?'var(--orange)':'var(--muted)') + '" onclick="toggleDetDesc(' + item.lineId + ')">' +
+          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>' +
+          (item.desc>0 ? 'Desc: ' + item.desc + '%' : 'Descuento') +
+        '</button>' +
       '</div>' +
       '<div class="det-obs-box' + (item.obs?' open':'') + '" id="detObs_' + item.lineId + '">' +
         '<input class="det-obs-input" type="text" placeholder="Ej: Sin cebolla, bien cocido..." maxlength="60" value="' + (item.obs||'') + '" oninput="saveDetObs(' + item.lineId + ', this.value)">' +
+      '</div>' +
+      '<div class="det-obs-box' + (item.desc>0?' open':'') + '" id="detDesc_' + item.lineId + '" style="display:' + (item.desc>0?'block':'none') + ';">' +
+        '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;">' +
+          '<span style="font-size:12px;color:var(--muted);flex-shrink:0;">Descuento %</span>' +
+          '<input class="det-obs-input" type="number" min="0" max="100" placeholder="0" value="' + (item.desc||'') + '" style="width:70px;text-align:center;" oninput="saveDetDesc(' + item.lineId + ', this.value)">' +
+          '<span style="font-size:12px;color:var(--orange);flex-shrink:0;">= ' + gs(calcItemTotal(item)) + '</span>' +
+        '</div>' +
       '</div>';
 
     list.appendChild(div);
@@ -2771,9 +3111,70 @@ function toggleDetObs(lineId){
 function saveDetObs(lineId, val){
   const item = cart.find(l=>l.lineId===lineId);
   if(item) item.obs = val;
-  // NO re-renderizar — solo actualizar el botón de obs inline
   const btn = document.querySelector('#detItem_'+lineId+' .det-obs-toggle');
   if(btn) btn.lastChild.textContent = val ? ' Obs: '+val.substring(0,20) : ' Observación';
+}
+
+function toggleDetDesc(lineId){
+  const el = document.getElementById('detDesc_'+lineId);
+  if(!el) return;
+  const open = el.style.display === 'block';
+  el.style.display = open ? 'none' : 'block';
+  if(!open) setTimeout(()=>el.querySelector('input')?.focus(), 50);
+}
+
+function saveDetDesc(lineId, val){
+  const item = cart.find(i=>i.lineId===lineId);
+  if(!item) return;
+  item.desc = Math.min(100, Math.max(0, parseFloat(val)||0));
+  updUI();
+  // Update subtotal in row
+  const sub = document.querySelector('#detItem_'+lineId+' .det-item-subtotal');
+  if(sub) sub.textContent = gs(calcItemTotal(item));
+  // Update desc button label
+  const btns = document.querySelectorAll('#detItem_'+lineId+' .det-obs-toggle');
+  if(btns[1]) btns[1].style.color = item.desc>0 ? 'var(--orange)' : 'var(--muted)';
+  // Update desc amount in box
+  const span = document.querySelector('#detDesc_'+lineId+' span:last-child');
+  if(span) span.textContent = '= '+gs(calcItemTotal(item));
+}
+
+function imprimirComandaPreCobro(){
+  if(!cart.length){ toast('Sin productos'); return; }
+  const d = new Date();
+  imprimirComanda({
+    items:     cart,
+    fecha:     d,
+    nroTicket: nroTicket || ticketCounter,
+    factura:   null
+  });
+}
+
+function abrirDescTicket(){
+  const actual = ticketDescuento > 0 ? ticketDescuento : '';
+  const val = prompt('Descuento en ticket total (%) — Ingresá 0 para quitar:', actual);
+  if(val === null) return;
+  const pct = Math.min(100, Math.max(0, parseFloat(val)||0));
+  ticketDescuento = pct;
+  updUI();
+  // Update cobrar screen
+  const t     = calcTotal();
+  const monto = calcDescuentoMonto();
+  const row   = document.getElementById('descTicketRow');
+  const montoEl = document.getElementById('descTicketMonto');
+  const btn   = document.getElementById('btnDescTicket');
+  if(row){
+    row.style.display = pct > 0 ? 'flex' : 'none';
+  }
+  if(montoEl) montoEl.textContent = '-'+gs(monto);
+  if(btn){
+    btn.textContent = pct > 0 ? pct+'% DESC' : '% DESC';
+    btn.style.background = pct > 0 ? 'var(--orange)' : 'var(--orange)';
+  }
+  document.getElementById('ctotal').textContent = gs(t);
+  document.getElementById('efecVal').textContent = gs(t);
+  if(pct > 0) toast('Descuento '+pct+'% aplicado — '+gs(monto)+' de descuento');
+  else toast('Descuento eliminado');
 }
 
 function vaciarTicket(){
@@ -2829,42 +3230,45 @@ function goGuardar(){
   setTimeout(()=>document.getElementById('guardObs').focus(), 300);
 }
 
+function guardarPendientesLocal(){
+  try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){}
+}
+
 function doGuardar(){
   const obs = document.getElementById('guardObs').value.trim();
 
   if(currentTicketNro !== null){
-    // ticket existente → actualizar en la lista de pendientes
+    // Actualizar ticket existente
     const idx = pendientes.findIndex(t => t.nro === currentTicketNro);
     if(idx >= 0){
       pendientes[idx].cart  = JSON.parse(JSON.stringify(cart));
       pendientes[idx].total = calcTotal();
       pendientes[idx].obs   = obs || pendientes[idx].obs;
-      pendientes[idx].fecha = new Date();
+      pendientes[idx].fecha = new Date().toISOString();
     }
     const nro = currentTicketNro;
-    cart=[];
     currentTicketNro = null;
-    updUI();
-    updBtnGuardar();
+    cart = [];
+    updUI(); updBtnGuardar();
+    guardarPendientesLocal(); // ← SIEMPRE guardar
     goTo('scSale');
-    toast('✓ Ticket #' + String(nro).padStart(4,'0') + ' actualizado');
+    toast('✓ Ticket #'+String(nro).padStart(4,'0')+' actualizado');
   } else {
-    // ticket nuevo → crear
-    const nro = ticketCounter;
+    // Ticket nuevo
+    const nro = ticketCounter++;
     pendientes.push({
       nro,
-      obs: obs || '',
-      cart: JSON.parse(JSON.stringify(cart)),
+      obs:   obs || '',
+      cart:  JSON.parse(JSON.stringify(cart)),
       total: calcTotal(),
-      fecha: new Date()
+      fecha: new Date().toISOString()
     });
-    ticketCounter++;
-    cart=[];
     currentTicketNro = null;
-    updUI();
-    updBtnGuardar();
+    cart = [];
+    updUI(); updBtnGuardar();
+    guardarPendientesLocal(); // ← SIEMPRE guardar
     goTo('scSale');
-    toast('✓ Ticket #' + String(nro).padStart(4,'0') + ' guardado');
+    toast('✓ Ticket #'+String(nro).padStart(4,'0')+' guardado');
   }
 }
 
@@ -2929,6 +3333,7 @@ function cargarTicket(i){
 }
 
 function nuevaVenta(){
+  try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){}
   const totalActual = calcTotal();
   if(totalActual > 0){
     // guardar la venta actual automáticamente
@@ -3154,12 +3559,24 @@ function confirmarPago(){
   const nroTicket = currentTicketNro;
   const facturaData = getFacturaData();
 
+  // Avanzar nro factura si hubo factura
+  if(facturaData && facturaData.timbrado){
+    avanzarNroFactura(timbradoSeleccionado || getTimbradoActivo());
+    timbradoSeleccionado = null; // reset para próxima venta
+    timbradoSession = getTimbradoActivo(); // refresh
+  }
+
+  // Reset descuentos
+  ticketDescuento = 0;
+  cart.forEach(i=>{ delete i.desc; });
+
   // Limpiar estado
   if(currentTicketNro !== null){
     const idx = pendientes.findIndex(p => p.nro === currentTicketNro);
     if(idx >= 0) pendientes.splice(idx, 1);
     currentTicketNro = null;
   }
+  try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){}
   cart=[];
   updUI();
   updBtnGuardar();
@@ -3184,6 +3601,8 @@ function confirmarPago(){
   generarRecibo({
     items: itemsVenta,
     total: totalVenta,
+    descTicket: ticketDescuento,
+    descMonto: calcDescuentoMonto(),
     metodo: metodoPago,
     comprobante: comprobante==='—'?'':comprobante,
     efectivo: efectivoEntregado,
@@ -3198,6 +3617,293 @@ function confirmarPago(){
 // FACTURA
 let facturaActiva = false;
 let rucTimer = null;
+let timbradoSession = null; // timbrado cargado para esta sesión
+
+async function cargarTimbradoSesion(){
+  const terminal = localStorage.getItem('pos_terminal')||'Terminal 1';
+  const email    = localStorage.getItem('lic_email');
+  if(!email || USAR_DEMO){ timbradoSession = getTimbradoActivo(); return; }
+
+  try {
+    const r = await fetch(SUPA_URL+'/rest/v1/rpc/get_timbrado_terminal',{
+      method:'POST',
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json'},
+      body: JSON.stringify({ p_email:email, p_terminal:terminal })
+    });
+    const d = await r.json();
+    if(d && d.nro){
+      // Guardar en cache de sesión y localStorage
+      window._timbradoCache = d;
+      localStorage.setItem('pos_timbrado_activo', JSON.stringify(d));
+      // Actualizar localStorage para modo offline
+      const tims = [{ ...d, asignaciones:[{ terminal, punto_exp:d.punto_exp, nro_actual:d.nro_actual }] }];
+      localStorage.setItem('pos_timbrados', JSON.stringify(tims));
+      localStorage.setItem('pos_timbrados_mapa', JSON.stringify({ [terminal]:{timIdx:0,asigIdx:0} }));
+      timbradoSession = d;
+      console.log('[Timbrado] ✅ Cargado:', d.nro, '| Próx.:', getNroFactura(d));
+    } else {
+      console.warn('[Timbrado] Sin asignación para terminal:', terminal, d);
+      timbradoSession = getTimbradoActivo(); // fallback local
+    }
+  } catch(e){
+    console.warn('[Timbrado] Error RPC:', e.message);
+    timbradoSession = getTimbradoActivo();
+  }
+}
+
+// Descargar config, timbrados y mapa desde Supabase
+async function sincronizarConfigNegocio(){
+  const email = localStorage.getItem('lic_email');
+  if(!email || USAR_DEMO) return;
+  try {
+    // Descargar todas las claves de config en una sola query
+    const rows = await fetch(
+      SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+
+      '&clave=in.(negocio_config,timbrados_config,timbrados_mapa)',
+      { headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'} }
+    ).then(r=>r.ok?r.json():[]);
+
+    rows.forEach(row => {
+      try {
+        const val = JSON.parse(row.valor||'{}');
+
+        if(row.clave === 'negocio_config'){
+          if(val.an)  configData.negocio   = val.an;
+          if(val.ar)  configData.ruc        = val.ar;
+          if(val.ad)  configData.direccion  = val.ad;
+          if(val.ciudad) configData.ciudad  = val.ciudad;
+          if(val.at)  configData.telefono   = val.at;
+          if(val.email_negocio) configData.email = val.email_negocio;
+          if(val.pie_recibo)    configData.pie_recibo  = val.pie_recibo;
+          if(val.mostrar_ruc)   configData.mostrar_ruc = val.mostrar_ruc;
+          if(val.moneda)        configData.moneda = val.moneda;
+          Object.entries(val).forEach(([k,v])=>{ if(v) localStorage.setItem(k,v); });
+          console.log('[Config] Negocio:', configData.negocio, '| RUC:', configData.ruc);
+        }
+
+        // timbrados_config y timbrados_mapa ahora vienen de tablas específicas
+        // Se cargan via cargarTimbradoSesion()
+
+      } catch(e){ console.warn('[Config] Error parsing', row.clave, e.message); }
+    });
+
+    // Recargar timbrado activo con los nuevos datos
+    cargarTimbradoSesion();
+
+  } catch(e){ console.warn('[Config] Error sync:', e.message); }
+}
+
+// Renderizar info en scConfigGeneral
+function renderGeneralInfo(){
+  const el = document.getElementById('generalInfoPanel');
+  if(!el) return;
+
+  const terminal = localStorage.getItem('pos_terminal') || 'Terminal 1';
+  const sucursal = localStorage.getItem('pos_sucursal') || '—';
+  const tim = getTimbradoActivo();
+  const pad3 = n => String(n||0).padStart(3,'0');
+  const padN = n => String(n||0).padStart(7,'0');
+
+  el.innerHTML = `
+    <!-- Terminal -->
+    <div style="background:#111;border:1.5px solid #2a2a2a;border-radius:10px;overflow:hidden;margin-bottom:14px;">
+      <div style="padding:10px 14px;border-bottom:1px solid #1e1e1e;display:flex;align-items:center;gap:8px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <span style="font-size:10px;font-weight:800;color:var(--green);letter-spacing:1px;text-transform:uppercase;">Esta Terminal</span>
+      </div>
+      <div style="padding:10px 14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-size:12px;color:#777;">Nombre</span>
+          <span style="font-size:16px;font-weight:800;color:#fff;">${terminal}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:#777;">Sucursal</span>
+          <span style="font-size:13px;font-weight:600;color:#ccc;">${sucursal}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timbrado -->
+    ${tim ? `
+    <div style="background:#111;border:1.5px solid rgba(76,175,80,.3);border-radius:10px;overflow:hidden;margin-bottom:14px;">
+      <div style="padding:10px 14px;border-bottom:1px solid #1e1e1e;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span style="font-size:10px;font-weight:800;color:var(--green);letter-spacing:1px;text-transform:uppercase;">Punto de Expedición Activo</span>
+        </div>
+        <span style="font-size:10px;background:var(--green2);color:var(--green);padding:2px 8px;border-radius:10px;font-weight:700;">✓ CONFIGURADO</span>
+      </div>
+      <div style="padding:10px 14px;display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-size:12px;color:#777;">Timbrado</span>
+          <span style="font-size:13px;font-weight:800;color:#fff;font-family:monospace;">${tim.nro}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-size:12px;color:#777;">Punto exp.</span>
+          <span style="font-size:13px;font-weight:700;color:#ccc;font-family:monospace;">${pad3(tim.sucursal)}-${pad3(tim.punto_exp)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding-top:4px;border-top:1px solid #1e1e1e;">
+          <span style="font-size:12px;color:#777;">Próxima factura</span>
+          <span style="font-size:14px;font-weight:800;color:var(--green);font-family:monospace;">${pad3(tim.sucursal)}-${pad3(tim.punto_exp)}-${padN(tim.nro_actual||tim.desde||1)}</span>
+        </div>
+        ${(tim.tipo==='electronico' && tim.cert_venc) ? (() => {
+          const dias = Math.ceil((new Date(tim.cert_venc+' 00:00:00')-new Date())/(1000*60*60*24));
+          if(dias <= 30) return '<div style="background:rgba(255,152,0,.1);border:1px solid rgba(255,152,0,.3);border-radius:6px;padding:6px 10px;margin-top:6px;font-size:11px;color:var(--orange);">⚠️ Certificado digital vence en '+dias+' días</div>';
+          return '';
+        })() : ''}
+      </div>
+    </div>` : `
+    <div style="background:rgba(239,83,80,.08);border:1.5px solid rgba(239,83,80,.3);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef5350" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span style="font-size:13px;font-weight:700;color:#ef5350;">Sin timbrado configurado</span>
+      </div>
+      <div style="font-size:12px;color:#777;line-height:1.5;">
+        Configurá un punto de expedición en el<br>
+        <strong style="color:#aaa;">Panel Admin → Administración → Puntos de Expedición</strong><br>
+        y asigná esta terminal: <strong style="color:#fff;">"${terminal}"</strong>
+      </div>
+    </div>`}
+  `;
+
+  // También cargar valores en los inputs
+  loadGeneralConfigInputs();
+}
+
+// Cargar config en inputs del formulario
+function loadGeneralConfigInputs(){
+  const set = (id, val) => { const el = document.getElementById(id); if(el && val) el.value = val; };
+  set('cfgNegocio',   configData.negocio   || localStorage.getItem('an') || '');
+  set('cfgDireccion', configData.direccion  || localStorage.getItem('ad') || '');
+  set('cfgTelefono',  configData.telefono   || localStorage.getItem('at') || '');
+  set('cfgRuc',       configData.ruc        || localStorage.getItem('ar') || '');
+}
+
+// Renderizar panel de info en pantalla Configuración del POS
+function renderConfigInfo(){
+  const el = document.getElementById('configInfoPanel');
+  if(!el) return;
+
+  const terminal  = localStorage.getItem('pos_terminal') || 'Terminal 1';
+  const sucursal  = localStorage.getItem('pos_sucursal') || '—';
+  const deposito  = localStorage.getItem('pos_deposito') || '—';
+  const negocio   = configData.negocio   || localStorage.getItem('an') || '—';
+  const ruc       = configData.ruc       || localStorage.getItem('ar') || '—';
+  const direccion = configData.direccion || localStorage.getItem('ad') || '—';
+  const ciudad    = configData.ciudad    || localStorage.getItem('ciudad') || '';
+  const telefono  = configData.telefono  || localStorage.getItem('at') || '—';
+  const email     = localStorage.getItem('lic_email') || '—';
+  const plan      = localStorage.getItem('lic_plan')  || '—';
+  const vence     = localStorage.getItem('lic_vence') || '—';
+
+  // Timbrado asignado a esta terminal
+  const tim = getTimbradoActivo();
+  const pad3 = n => String(n||0).padStart(3,'0');
+  const padN = n => String(n||0).padStart(7,'0');
+  const timInfo = tim
+    ? pad3(tim.sucursal)+'-'+pad3(tim.punto_exp)+' · Timb. '+tim.nro
+    : null;
+
+  el.innerHTML = `
+    <!-- Terminal -->
+    <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;margin-bottom:12px;">
+      <div style="background:#222;padding:10px 14px;display:flex;align-items:center;gap:8px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <span style="font-size:12px;font-weight:800;color:var(--green);letter-spacing:.5px;text-transform:uppercase;">Esta Terminal</span>
+      </div>
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:#777;">Nombre</span>
+          <span style="font-size:15px;font-weight:800;color:#fff;">${terminal}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:#777;">Sucursal</span>
+          <span style="font-size:13px;font-weight:600;color:#ccc;">${sucursal}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:#777;">Depósito</span>
+          <span style="font-size:13px;color:#aaa;">${deposito}</span>
+        </div>
+        ${timInfo ? `
+        <div style="border-top:1px solid #2a2a2a;padding-top:8px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:#777;">Timbrado</span>
+          <span style="font-size:12px;font-weight:700;color:var(--green);font-family:monospace;">${timInfo}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:#777;">Próx. factura</span>
+          <span style="font-size:13px;font-weight:700;color:#fff;font-family:monospace;">${pad3(tim.sucursal)}-${pad3(tim.punto_exp)}-${padN(tim.nro_actual||tim.desde||1)}</span>
+        </div>` : `
+        <div style="border-top:1px solid #2a2a2a;padding-top:8px;">
+          <span style="font-size:12px;color:#ef5350;">⚠️ Sin timbrado asignado — configurar en Panel Admin</span>
+        </div>`}
+      </div>
+    </div>
+
+    <!-- Datos del negocio -->
+    <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;margin-bottom:12px;">
+      <div style="background:#222;padding:10px 14px;display:flex;align-items:center;gap:8px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#42a5f5" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span style="font-size:12px;font-weight:800;color:#42a5f5;letter-spacing:.5px;text-transform:uppercase;">Datos del Negocio</span>
+      </div>
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <span style="font-size:12px;color:#777;flex-shrink:0;">Razón social</span>
+          <span style="font-size:13px;font-weight:700;color:#fff;text-align:right;">${negocio}</span>
+        </div>
+        ${ruc !== '—' ? `<div style="display:flex;justify-content:space-between;">
+          <span style="font-size:12px;color:#777;">RUC</span>
+          <span style="font-size:13px;font-weight:600;color:#ccc;font-family:monospace;">${ruc}</span>
+        </div>` : ''}
+        ${direccion !== '—' ? `<div style="display:flex;justify-content:space-between;gap:8px;">
+          <span style="font-size:12px;color:#777;flex-shrink:0;">Dirección</span>
+          <span style="font-size:12px;color:#aaa;text-align:right;">${direccion}${ciudad?', '+ciudad:''}</span>
+        </div>` : ''}
+        ${telefono !== '—' ? `<div style="display:flex;justify-content:space-between;">
+          <span style="font-size:12px;color:#777;">Teléfono</span>
+          <span style="font-size:13px;color:#aaa;">${telefono}</span>
+        </div>` : ''}
+      </div>
+    </div>
+
+    <!-- Licencia -->
+    <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;margin-bottom:12px;">
+      <div style="background:#222;padding:10px 14px;display:flex;align-items:center;gap:8px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        <span style="font-size:12px;font-weight:800;color:#ff9800;letter-spacing:.5px;text-transform:uppercase;">Licencia</span>
+      </div>
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-size:12px;color:#777;">Email</span>
+          <span style="font-size:12px;color:#aaa;">${email}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-size:12px;color:#777;">Plan</span>
+          <span style="font-size:13px;font-weight:700;color:var(--green);">${plan}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-size:12px;color:#777;">Vence</span>
+          <span style="font-size:13px;color:#aaa;">${vence}</span>
+        </div>
+      </div>
+    </div>`;
+
+  // Update email in footer
+  const emailEl = document.getElementById('configEmail');
+  if(emailEl) emailEl.textContent = email;
+}
+
+// Cargar config desde localStorage (offline fallback)
+function cargarConfigLocal(){
+  const keys = {
+    an:'negocio', ar:'ruc', ad:'direccion',
+    ciudad:'ciudad', at:'telefono', pie_recibo:'pie_recibo',
+    mostrar_ruc:'mostrar_ruc', moneda:'moneda'
+  };
+  Object.entries(keys).forEach(([lk, ck])=>{
+    const v = localStorage.getItem(lk);
+    if(v) configData[ck] = v;
+  });
+}
 
 // Datos simulados para demo (mientras no hay API real)
 const RUC_DEMO = {
@@ -3221,7 +3927,7 @@ function onRucInput(){
 
 async function consultarRuc(){
   const rucRaw   = document.getElementById('factRuc').value.trim();
-  const rucLimpio = rucRaw.replace(/[-\\.\\s]/g,'');
+  const rucLimpio = rucRaw.replace(/[-\.\s]/g,'');
 
   if(!rucLimpio || rucLimpio.length < 6){
     setRucStatus('Ingresá un RUC o CI válido', 'error');
@@ -3322,23 +4028,148 @@ function setRucStatus(msg, type){
   el.style.color = type==='ok' ? '#4caf50' : type==='error' ? '#e53935' : type==='warn' ? '#ff9800' : '#888';
 }
 
+// Timbrado seleccionado para esta factura
+let timbradoSeleccionado = null;
+
 function toggleFactura(){
   facturaActiva = !facturaActiva;
-  const form = document.getElementById('facturaForm');
+  const form   = document.getElementById('facturaForm');
   const toggle = document.getElementById('facturaToggle');
-  const badge = document.getElementById('facturaBadge');
+  const badge  = document.getElementById('facturaBadge');
   form.classList.toggle('open', facturaActiva);
   toggle.classList.toggle('active', facturaActiva);
   badge.textContent = facturaActiva ? 'ACTIVA' : 'OPCIONAL';
-  if(facturaActiva) setTimeout(()=>document.getElementById('factRuc').focus(), 200);
+  if(facturaActiva){
+    mostrarSelectorTimbrado();
+    setTimeout(()=>{ const r=document.getElementById('factRuc'); if(r)r.focus(); }, 300);
+  } else {
+    timbradoSeleccionado = null;
+  }
+}
+
+function mostrarSelectorTimbrado(){
+  const infoEl = document.getElementById('timbradoInfo');
+  if(!infoEl) return;
+
+  // Cargar timbrados disponibles
+  let tims = [];
+  try { tims = JSON.parse(localStorage.getItem('pos_timbrados')||'[]'); } catch(e){}
+
+  // Filtrar vigentes
+  const hoy = new Date();
+  const vigentes = tims.filter(t=>{
+    if(t.tipo==='electronico') return true; // sin vencimiento
+    return t.vig_fin ? new Date(t.vig_fin+' 00:00:00') >= hoy : true;
+  });
+
+  if(!vigentes.length){
+    // Sin timbrados — mostrar aviso
+    infoEl.style.display = 'block';
+    infoEl.innerHTML =
+      '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">'+
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef5350" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'+
+      '<span style="font-size:13px;color:#ef5350;font-weight:700;">Sin timbrado configurado</span></div>'+
+      '<div style="font-size:12px;color:#666;margin-top:2px;">Configurá un punto de expedición en el <b style="color:#aaa">Panel Admin → Administración</b></div>';
+    timbradoSeleccionado = null;
+    return;
+  }
+
+  // Si solo hay uno o ya hay uno de la sucursal → usarlo directo
+  const sucursal = localStorage.getItem('pos_sucursal')||'Principal';
+  let autoTim = getTimbradoActivo();
+
+  // Si hay uno auto-asignado a esta sucursal, mostrarlo seleccionado
+  if(autoTim && vigentes.find(t=>t.nro===autoTim.nro)){
+    timbradoSeleccionado = autoTim;
+    renderTimbradoBanner(infoEl, autoTim, vigentes);
+    return;
+  }
+
+  // Si hay solo uno, seleccionar automáticamente
+  if(vigentes.length === 1){
+    timbradoSeleccionado = vigentes[0];
+    renderTimbradoBanner(infoEl, vigentes[0], vigentes);
+    return;
+  }
+
+  // Hay varios → mostrar selector
+  timbradoSeleccionado = null;
+  renderTimbradoBanner(infoEl, null, vigentes);
+}
+
+function renderTimbradoBanner(el, selected, todos){
+  const pad3 = n=>String(n).padStart(3,'0');
+  const padN = n=>String(n).padStart(7,'0');
+
+  // Opciones del selector
+  const opts = todos.map((t,i)=>{
+    const nro = pad3(t.sucursal)+'-'+pad3(t.punto_exp)+'-'+padN(t.nro_actual||t.desde);
+    const label = 'Timb. '+t.nro+' · '+nro+(t.nombre_suc?' ('+t.nombre_suc+')':'')+(t.asignado_a?' — '+t.asignado_a:'');
+    const sel = selected && selected.nro===t.nro ? 'selected' : '';
+    return '<option value="'+i+'" '+sel+'>'+label+'</option>';
+  }).join('');
+
+  let certAlert = '';
+  if(selected && selected.tipo==='electronico' && selected.cert_venc){
+    const dias = Math.ceil((new Date(selected.cert_venc+' 00:00:00')-new Date())/(1000*60*60*24));
+    if(dias <= 30) certAlert = '<div style="font-size:11px;color:var(--orange);margin-top:4px;">⚠️ Certificado vence en '+dias+' días</div>';
+  }
+
+  el.style.display = 'block';
+  el.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'+
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4caf50" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'+
+    '<span style="font-size:11px;font-weight:700;color:var(--green);">PUNTO DE EXPEDICIÓN</span>'+
+    '</div>'+
+    '<select id="selTimbrado" onchange="onSelTimbrado(this)"'+
+    ' style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;'+
+    'font-family:Barlow,sans-serif;font-size:13px;padding:10px 12px;outline:none;margin-bottom:4px;">'+
+    '<option value="">— Seleccioná un timbrado —</option>'+
+    opts+
+    '</select>'+
+    (selected ?
+      '<div style="font-size:12px;color:#aaa;display:flex;justify-content:space-between;align-items:center;">'+
+      '<span>Próx. factura: <b style="color:#fff;font-family:monospace;">'+
+        pad3(selected.sucursal)+'-'+pad3(selected.punto_exp)+'-'+padN(selected.nro_actual||selected.desde)+
+      '</b></span>'+
+      '<span style="color:#555;">Timb. '+selected.nro+'</span>'+
+      '</div>'+certAlert
+    : '<div style="font-size:12px;color:#ef5350;">Seleccioná un timbrado para facturar</div>');
+
+  // Guardar referencia a todos para el onchange
+  el._todos = todos;
+}
+
+function onSelTimbrado(sel){
+  const el = document.getElementById('timbradoInfo');
+  let tims = [];
+  try { tims = JSON.parse(localStorage.getItem('pos_timbrados')||'[]'); } catch(e){}
+  const hoy = new Date();
+  const vigentes = tims.filter(t=> t.tipo==='electronico' || (t.vig_fin ? new Date(t.vig_fin+' 00:00:00') >= hoy : true));
+  const idx = parseInt(sel.value);
+  if(isNaN(idx)||idx<0){ timbradoSeleccionado=null; return; }
+  timbradoSeleccionado = vigentes[idx];
+  // Guardar como activo para esta sucursal
+  localStorage.setItem('pos_timbrado_activo', JSON.stringify(timbradoSeleccionado));
+  renderTimbradoBanner(el, timbradoSeleccionado, vigentes);
 }
 
 function getFacturaData(){
   if(!facturaActiva) return null;
+  // Usar el timbrado seleccionado en el formulario (o el activo si no hay selector)
+  const tim = timbradoSeleccionado || getTimbradoActivo();
+  const pad3 = n=>String(n).padStart(3,'0');
+  const padN = n=>String(n).padStart(7,'0');
+  const nroFact = tim ? pad3(tim.sucursal)+'-'+pad3(tim.punto_exp)+'-'+padN(tim.nro_actual||tim.desde) : '';
   return {
-    ruc: document.getElementById('factRuc').value.trim(),
-    nombre: document.getElementById('factNombre').value.trim(),
-    direccion: document.getElementById('factDireccion').value.trim()
+    ruc:           document.getElementById('factRuc').value.trim(),
+    nombre:        document.getElementById('factNombre').value.trim(),
+    direccion:     document.getElementById('factDireccion').value.trim(),
+    timbrado:      tim ? tim.nro : '',
+    nro_factura:   nroFact,
+    tipo_timbrado: tim ? tim.tipo : 'autoimpresor',
+    sucursal_nro:  tim ? pad3(tim.sucursal) : '',
+    punto_exp:     tim ? pad3(tim.punto_exp) : '',
   };
 }
 
@@ -3354,67 +4185,454 @@ function resetFactura(){
 
 // RECIBO
 function generarRecibo(data){
-  const fecha = data.fecha;
-  const pad = n => String(n).padStart(2,'0');
-  const fechaStr = pad(fecha.getDate())+'/'+pad(fecha.getMonth()+1)+'/'+fecha.getFullYear()+' '+pad(fecha.getHours())+':'+pad(fecha.getMinutes());
-  const nroStr = data.nroTicket ? '#'+String(data.nroTicket).padStart(4,'0') : '#'+String(ticketCounter-1).padStart(4,'0');
+  ultimoReciboData = data;
 
-  let itemsHTML = '';
-  data.items.forEach(i=>{
-    itemsHTML += '<div class="rec-row"><span class="rec-item-qty">'+i.qty+'x</span><span class="rec-item-name">'+i.name+'</span><span class="rec-item-price">'+gs(i.price*i.qty)+'</span></div>';
-    if(i.obs) itemsHTML += '<div class="rec-obs">  → '+i.obs+'</div>';
-  });
+  const esFactura = data.factura && data.factura.timbrado;
+  const size      = getPaperSize('ticket');
 
-  const vueltoHTML = data.vuelto
-    ? '<div class="rec-row vuelto"><span>Vuelto</span><span>'+data.vuelto+'</span></div>'
-    : '';
+  // Título
+  const titulo = document.getElementById('reciboTitulo');
+  if(titulo) titulo.textContent = esFactura ? 'Factura' : 'Ticket';
 
-  const compHTML = data.comprobante
-    ? '<div class="rec-row"><span class="rec-nro">Comprobante: '+data.comprobante+'</span></div>'
-    : '';
+  // Generar HTML y renderizarlo en un iframe dentro de reciboPapel
+  const htmlImpresion = esFactura
+    ? generarHTMLFactura(data, size)
+    : generarHTMLTicket(data, size);
 
-  document.getElementById('reciboPapel').innerHTML =
-    '<div class="rec-center"><div class="rec-title">MI NEGOCIO</div><div class="rec-sub">ASUNCION</div><div class="rec-sub">Tel: ---</div></div>'+
-    '<hr class="rec-divider">'+
-    '<div class="rec-row"><span class="rec-nro">Ticket: '+nroStr+'</span><span class="rec-nro">'+fechaStr+'</span></div>'+
-    '<hr class="rec-divider">'+
-    itemsHTML+
-    '<div class="rec-row total"><span>TOTAL</span><span>'+gs(data.total)+'</span></div>'+
-    '<div class="rec-row"><span>'+data.metodo+'</span><span>'+(data.metodo==='EFECTIVO'?data.efectivo:gs(data.total))+'</span></div>'+
-    vueltoHTML+
-    compHTML+
-    '<hr class="rec-divider">'+
-    (data.factura ? (
-      '<div class="rec-center" style="font-size:11px;font-weight:700;margin-bottom:4px;">FACTURA</div>'+
-      '<div class="rec-row"><span style="font-size:11px;">RUC/CI:</span><span style="font-size:11px;">'+data.factura.ruc+'</span></div>'+
-      '<div style="font-size:11px;margin:2px 0;">'+data.factura.nombre+'</div>'+
-      (data.factura.direccion?'<div style="font-size:11px;color:#555;">'+data.factura.direccion+'</div>':'')+
-      '<hr class="rec-divider">'
-    ) : '')+
-    '<div class="rec-footer-text">¡Gracias por su compra!</div>';
+  mostrarPreviewRecibo(htmlImpresion, size);
+
+  // Botón comanda
+  const btnComanda = document.getElementById('btnComandaRecibo');
+  if(btnComanda) btnComanda.style.display = data.items?.length ? 'flex' : 'none';
 }
 
-function imprimirRecibo(){
+function mostrarPreviewRecibo(html, size){
   const papel = document.getElementById('reciboPapel');
-  const w = window.open('','_blank','width=400,height=600');
-  w.document.write('<html><head><title>Recibo</title><style>'+
-    'body{margin:0;background:#fff;font-family:"Courier New",monospace;font-size:13px;}'+
-    '.rec-row{display:flex;justify-content:space-between;margin:3px 0;}'+
-    '.rec-center{text-align:center;margin-bottom:6px;}'+
-    '.rec-title{font-size:16px;font-weight:700;text-transform:uppercase;}'+
-    '.rec-sub{font-size:11px;color:#555;}'+
-    '.rec-divider{border:none;border-top:1px dashed #999;margin:8px 0;}'+
-    '.rec-row.total{font-size:15px;font-weight:700;border-top:1px dashed #999;padding-top:6px;margin-top:6px;}'+
-    '.rec-row.vuelto{color:#2e7d32;font-weight:700;}'+
-    '.rec-item-name{flex:1;margin-right:8px;}'+
-    '.rec-item-qty{color:#555;margin-right:8px;}'+
-    '.rec-obs{font-size:11px;color:#777;padding-left:8px;}'+
-    '.rec-footer-text{text-align:center;font-size:11px;color:#888;margin-top:8px;}'+
-    '.rec-nro{font-size:11px;color:#777;}'+
-    '<\/style><\/head><body>'+papel.innerHTML+'<\/body><\/html>');
-  w.document.close();
-  w.focus();
-  setTimeout(function(){ w.print(); }, 400);
+  if(!papel) return;
+
+  // Usar iframe para renderizar el HTML térmico fielmente
+  const pxW = size==='58' ? 220 : 300;
+  papel.style.width  = pxW+'px';
+  papel.style.padding = '0';
+  papel.style.background = 'transparent';
+  papel.style.boxShadow = 'none';
+
+  // Remover iframe anterior si existe
+  let iframe = document.getElementById('previewIframe');
+  if(iframe) iframe.remove();
+
+  iframe = document.createElement('iframe');
+  iframe.id = 'previewIframe';
+  iframe.style.cssText = [
+    'width:'+pxW+'px',
+    'border:none',
+    'background:#fff',
+    'border-radius:4px',
+    'box-shadow:0 2px 20px rgba(0,0,0,.6)',
+    'display:block',
+    'min-height:200px'
+  ].join(';');
+  iframe.scrolling = 'no';
+  papel.appendChild(iframe);
+
+  // Escribir el HTML térmico en el iframe
+  iframe.contentDocument.open();
+  iframe.contentDocument.write(html.replace(/<div id="printInfo"[\s\S]*?<\/div>/, ''));
+  iframe.contentDocument.close();
+
+  // Auto-altura
+  setTimeout(()=>{
+    try {
+      const h = iframe.contentDocument.body.scrollHeight;
+      iframe.style.height = (h+10)+'px';
+    } catch(e){}
+  }, 200);
+}
+
+// Convertir HTML térmico a texto plano para preview
+function htmlToPreview(html, size){
+  const cols = size==='58' ? 32 : 42;
+  // Remover tags y convertir <p> a líneas
+  return html
+    .replace(/<hr[^>]*>/gi, '-'.repeat(cols))
+    .replace(/<br\s*\/?>/gi, '')
+    .replace(/<p[^>]*class="row"[^>]*>([\s\S]*?)<\/p>/gi, (m, inner) => {
+      // Extraer los dos spans de .row
+      const spans = inner.match(/<span[^>]*>([\s\S]*?)<\/span>/gi) || [];
+      const texts = spans.map(s => s.replace(/<[^>]+>/g,'').trim());
+      if(texts.length >= 2){
+        const left  = texts[0];
+        const right = texts.slice(1).join(' ');
+        const pad   = Math.max(1, cols - left.length - right.length);
+        return left + ' '.repeat(pad) + right;
+      }
+      return texts.join(' ');
+    })
+    .replace(/<[^>]+>/g, '')  // remover tags restantes
+    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&nbsp;/g,' ')
+    .split('\n')
+    .map(l => l.trimEnd())
+    .join('\n');
+}
+
+// Imprimir comanda del último recibo
+function imprimirComandaActual(){
+  if(!ultimoReciboData) return;
+  imprimirComanda(ultimoReciboData);
+}
+
+
+// ══════════════════════════════════════════════════════
+// IMPRESIÓN TÉRMICA — POS58 / POS80
+// ══════════════════════════════════════════════════════
+
+// Guardar último recibo para reimprimir
+let ultimoReciboData = null;
+
+// Obtener tamaño de papel configurado
+function getPaperSize(tipo){ return printers[tipo]?.size || localStorage.getItem('printerSize_'+tipo) || '58'; }
+
+// CSS base para impresión térmica
+function getCSSTermico(size){
+  const w  = size==='58' ? '58mm' : '80mm';
+  const pw = size==='58' ? '48mm' : '72mm'; // printable width
+  const fs = size==='58' ? '9pt'  : '10pt';
+  const ss = size==='58' ? '7pt'  : '8pt';
+  const ls = size==='58' ? '12pt' : '14pt';
+  return `
+    @page {
+      size: ${w} auto !important;
+      margin: 0 !important;
+    }
+    @media print {
+      html, body {
+        width: ${w} !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html { width:${w}; }
+    body {
+      font-family: "Courier New", Courier, monospace;
+      font-size: ${fs};
+      width: ${pw};
+      max-width: ${pw};
+      margin: 0 auto;
+      padding: 2mm 0;
+      background: #fff;
+      color: #000;
+    }
+    p { margin: 0; padding: 0; line-height: 1.35; }
+    .c  { text-align: center; }
+    .r  { text-align: right; }
+    .b  { font-weight: bold; }
+    .s  { font-size: ${ss}; }
+    .l  { font-size: ${ls}; font-weight: bold; }
+    .hr { border:none; border-top:1px dashed #000; margin: 1mm 0; display:block; }
+    .row{ display:flex; justify-content:space-between; }
+    .row .l1 { flex:1; padding-right:3px; overflow:hidden; }
+    .row .l2 { text-align:right; white-space:nowrap; }
+    .obs { font-size:${ss}; padding-left:6px; }
+  `;
+}
+
+// Abrir ventana e imprimir
+function abrirVentanaImpresion(html, size){
+  const mmW = size==='58' ? '58mm' : '80mm';
+  const pxW = size==='58' ? 230 : 310;
+
+  // Inject print instructions into HTML
+  const instruccion = `
+    <div id="printInfo" style="font-family:Arial,sans-serif;font-size:11px;color:#666;
+      background:#fff3cd;border:1px solid #ffc107;padding:8px 10px;margin-bottom:8px;
+      border-radius:4px;">
+      <b>⚠️ Configurar impresión:</b><br>
+      1. Más opciones → <b>Tamaño del papel: ${mmW}</b><br>
+      2. Márgenes: <b>Ninguno / Sin márgenes</b><br>
+      3. Desactivar "Encabezados y pies de página"
+    </div>`;
+
+  const htmlFinal = html.replace('<body>', '<body>'+instruccion);
+
+  const win = window.open('','_blank',
+    'width='+pxW+',height=700,menubar=no,toolbar=no,location=no');
+  win.document.write(htmlFinal);
+  win.document.close();
+  win.focus();
+  // Hide instructions when printing
+  const style = win.document.createElement('style');
+  style.textContent = '@media print { #printInfo { display:none !important; } }';
+  win.document.head.appendChild(style);
+  setTimeout(()=>{ win.print(); }, 500);
+}
+
+// Formatear número guaraní sin símbolo (para ticket)
+function gn(n){ return Math.round(n||0).toLocaleString('es-PY'); }
+
+// Padding derecho para columnas
+function padL(s,n){ s=String(s); return s.length>=n?s.substring(0,n):s+' '.repeat(n-s.length); }
+function padR(s,n){ s=String(s); return s.length>=n?s.substring(0,n):' '.repeat(n-s.length)+s; }
+function center(s,n){ s=String(s); const p=Math.max(0,n-s.length); const l=Math.floor(p/2); return ' '.repeat(l)+s+' '.repeat(p-l); }
+
+// ── TICKET (no factura) ───────────────────────────────────
+function generarHTMLTicket(data, size){
+  const cols = size==='58' ? 32 : 42;
+  const sep  = '-'.repeat(cols);
+  const neg  = configData.negocio || 'MI NEGOCIO';
+  const ruc  = configData.ruc     || '';
+  const dir  = configData.direccion || '';
+  const tel  = configData.telefono  || '';
+
+  const pad = n=>String(n).padStart(2,'0');
+  const d   = data.fecha;
+  const fecha = pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();
+  const hora  = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+
+  let lineas = '';
+
+  // Cabecera
+  lineas += '<p class="c b">'+neg+'</p>';
+  if(ruc)  lineas += '<p class="c s">RUC: '+ruc+'</p>';
+  if(dir)  lineas += '<p class="c s">'+dir+'</p>';
+  if(tel)  lineas += '<p class="c s">Tel: '+tel+'</p>';
+  lineas += '<p class="hr"></p>';
+
+  // Datos ticket
+  lineas += '<p class="s">TICKET NRO: '+String(data.nroTicket||0).padStart(6,'0')+'</p>';
+  lineas += '<p class="s">FECHA: '+fecha+' -HORA: '+hora+'</p>';
+  lineas += '<p class="s">CLIENTE: '+(data.factura?.nombre||'SIN NOMBRE')+'</p>';
+  if(data.obs) lineas += '<p class="s">OBS: '+data.obs+'</p>';
+  lineas += '<p class="hr"></p>';
+
+  // Encabezado columnas
+  const c1 = size==='58' ? 4 : 6;
+  const c2 = size==='58' ? 16: 22;
+  const c3 = size==='58' ? 6 : 8;
+  const c4 = size==='58' ? 6 : 8;
+  lineas += '<p class="s b">'+padL('COD.',c1)+' '+padL('DESCRIPCION',c2)+' '+padR('PR.UNIT',c3)+' '+padR('SUBTOT',c4)+'</p>';
+  lineas += '<p class="hr"></p>';
+
+  // Items
+  data.items.forEach(item => {
+    const subtot = item.desc>0 ? Math.round(item.price*item.qty*(1-item.desc/100)) : item.price*item.qty;
+    const cod    = padL(item.codigo||'',c1);
+    const nom    = padL(item.name, c2);
+    const prec   = padR(gn(item.price), c3);
+    const sub    = padR(gn(subtot), c4);
+    lineas += '<p class="s">'+cod+' '+nom+' '+prec+' '+sub+'</p>';
+    if(item.desc>0) lineas += '<p class="obs s">  Desc: '+item.desc+'%</p>';
+    if(item.obs)    lineas += '<p class="obs s">  '+item.obs+'</p>';
+  });
+  lineas += '<p class="hr"></p>';
+
+  // Totales
+  const subtotal = data.items
+    .filter(i=>!i.esDescuento)
+    .reduce((s,i)=>s+(i.desc>0?Math.round(i.price*i.qty*(1-i.desc/100)):i.price*i.qty),0);
+  const totalDescuentos = data.items
+    .filter(i=>i.esDescuento)
+    .reduce((s,i)=>s+(i.montoDesc||0),0);
+  const hayDescuentos = totalDescuentos>0 || (data.descTicket>0);
+
+  if(hayDescuentos){
+    lineas += '<p class="row s"><span class="l1">SUBTOTAL</span><span class="l2">'+gn(subtotal)+'</span></p>';
+    if(totalDescuentos>0){
+      // Mostrar cada descuento aplicado
+      data.items.filter(i=>i.esDescuento).forEach(d=>{
+        lineas += '<p class="row s"><span class="l1">(-) '+d.name+'</span><span class="l2">'+gn(d.montoDesc)+'</span></p>';
+      });
+    }
+    if(data.descTicket>0){
+      lineas += '<p class="row s"><span class="l1">(-) Desc. ticket '+data.descTicket+'%</span><span class="l2">'+gn(data.descMonto||0)+'</span></p>';
+    }
+  }
+  lineas += '<p class="row b l"><span class="l1">TOTAL:</span><span class="l2">'+gn(data.total)+'</span></p>';
+  lineas += '<p class="hr"></p>';
+
+  // Forma de pago
+  lineas += '<p class="row s"><span class="l1">FORMA DE PAGO</span><span class="l2">IMPORTE</span></p>';
+  lineas += '<p class="hr"></p>';
+  lineas += '<p class="row s"><span class="l1">'+data.metodo+':</span><span class="l2">'+gn(data.total)+'</span></p>';
+  if(data.vuelto) lineas += '<p class="row s"><span class="l1">VUELTO:</span><span class="l2">'+data.vuelto+'</span></p>';
+  lineas += '<p class="hr"></p>';
+
+  // Pie
+  lineas += '<p class="c s">Comprobante no válido para el IVA</p>';
+  if(configData.pie_recibo) lineas += '<p class="c s">'+configData.pie_recibo+'</p>';
+  lineas += '<p class="c s">*** GRACIAS POR SU PREFERENCIA ***</p>';
+  lineas += '<p class="hr"></p>';
+  lineas += '<br><br><br>';
+
+  return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
+}
+
+// ── FACTURA ───────────────────────────────────────────────
+function generarHTMLFactura(data, size){
+  const cols = size==='58' ? 32 : 42;
+  const neg  = configData.negocio   || 'MI NEGOCIO';
+  const ruc  = configData.ruc       || '';
+  const dir  = configData.direccion || '';
+  const tel  = configData.telefono  || '';
+  const f    = data.factura || {};
+  const tim  = f.timbrado   || '';
+  const nroF = f.nro_factura|| '';
+
+  const pad = n=>String(n).padStart(2,'0');
+  const d   = data.fecha;
+  const fecha = pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();
+  const hora  = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+
+  // Calcular IVA (solo ítems normales, no descuentos)
+  let grav10=0, grav5=0, exento=0;
+  const subtotalFact = data.items
+    .filter(i=>!i.esDescuento)
+    .reduce((s,i)=>s+(i.desc>0?Math.round(i.price*i.qty*(1-i.desc/100)):i.price*i.qty),0);
+  const totalDescFact = data.items
+    .filter(i=>i.esDescuento)
+    .reduce((s,i)=>s+(i.montoDesc||0),0);
+
+  data.items.filter(i=>!i.esDescuento).forEach(item=>{
+    const sub = item.desc>0 ? Math.round(item.price*item.qty*(1-item.desc/100)) : item.price*item.qty;
+    if(item.iva==='10')       grav10  += sub;
+    else if(item.iva==='5')   grav5   += sub;
+    else                       exento  += sub;
+  });
+  const iva10  = Math.round(grav10  * 10/110);
+  const iva5   = Math.round(grav5   * 5/105);
+  const total  = data.total;
+
+  let lineas = '';
+
+  // Cabecera
+  lineas += '<p class="c b">'+neg+'</p>';
+  if(ruc)  lineas += '<p class="c s">'+dir+'</p>';
+  if(ruc)  lineas += '<p class="c s">RUC: '+ruc+'</p>';
+  if(dir)  lineas += '<p class="c s">Avda. Mariscal Lopez</p>';
+  if(tel)  lineas += '<p class="c s">Tel:</p>';
+  lineas += '<p class="hr"></p>';
+
+  // Timbrado
+  lineas += '<p class="s">TIMBRADO Nro: '+tim+'</p>';
+  lineas += '<p class="s">INICIO:'+fecha+'</p>';
+  if(getTimbradoActivo()?.vig_fin && getTimbradoActivo()?.vig_fin!=='2999-12-31'){
+    lineas += '<p class="s">VTO:'+getTimbradoActivo().vig_fin.split('-').reverse().join('/')+'</p>';
+  }
+  lineas += '<p class="s b">FACTURA CONTADO NRO:'+nroF+'</p>';
+  lineas += '<p class="s">Fecha: '+fecha+' - Hora: '+hora+'</p>';
+  lineas += '<p class="hr"></p>';
+
+  // Encabezado items
+  const c1=size==='58'?5:6, c2=size==='58'?4:5, c3=size==='58'?6:7, c4=size==='58'?7:8, c5=size==='58'?4:5;
+  lineas += '<p class="s b">'+padL('DESCRIPCION',c1+c2+c3+c4+c5+4)+'</p>';
+  lineas += '<p class="s b">'+padL('COD.BAR.',c1)+' '+padR('CANT',c2)+' '+padR('PR.UNIT',c3)+' '+padR('IMPORTE',c4)+' '+padR('IVA',c5)+'</p>';
+  lineas += '<p class="hr"></p>';
+
+  // Items (excluir descuentos — van en totales)
+  data.items.filter(i=>!i.esDescuento).forEach(item=>{
+    const sub = item.desc>0 ? Math.round(item.price*item.qty*(1-item.desc/100)) : item.price*item.qty;
+    lineas += '<p class="s">'+item.name+'</p>';
+    const cod  = padL(item.codigo||'',c1);
+    const cant = padR(item.qty,c2);
+    const pu   = padR(gn(item.price),c3);
+    const imp  = padR(gn(sub),c4);
+    const iv   = padR(item.iva==='exento'?'Exnt':(item.iva||'10')+'%',c5);
+    lineas += '<p class="s">'+cod+' '+cant+' '+pu+' '+imp+' '+iv+'</p>';
+    if(item.obs) lineas += '<p class="obs s">  '+item.obs+'</p>';
+  });
+  lineas += '<p class="hr"></p>';
+
+  // Total
+  lineas += '<p class="row b l"><span class="l1">TOTAL:</span><span class="l2">'+gn(total)+'</span></p>';
+  lineas += '<p class="hr"></p>';
+
+  // Sub totales IVA
+  lineas += '<p class="row s"><span class="l1">SUB TOTALES</span><span class="l2">LIQUIDACION</span><span style="margin-left:4px;" class="l2 s">IVA</span></p>';
+  lineas += '<p class="hr"></p>';
+  if(grav10>0)  lineas += '<p class="row s"><span class="l1">Gravado 10%</span><span class="l2">'+gn(grav10)+'</span><span style="margin-left:4px;" class="l2">'+gn(iva10)+'</span></p>';
+  if(grav5>0)   lineas += '<p class="row s"><span class="l1">Gravado 5%</span><span class="l2">'+gn(grav5)+'</span><span style="margin-left:4px;" class="l2">'+gn(iva5)+'</span></p>';
+  if(exento>0)  lineas += '<p class="row s"><span class="l1">Exento</span><span class="l2">'+gn(exento)+'</span><span style="margin-left:4px;" class="l2">0</span></p>';
+  lineas += '<p class="hr"></p>';
+
+  // Forma de pago
+  lineas += '<p class="row s"><span class="l1">FORMA DE PAGO</span><span class="l2">IMPORTE</span></p>';
+  lineas += '<p class="hr"></p>';
+  lineas += '<p class="row s"><span class="l1">'+data.metodo+':</span><span class="l2">'+gn(total)+'</span></p>';
+  if(data.vuelto) lineas += '<p class="row s"><span class="l1">VUELTO:</span><span class="l2">'+data.vuelto+'</span></p>';
+  lineas += '<p class="hr"></p>';
+
+  // Cliente
+  lineas += '<p class="s">Cliente: '+(f.nombre||'')+'</p>';
+  lineas += '<p class="s">RUC: '+(f.ruc||'')+'</p>';
+  lineas += '<p class="s">Dir:</p>';
+  lineas += '<p class="s">Tel:</p>';
+  lineas += '<p class="hr"></p>';
+
+  // Footer
+  lineas += '<p class="s">TICKET NRO: '+String(data.nroTicket||0).padStart(6,'0')+'</p>';
+  lineas += '<p class="s">NRO. TRANSACCION: '+String(data.nroTicket||0).padStart(3,'0')+'</p>';
+  lineas += '<p class="s">ATENDIDO POR: '+(configData.terminal||'admin')+'</p>';
+  lineas += '<p class="s">ORIGINAL: CLIENTE</p>';
+  lineas += '<p class="s">DUPLICADO: ARCHIVO TRIBUTARIO</p>';
+  lineas += '<p class="hr"></p>';
+  lineas += '<p class="s">LOS DATOS IMPRESOS REQUIEREN DE CUIDADOS ESPECIALES.</p>';
+  if(configData.pie_recibo) lineas += '<p class="c s">'+configData.pie_recibo+'</p>';
+  lineas += '<p class="c s b">*** GRACIAS POR SU PREFERENCIA ***</p>';
+  lineas += '<p class="hr"></p>';
+  lineas += '<br><br><br>';
+
+  return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
+}
+
+// ── COMANDA ───────────────────────────────────────────────
+function generarHTMLComanda(data, size){
+  const neg = configData.negocio || 'MI NEGOCIO';
+  const pad = n=>String(n).padStart(2,'0');
+  const d   = data.fecha;
+  const fecha = pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();
+  const hora  = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+
+  let lineas = '';
+
+  lineas += '<p class="c b">Orden #: '+String(data.nroTicket||0)+'</p>';
+  lineas += '<p class="c s">Fecha: '+fecha+'</p>';
+  lineas += '<p class="c l">'+hora+'</p>';
+  lineas += '<p class="c s">NRO_TICKET: '+String(data.nroTicket||0).padStart(3,'0')+'-'+String((data.nroTicket||0)+1)+'</p>';
+  lineas += '<p class="c s">CLIENTE: '+(data.factura?.nombre||'SIN NOMBRE')+'</p>';
+  lineas += '<p class="hr"></p>';
+
+  lineas += '<p class="row s"><span class="l1">Canc.</span><span class="l2">Descripcion</span></p>';
+  lineas += '<p class="hr"></p>';
+
+  data.items.filter(i=>!i.esDescuento).forEach(item=>{
+    lineas += '<p class="s">'+item.qty+'    '+item.name+'</p>';
+    if(item.obs) lineas += '<p class="s">OBS: '+item.obs+'</p>';
+  });
+
+  lineas += '<p class="hr"></p>';
+  lineas += '<p class="s">OBS:</p>';
+  lineas += '<p class="hr"></p>';
+  lineas += '<br><br><br>';
+
+  return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
+}
+
+// ── IMPRIMIR RECIBO (ticket o factura según si tiene timbrado) ──
+function imprimirRecibo(){
+  if(!ultimoReciboData){ toast('Sin datos para imprimir'); return; }
+  const size = getPaperSize('ticket');
+  const esFactura = ultimoReciboData.factura && ultimoReciboData.factura.timbrado;
+  const html = esFactura
+    ? generarHTMLFactura(ultimoReciboData, size)
+    : generarHTMLTicket(ultimoReciboData, size);
+  abrirVentanaImpresion(html, size);
+}
+
+// ── IMPRIMIR COMANDA ──────────────────────────────────────
+function imprimirComanda(data){
+  const size = getPaperSize('comanda');
+  const html = generarHTMLComanda(data, size);
+  abrirVentanaImpresion(html, size);
 }
 
 function finalizarRecibo(){
@@ -3607,16 +4825,202 @@ let turnoData = {
 };
 
 // Registrar venta en el turno al confirmar pago
+// ══════════════════════════════════════════════════════
+// TIMBRADO / PUNTO DE EXPEDICIÓN
+// ══════════════════════════════════════════════════════
+
+function getTimbradoActivo(){
+  // Usar el timbrado cargado en sesión (descargado de Supabase)
+  if(window._timbradoCache) return window._timbradoCache;
+  // Fallback a localStorage
+  try {
+    const terminal = localStorage.getItem('pos_terminal')||'Terminal 1';
+    const mapa = JSON.parse(localStorage.getItem('pos_timbrados_mapa')||'{}');
+    const tims = JSON.parse(localStorage.getItem('pos_timbrados')||'[]');
+    const asig = mapa[terminal];
+    if(asig !== undefined && tims[asig.timIdx]){
+      const t = tims[asig.timIdx];
+      const a = t.asignaciones && t.asignaciones[asig.asigIdx];
+      if(a) return { ...t, punto_exp:a.punto_exp, nro_actual:a.nro_actual||a.desde||1 };
+    }
+    // Buscar en asignaciones directamente
+    for(const t of tims){
+      const a = (t.asignaciones||[]).find(a=>a.terminal===terminal);
+      if(a) return { ...t, punto_exp:a.punto_exp, nro_actual:a.nro_actual||1 };
+    }
+    if(tims.length) return tims[0];
+  } catch(e){ console.warn('[getTimbrado]', e.message); }
+  return null;
+}
+
+function getNroFactura(timbrado){
+  const t = timbrado || window._timbradoCache;
+  if(!t) return null;
+  const pad3 = n=>String(n||0).padStart(3,'0');
+  const padN = n=>String(n||0).padStart(7,'0');
+  return pad3(t.sucursal)+'-'+pad3(t.punto_exp)+'-'+padN(t.nro_actual||t.desde||1);
+}
+
+async function avanzarNroFactura(timbrado){
+  if(!timbrado) return;
+  const terminal = localStorage.getItem('pos_terminal')||'Terminal 1';
+  const email    = localStorage.getItem('lic_email');
+  // Incrementar local inmediatamente
+  if(window._timbradoCache) window._timbradoCache.nro_actual=(window._timbradoCache.nro_actual||1)+1;
+  const cached = JSON.parse(localStorage.getItem('pos_timbrado_activo')||'null');
+  if(cached){ cached.nro_actual=(cached.nro_actual||1)+1; localStorage.setItem('pos_timbrado_activo',JSON.stringify(cached)); }
+  // Avisar a Supabase sin bloquear
+  if(email && !USAR_DEMO){
+    fetch(SUPA_URL+'/rest/v1/rpc/avanzar_correlativo',{
+      method:'POST',
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json'},
+      body: JSON.stringify({ p_email:email, p_terminal:terminal })
+    }).then(r=>r.json()).then(d=>{
+      if(d&&d.ok) console.log('[Correlativo] +1 en Supabase → nro_actual:',d.nro_actual);
+    }).catch(e=>console.warn('[Correlativo]',e.message));
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// PERSISTENCIA DE TURNO EN localStorage
+// ══════════════════════════════════════════════════════
+const TURNO_KEY = 'pos_turno_activo';
+
+function turnoGuardar(){
+  try {
+    localStorage.setItem(TURNO_KEY, JSON.stringify(turnoData));
+  } catch(e){ console.warn('[Turno] Error guardando:', e.message); }
+}
+
+function turnoRestaurar(){
+  try {
+    const raw = localStorage.getItem(TURNO_KEY);
+    if(!raw) return false;
+    const data = JSON.parse(raw);
+    if(!data || !data.fechaApertura) return false;
+    // Restaurar fechas como objetos Date
+    if(data.fechaApertura) data.fechaApertura = new Date(data.fechaApertura);
+    if(data.ventas) data.ventas.forEach(v=>{ if(v.fecha) v.fecha = new Date(v.fecha); });
+    if(data.egresos) data.egresos.forEach(e=>{ if(e.fecha) e.fecha = new Date(e.fecha); });
+    Object.assign(turnoData, data);
+    console.log('[Turno] Restaurado — '+turnoData.ventas.length+' ventas, abierto: '+turnoData.fechaApertura);
+    return true;
+  } catch(e){
+    console.warn('[Turno] Error restaurando:', e.message);
+    localStorage.removeItem(TURNO_KEY);
+    return false;
+  }
+}
+
+function turnoBorrar(){
+  localStorage.removeItem(TURNO_KEY);
+}
+
 function registrarVentaEnTurno(data){
   turnoData.ventas.push({
-    items: data.items,
-    total: data.total,
-    metodo: data.metodo,
+    items:       data.items,
+    total:       data.total,
+    metodo:      data.metodo,
     comprobante: data.comprobante,
-    factura: data.factura,
-    fecha: data.fecha,
-    nroTicket: data.nroTicket,
+    factura:     data.factura,
+    fecha:       data.fecha,
+    nroTicket:   data.nroTicket,
   });
+  // Persistir en localStorage (sobrevive al cerrar la app)
+  turnoGuardar();
+  // Guardar en Supabase en background
+  supaInsertVenta(data);
+}
+
+// Insertar venta en Supabase (en background, no bloquea la UI)
+function supaInsertVenta(data){
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+
+  const venta = {
+    fecha:          (data.fecha || new Date()).toISOString(),
+    turno_id:       turnoData.dbId || null,
+    terminal:       licGetTerminal(),
+    sucursal:       localStorage.getItem('pos_sucursal') || 'Principal',
+    licencia_email: email,
+    total:          data.total || 0,
+    metodo_pago:    (data.metodo || 'EFECTIVO').toUpperCase(),
+    comprobante:    data.comprobante || '',
+    items:          JSON.stringify((data.items||[]).map(i=>({
+                      id:     i.id,
+                      nombre: i.name,
+                      qty:    i.qty,
+                      precio: i.price,
+                      obs:    i.obs||''
+                    }))),
+    tiene_factura:  !!(data.factura && data.factura.ruc),
+    factura_ruc:    data.factura ? (data.factura.ruc||'')   : '',
+    factura_nombre: data.factura ? (data.factura.nombre||'') : '',
+  };
+
+  // También guardar en IndexedDB local
+  if(db) dbSaveVenta({
+    ...data,
+    turnoId: turnoData.dbId,
+  });
+
+  // Enviar a Supabase
+  if(USAR_DEMO || !navigator.onLine){
+    // Sin conexión — encolar para sync posterior
+    if(db) dbQueueSync('ventas','insert', venta);
+    return;
+  }
+
+  fetch(SUPA_URL+'/rest/v1/pos_ventas', {
+    method:  'POST',
+    headers: {
+      'apikey':          SUPA_ANON,
+      'Authorization':   'Bearer '+SUPA_ANON,
+      'Content-Type':    'application/json',
+      'Prefer':          'return=minimal',
+    },
+    body: JSON.stringify(venta)
+  })
+  .then(r => {
+    if(!r.ok) return r.text().then(t => { throw new Error(t); });
+    console.log('[Venta] Guardada en Supabase OK');
+  })
+  .catch(e => {
+    console.warn('[Venta] Error Supabase, encolando:', e.message);
+    if(db) dbQueueSync('ventas','insert', venta);
+  });
+}
+
+// Sincronizar ventas pendientes de la cola
+async function syncVentasPendientes(){
+  if(!db || !navigator.onLine || USAR_DEMO) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+  try {
+    const pending = await db.sync_queue
+      .where('sincronizado').equals(0)
+      .filter(r => r.tabla === 'ventas')
+      .limit(20)
+      .toArray();
+
+    for(const item of pending){
+      try {
+        const datos = JSON.parse(item.datos);
+        datos.licencia_email = email;
+        const res = await fetch(SUPA_URL+'/rest/v1/pos_ventas', {
+          method:  'POST',
+          headers: {
+            'apikey':        SUPA_ANON,
+            'Authorization': 'Bearer '+SUPA_ANON,
+            'Content-Type':  'application/json',
+            'Prefer':        'return=minimal',
+          },
+          body: JSON.stringify(datos)
+        });
+        if(res.ok) await db.sync_queue.update(item.id, { sincronizado: 1 });
+      } catch(e){ break; } // sin internet, parar
+    }
+  } catch(e){ console.warn('[Sync ventas]', e.message); }
 }
 
 function renderTurno(){
@@ -3736,6 +5140,7 @@ function guardarEgreso(){
   if(!desc){ toast('Ingresá la descripción'); return; }
   if(!monto){ toast('Ingresá el monto'); return; }
   turnoData.egresos.push({ desc, monto, fecha: new Date() });
+  turnoGuardar(); // persistir
   document.getElementById('egresoModal').classList.remove('open');
   renderTurno();
   toast('✓ Egreso registrado');
@@ -3919,22 +5324,289 @@ const COLORES_TILE = [
   '#827717','#6d6f1a','#33691e','#4e342e','#37474f',
   '#558b2f','#bf360c','#00695c','#0277bd','#283593',
 ];
-let CATEGORIAS = [
-  { id:1, nombre:'Comidas',  color:'#e65100' },
-  { id:2, nombre:'Bebidas',  color:'#c62828' },
-  { id:3, nombre:'Minutas',  color:'#2e7d32' },
-  { id:4, nombre:'Extras',   color:'#827717' },
-  { id:5, nombre:'Otros',    color:'#546e7a' },
-];
-let DESCUENTOS = []; // {id, name, tipo:'%'|'monto', valor, activo:true}
-let nextDescId = 1;
-let nextCatId = 6;
+let CATEGORIAS = [];
+let nextCatId  = 1;
 const CATEGORIAS_DEFAULT = CATEGORIAS.map(c => c.nombre);
+
+// Descuentos (igual que productos pero categoría especial)
+let DESCUENTOS = []; // {id, name, tipo:'%'|'monto', valor:null|number, color:'#e53935'}
+let nextDescId = 9000;
+
+// ════════════════════════════════════════════════════════
+// DESCUENTOS
+// ════════════════════════════════════════════════════════
+
+let descEditId = null;
+let descTipoSel = '%';
+
+function goToDescuentos(){
+  goTo('scDescuentos');
+  renderDescList();
+  renderCategoriasVenta(); // actualizar categorías en pantalla de ventas
+}
+
+function renderDescList(){
+  const list = document.getElementById('descList');
+  if(!list) return;
+
+  // Combinar DESCUENTOS[] + productos de Supabase con cat='Descuentos'
+  const descIds = new Set(DESCUENTOS.map(d=>String(d.id)));
+  const prodsDesc = PRODS.filter(p=>
+    p.cat==='Descuentos' && p.activo!==false && !descIds.has(String(p.id))
+  );
+  const descs = [
+    ...DESCUENTOS.filter(d=>d.activo!==false),
+    ...prodsDesc.map(p=>({
+      id:p.id, name:p.name,
+      tipo:p.descTipo||'%', valor:p.descValor||null,
+      color:'#e53935', activo:true
+    }))
+  ];
+
+  if(!descs.length){
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:14px;">'+
+      '<div style="font-size:32px;margin-bottom:8px;">🏷️</div>'+
+      'Sin descuentos creados<br>'+
+      '<span style="font-size:12px;">Tocá + para crear uno</span></div>';
+    return;
+  }
+
+  list.innerHTML = descs.map(d => {
+    const valorStr = d.valor != null
+      ? (d.tipo==='%' ? d.valor+'%' : gs(d.valor))
+      : '<span style="color:#555;font-style:italic;">se ingresa al vender</span>';
+    return '<div class="art-item" onclick="editarDesc('+d.id+')" style="border-left:3px solid #e53935;">'+
+      '<div class="art-item-color" style="background:#e53935;font-size:12px;font-weight:800;">%</div>'+
+      '<div class="art-item-info">'+
+        '<div class="art-item-name">'+d.name+'</div>'+
+        '<div class="art-item-meta">'+
+          '<span>'+(d.tipo==='%'?'Porcentaje':'Monto fijo')+'</span>'+
+          '<span>·</span><span>'+valorStr+'</span>'+
+        '</div>'+
+      '</div>'+
+      '<button onclick="event.stopPropagation();eliminarDesc('+d.id+')" '+
+        'style="background:rgba(239,83,80,.1);border:1px solid var(--red);border-radius:6px;'+
+        'color:var(--red);font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;">✕</button>'+
+    '</div>';
+  }).join('');
+}
+
+function abrirNuevoDesc(){
+  descEditId = null;
+  descTipoSel = '%';
+  document.getElementById('mDescTitulo').textContent = 'Nuevo Descuento';
+  document.getElementById('mDescNombre').value = '';
+  document.getElementById('mDescValor').value = '';
+  selDescTipo('%');
+  document.getElementById('mDescOv').style.display = 'flex';
+  setTimeout(()=>document.getElementById('mDescNombre').focus(), 100);
+}
+
+function editarDesc(id){
+  const d = DESCUENTOS.find(x=>x.id===id);
+  if(!d) return;
+  descEditId  = id;
+  descTipoSel = d.tipo || '%';
+  document.getElementById('mDescTitulo').textContent = 'Editar Descuento';
+  document.getElementById('mDescNombre').value = d.name;
+  document.getElementById('mDescValor').value  = d.valor != null ? d.valor : '';
+  selDescTipo(d.tipo || '%');
+  document.getElementById('mDescOv').style.display = 'flex';
+}
+
+function selDescTipo(tipo){
+  descTipoSel = tipo;
+  const bPct   = document.getElementById('mDescTipoPct');
+  const bMonto = document.getElementById('mDescTipoMonto');
+  if(bPct){
+    bPct.style.borderColor   = tipo==='%'     ? 'var(--green)' : '#2a2a2a';
+    bPct.style.background    = tipo==='%'     ? 'rgba(76,175,80,.1)' : 'transparent';
+    bPct.style.color         = tipo==='%'     ? 'var(--green)' : '#aaa';
+  }
+  if(bMonto){
+    bMonto.style.borderColor = tipo==='monto' ? 'var(--green)' : '#2a2a2a';
+    bMonto.style.background  = tipo==='monto' ? 'rgba(76,175,80,.1)' : 'transparent';
+    bMonto.style.color       = tipo==='monto' ? 'var(--green)' : '#aaa';
+  }
+  const inp = document.getElementById('mDescValor');
+  if(inp) inp.placeholder = tipo==='%'
+    ? 'Ej: 10 (= 10%) — vacío = ingresar al vender'
+    : 'Ej: 5000 — vacío = ingresar al vender';
+}
+
+function cerrarMDesc(){
+  document.getElementById('mDescOv').style.display = 'none';
+}
+
+function guardarDesc(){
+  const nombre   = document.getElementById('mDescNombre').value.trim();
+  const valorStr = document.getElementById('mDescValor').value.trim();
+  const valor    = valorStr !== '' ? parseFloat(valorStr) : null;
+
+  if(!nombre){ toast('Ingresá un nombre'); return; }
+  if(descTipoSel==='%' && valor!=null && (valor<=0||valor>100)){
+    toast('El porcentaje debe ser entre 1 y 100'); return;
+  }
+
+  if(descEditId != null){
+    const d = DESCUENTOS.find(x=>x.id===descEditId);
+    if(d){ d.name=nombre; d.tipo=descTipoSel; d.valor=valor; }
+  } else {
+    DESCUENTOS.push({
+      id:    nextDescId++,
+      name:  nombre,
+      tipo:  descTipoSel,
+      valor: valor,
+      color: '#e53935',
+      activo:true
+    });
+  }
+
+  // Persistir en pos_config y localStorage
+  guardarDescuentosConfig();
+  cerrarMDesc();
+  renderDescList();
+  filterP();
+  toast('Descuento guardado');
+}
+
+function guardarDescuentosConfig(){
+  // Guardar en localStorage
+  localStorage.setItem('pos_descuentos', JSON.stringify(DESCUENTOS));
+  // Guardar en Supabase pos_config
+  const email = localStorage.getItem('lic_email');
+  if(!email || USAR_DEMO) return;
+  fetch(SUPA_URL+'/rest/v1/pos_config?on_conflict=licencia_email,clave',{
+    method:'POST',
+    headers:{
+      'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+      'Content-Type':'application/json',
+      'Prefer':'resolution=merge-duplicates'
+    },
+    body: JSON.stringify({
+      licencia_email: email,
+      clave: 'descuentos_config',
+      valor: JSON.stringify(DESCUENTOS)
+    })
+  }).catch(e=>console.warn('[Desc] No se pudo guardar en Supabase:', e.message));
+}
+
+async function cargarDescuentosConfig(){
+  // 1. Intentar desde Supabase
+  try {
+    const email = localStorage.getItem('lic_email');
+    if(email && !USAR_DEMO){
+      const r = await fetch(
+        SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+
+        '&clave=eq.descuentos_config&select=valor',
+        {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}}
+      );
+      if(r.ok){
+        const data = await r.json();
+        if(data && data[0] && data[0].valor){
+          const parsed = JSON.parse(data[0].valor);
+          if(Array.isArray(parsed) && parsed.length){
+            DESCUENTOS.length = 0;
+            parsed.forEach(d=>DESCUENTOS.push(d));
+            localStorage.setItem('pos_descuentos', JSON.stringify(DESCUENTOS));
+            console.log('[Desc] Cargados desde Supabase:', DESCUENTOS.length);
+            return;
+          }
+        }
+      }
+    }
+  } catch(e){ console.warn('[Desc] Fallback a localStorage'); }
+
+  // 2. Fallback localStorage
+  try {
+    const stored = localStorage.getItem('pos_descuentos');
+    if(stored){
+      const parsed = JSON.parse(stored);
+      if(Array.isArray(parsed)){
+        DESCUENTOS.length = 0;
+        parsed.forEach(d=>DESCUENTOS.push(d));
+        console.log('[Desc] Cargados desde localStorage:', DESCUENTOS.length);
+      }
+    }
+  } catch(e){ console.warn('[Desc] Error cargando descuentos:', e.message); }
+}
+
+function eliminarDesc(id){
+  if(!confirm('Eliminar este descuento?')) return;
+  const idx = DESCUENTOS.findIndex(x=>x.id===id);
+  if(idx>=0) DESCUENTOS.splice(idx,1);
+  guardarDescuentosConfig();
+  renderDescList();
+  filterP();
+  toast('Descuento eliminado');
+}
+
+// Agregar descuento al carrito
+function addDescuento(descId){
+  const d = DESCUENTOS.find(x=>x.id===descId);
+  if(!d) return;
+
+  // Calcular subtotal actual del carrito (sin otros descuentos)
+  const subtotal = cart
+    .filter(i=>!i.esDescuento)
+    .reduce((s,i)=>s+calcItemTotal(i),0);
+
+  if(!subtotal){ toast('Agregá productos primero'); return; }
+
+  let monto = 0;
+
+  const tipo  = d.descTipo  || d.tipo  || '%';
+  const valor = d.descValor != null ? d.descValor : (d.valor != null ? d.valor : null);
+
+  if(valor != null){
+    // Valor predefinido
+    monto = tipo==='%'
+      ? Math.round(subtotal * valor / 100)
+      : valor;
+  } else {
+    // Pedir valor en el momento
+    const input = prompt(
+      tipo==='%'
+        ? 'Ingresá el porcentaje de descuento (1-100):'
+        : 'Ingresá el monto del descuento:'
+    );
+    if(input===null) return;
+    const val = parseFloat(input);
+    if(!val || val<=0){ toast('Valor inválido'); return; }
+    monto = d.tipo==='%'
+      ? Math.round(subtotal * Math.min(val,100) / 100)
+      : val;
+  }
+
+  if(monto<=0){ toast('Monto de descuento inválido'); return; }
+  if(monto>subtotal){ toast('El descuento no puede superar el subtotal'); return; }
+
+  // Agregar como ítem especial
+  cart.push({
+    lineId:      Date.now()*1000+Math.floor(Math.random()*1000),
+    id:          descId,
+    name:        d.name,
+    price:       -monto, // negativo internamente para el cálculo
+    qty:         1,
+    obs:         '',
+    color:       '#e53935',
+    esDescuento: true,
+    montoDesc:   monto,
+    iva:         'exento'
+  });
+
+  updUI();
+  if(showTkt) renderTkt();
+  toast('Descuento aplicado: '+gs(monto));
+}
+
+
 let artEditIdx = -1;
 let artColorSel = COLORES_TILE[0];
 let artColorManual = false;
 let artCatSel = 'Comidas';
 let artIvaSel = '10';
+let artImagenBase64 = null; // imagen del producto actual en edición
 let nextProdId = 100;
 
 function getProductColor(prod){
@@ -3955,6 +5627,122 @@ PRODS.forEach((p,i) => {
   if(p.colorPropio === undefined)    p.colorPropio    = false;
 });
 nextProdId = PRODS.length + 1;
+
+// ── IMAGEN DE PRODUCTO — Supabase Storage ───────────────
+async function onArtImgChange(input){
+  const file = input.files[0];
+  if(!file) return;
+
+  // Mostrar preview local inmediatamente
+  const localUrl = URL.createObjectURL(file);
+  mostrarPreviewImagen(localUrl, true); // true = uploading
+
+  try {
+    // Comprimir si es muy grande (max 800px, calidad 80%)
+    const compressed = await comprimirImagen(file, 800, 0.8);
+
+    // Subir a Supabase Storage
+    const email    = localStorage.getItem('lic_email') || 'demo';
+    const ext      = file.name.split('.').pop().toLowerCase() || 'jpg';
+    const filename = 'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)+'.'+ext;
+    const path     = email.replace(/[^a-z0-9]/gi,'_')+'/'+filename;
+
+    const r = await fetch(
+      SUPA_URL+'/storage/v1/object/productos/'+path,
+      {
+        method: 'POST',
+        headers: {
+          'apikey':        SUPA_ANON,
+          'Authorization': 'Bearer '+SUPA_ANON,
+          'Content-Type':  compressed.type || 'image/jpeg',
+          'x-upsert':      'true'
+        },
+        body: compressed
+      }
+    );
+
+    if(!r.ok){
+      const t = await r.text();
+      throw new Error('Upload error: '+t.substring(0,100));
+    }
+
+    // Construir URL pública
+    const publicUrl = SUPA_URL+'/storage/v1/object/public/productos/'+path;
+    artImagenBase64 = publicUrl; // guardamos la URL, no base64
+    mostrarPreviewImagen(publicUrl, false);
+    console.log('[Imagen] Subida OK:', publicUrl);
+
+  } catch(e){
+    console.error('[Imagen] Error Storage:', e.message);
+    toast('⚠️ Usando imagen local (ejecutá supabase_storage.sql)');
+    // Fallback: comprimir mucho y guardar como base64 pequeño
+    try {
+      const tiny = await comprimirImagen(file, 300, 0.6);
+      const reader = new FileReader();
+      reader.onload = function(ev){
+        artImagenBase64 = ev.target.result;
+        mostrarPreviewImagen(artImagenBase64, false);
+        console.log('[Imagen] Base64 fallback:', Math.round(ev.target.result.length/1024)+'KB');
+      };
+      reader.readAsDataURL(tiny);
+    } catch(e2){ console.error('[Imagen] Fallback error:', e2.message); }
+  }
+}
+
+// Comprimir imagen antes de subir
+async function comprimirImagen(file, maxSize, quality){
+  return new Promise((resolve)=>{
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = function(){
+      URL.revokeObjectURL(url);
+      let w = img.width, h = img.height;
+      if(w > maxSize || h > maxSize){
+        if(w > h){ h = Math.round(h * maxSize/w); w = maxSize; }
+        else      { w = Math.round(w * maxSize/h); h = maxSize; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(blob => resolve(blob || file), 'image/jpeg', quality);
+    };
+    img.onerror = ()=>resolve(file);
+    img.src = url;
+  });
+}
+
+function mostrarPreviewImagen(src, uploading){
+  const preview = document.getElementById('artImgPreview');
+  const img     = document.getElementById('artImgPreviewImg');
+  const upload  = document.getElementById('artImgUpload');
+  if(!preview) return;
+  if(src){
+    img.src = src;
+    img.style.opacity = uploading ? '0.5' : '1';
+    preview.style.display = 'block';
+    upload.style.display  = 'none';
+    if(uploading){
+      const lbl = upload.querySelector('div');
+      if(lbl) lbl.textContent = 'Subiendo...';
+    }
+  } else {
+    preview.style.display = 'none';
+    upload.style.display  = 'block';
+  }
+}
+
+function quitarImagen(){
+  artImagenBase64 = null;
+  mostrarPreviewImagen(null, false);
+  document.getElementById('artImgInput').value = '';
+}
+
+function resetArtImagen(){
+  artImagenBase64 = null;
+  mostrarPreviewImagen(null, false);
+  const inp = document.getElementById('artImgInput');
+  if(inp) inp.value = '';
+}
 
 function renderArtList(filter){
   filter = filter || '';
@@ -4000,11 +5788,98 @@ function renderArtList(filter){
   }
 }
 
+function buildArtItem(p, inact){
+  const prodIdx  = PRODS.indexOf(p);
+  const priceStr = p.precioVariable
+    ? '<span style="color:#ff9800;font-size:12px;">Precio variable</span>'
+    : gs(p.price);
+  const ivaStr   = p.iva==='exento' ? 'Exento' : 'IVA '+p.iva+'%';
+
+  const div = document.createElement('div');
+  div.className = 'art-item';
+  if(inact){
+    div.style.opacity    = '0.55';
+    div.style.borderLeft = '3px solid #ef5350';
+  }
+
+  div.onclick = () => inact ? mostrarOpcionesInactivo(prodIdx) : editarArticulo(prodIdx);
+
+  div.innerHTML =
+    '<div class="art-item-color" style="background:'+(inact?'#2a2a2a':getProductColor(p))+'">'+
+      '<span style="font-size:11px;font-weight:700;">'+(inact?'✕':p.name.substring(0,2))+'</span>'+
+    '</div>'+
+    '<div class="art-item-info">'+
+      '<div class="art-item-name">'+p.name+
+        (inact?' <span style="font-size:10px;background:rgba(239,83,80,.2);color:#ef5350;'+
+          'border-radius:3px;padding:1px 6px;font-weight:700;">INACTIVO</span>':'')+
+      '</div>'+
+      '<div class="art-item-meta">'+
+        '<span>'+p.cat+'</span><span>·</span><span>'+ivaStr+'</span>'+
+        (p.codigo?'<span>·</span><span style="color:#555;">'+p.codigo+'</span>':'')+
+      '</div>'+
+    '</div>'+
+    (inact
+      ? '<button onclick="event.stopPropagation();reactivarArticulo('+prodIdx+')" '+
+          'style="background:rgba(76,175,80,.12);border:1px solid var(--green);'+
+          'border-radius:6px;color:var(--green);font-size:11px;font-weight:700;'+
+          'padding:6px 12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">↑ ACTIVAR</button>'
+      : '<div class="art-item-price">'+priceStr+'</div>'
+    );
+
+  return div;
+}
+
+
+// Mostrar opciones para artículo inactivo
+function mostrarOpcionesInactivo(prodIdx){
+  const p = PRODS[prodIdx];
+  if(!p) return;
+  const opc = confirm('Reactivar "'+p.name+'"? Volverá a aparecer en ventas.');
+  if(opc) reactivarArticulo(prodIdx);
+}
+
+// Reactivar artículo
+async function reactivarArticulo(prodIdx){
+  const p = PRODS[prodIdx];
+  if(!p) return;
+
+  // 1. Marcar en memoria
+  p.activo = true;
+  delete p.deleted_at;
+
+  // 2. Dexie
+  if(db) await db.productos.update(p.id, {activo:true, updatedAt:new Date().toISOString()});
+
+  // 3. Supabase
+  const email = localStorage.getItem('lic_email');
+  if(email && !USAR_DEMO){
+    try {
+      const r = await fetch(
+        SUPA_URL+'/rest/v1/pos_productos?id=eq.'+p.id+'&licencia_email=eq.'+encodeURIComponent(email),
+        { method:'PATCH',
+          headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+            'Content-Type':'application/json','Prefer':'return=minimal'},
+          body: JSON.stringify({activo:true})
+        }
+      );
+      if(r.ok) console.log('[Producto] Reactivado OK:', p.name);
+      else { const t=await r.text(); console.warn('[Producto] Error reactivar:',t); }
+    } catch(e){ console.warn('[Producto] Sin conexión:', e.message); }
+  }
+
+  filterP();
+  renderArtList();
+  toast('✓ "'+p.name+'" reactivado');
+}
+
 function filterArts(){
   renderArtList(document.getElementById('artSearch').value);
 }
 
 function nuevoArticulo(){
+  artEditIdx = -1;
+  artImagenBase64 = null;
+  setTimeout(()=>resetArtImagen(), 50);
   artEditIdx = -1;
   artCatSel = CATEGORIAS.length > 0 ? CATEGORIAS[0].nombre : 'Comidas';
   artIvaSel = '10';
@@ -4048,6 +5923,9 @@ function editarArticulo(idx){
   selIva(artIvaSel);
   renderColorPicker();
   renderCatSelector();
+  // Cargar imagen existente
+  artImagenBase64 = null; // null = no cambiar
+  setTimeout(()=>mostrarPreviewImagen(p.imagen||null), 80);
   goTo('scArticuloNuevo');
 }
 
@@ -4116,22 +5994,34 @@ function guardarArticulo(){
   if(!nombre){ toast('Ingresá el nombre del artículo'); return; }
 
   if(artEditIdx >= 0){
+    const imgUpdate = artImagenBase64 !== null ? {imagen: artImagenBase64} : {};
     Object.assign(PRODS[artEditIdx], {
       name: nombre.toUpperCase(), price: precioVariable?0:precio,
       precioVariable, costo, codigo, color: artColorSel,
       colorPropio: artColorManual,
-      cat: artCatSel, iva: artIvaSel, mitad, inventario, comanda
+      cat: artCatSel, iva: artIvaSel, mitad, inventario, comanda,
+      ...imgUpdate
     });
+    const prod = PRODS[artEditIdx];
+    // Guardar en Dexie y Supabase
+    dbSaveProducto(prod);
+    supaUpsertProducto(prod);
     toast('Artículo actualizado');
+    if(db) dbSaveProducto(PRODS[artEditIdx]);
+    supaUpsertProducto(PRODS[artEditIdx]);
   } else {
-    PRODS.push({
+    const newProd = {
       id: nextProdId, prodId: nextProdId,
       name: nombre.toUpperCase(), price: precioVariable?0:precio,
       precioVariable, costo, codigo, color: artColorSel,
       colorPropio: artColorManual,
       cat: artCatSel, iva: artIvaSel, mitad, inventario, comanda
-    });
+    };
+    PRODS.push(newProd);
     nextProdId++;
+    // Guardar en Dexie y Supabase
+    dbSaveProducto(newProd);
+    supaUpsertProducto(newProd);
     toast('Artículo agregado');
   }
   filterP(); renderArtList();
@@ -4249,8 +6139,9 @@ function renderCatListScreen(){
   if(!CATEGORIAS.length){ list.innerHTML='<div class="cat-empty-msg"><p>No hay categorías</p></div>'; return; }
   list.innerHTML = '';
   CATEGORIAS.forEach((cat, i) => {
-    const count = PRODS.filter(p => p.cat === cat.nombre).length;
+    const count = PRODS.filter(p => p.cat === cat.nombre && p.activo!==false).length;
     const div = document.createElement('div');
+    if(cat.activa === false) div.style.opacity = '0.5';
     div.className = 'cat-list-item';
     div.onclick = () => editarCategoria(i);
     div.innerHTML =
@@ -4328,14 +6219,20 @@ function guardarCategoria(){
       if(p.cat === old) p.cat = nombre;
       if(!p.colorPropio && p.color === oldColor) p.color = catColorSel;
     });
+    supaUpsertCategoria(CATEGORIAS[catEditIdx]);
     toast('Categoría actualizada');
   } else {
     if(CATEGORIAS.find(c => c.nombre.toLowerCase() === nombre.toLowerCase())){ toast('Ya existe esa categoría'); return; }
-    CATEGORIAS.push({ id: nextCatId++, nombre, color: catColorSel });
+    const newCat = { id: nextCatId++, nombre, color: catColorSel };
+    CATEGORIAS.push(newCat);
+    supaUpsertCategoria(newCat);
     toast('Categoría creada');
   }
   CATEGORIAS_DEFAULT.length = 0;
-  CATEGORIAS.forEach(c => CATEGORIAS_DEFAULT.push(c.nombre));
+  CATEGORIAS.filter(c=>c.activa!==false).forEach(c => CATEGORIAS_DEFAULT.push(c.nombre));
+  // Sync con Supabase
+  const catObj = catEditIdx >= 0 ? CATEGORIAS[catEditIdx] : CATEGORIAS[CATEGORIAS.length-1];
+  if(catObj) supaUpsertCategoria(catObj);
   filterP(); renderCatListScreen();
   goTo('scCategorias');
 }
@@ -4343,14 +6240,25 @@ function guardarCategoria(){
 function eliminarCategoria(){
   if(catEditIdx < 0) return;
   const cat = CATEGORIAS[catEditIdx];
-  const count = PRODS.filter(p => p.cat === cat.nombre).length;
-  if(count > 0){ toast('No se puede eliminar: tiene '+count+' artículo'+(count!==1?'s':'')); return; }
-  CATEGORIAS.splice(catEditIdx, 1);
+  // Contar productos activos (no inactivos)
+  const activeCount = PRODS.filter(p => p.cat === cat.nombre && p.activo !== false).length;
+  const totalCount  = PRODS.filter(p => p.cat === cat.nombre).length;
+  if(activeCount > 0){
+    toast('No se puede eliminar: tiene '+activeCount+' artículo'+(activeCount!==1?'s':'')+' activo'+(activeCount!==1?'s':''));
+    return;
+  }
+  if(totalCount > 0 && !confirm('Esta categoría tiene '+totalCount+' producto'+(totalCount!==1?'s':'')+' inactivo'+(totalCount!==1?'s':'')+'. ¿Eliminar igual?')) return;
+  // Soft delete: marcar inactiva
+  CATEGORIAS[catEditIdx].activa = false;
+  CATEGORIAS[catEditIdx].deleted_at = new Date().toISOString();
+  // Actualizar defaults (excluir inactivas)
   CATEGORIAS_DEFAULT.length = 0;
-  CATEGORIAS.forEach(c => CATEGORIAS_DEFAULT.push(c.nombre));
+  CATEGORIAS.filter(c=>c.activa!==false).forEach(c => CATEGORIAS_DEFAULT.push(c.nombre));
+  if(db) dbSaveConfig('categorias', JSON.stringify(CATEGORIAS));
+  supaUpsertCategoria({ ...CATEGORIAS[catEditIdx], activa: false });
   renderCatListScreen();
   goTo('scCategorias');
-  toast('Categoría eliminada');
+  toast('Categoría desactivada');
 }
 
 let asignarCatNombre = '';
@@ -4540,6 +6448,7 @@ function buildCierreTicket(){
 function confirmarCierre(){
   buildCierreTicket();
   document.getElementById('previewPapel').innerHTML = cierreTicketHTML;
+  turnoBorrar();
   turnoData = { fechaApertura: null, efectivoInicial: 0, ventas: [], egresos: [], ingresos: [] };
   cierreMetodos = {};
   goTo('scPreviewCierre');
@@ -4567,11 +6476,15 @@ function cerrarPreviewCierre(){
 
 // ── CONFIGURACIÓN ────────────────────────────────────────────────────────────
 let configData = {
-  negocio:      'MI NEGOCIO',
-  direccion:    'ASUNCION',
-  telefono:     '',
-  ruc:          '',
-  email:        'usuario@email.com',
+  negocio:      localStorage.getItem('an')       || 'MI NEGOCIO',
+  direccion:    localStorage.getItem('ad')       || 'ASUNCION',
+  ciudad:       localStorage.getItem('ciudad')   || '',
+  telefono:     localStorage.getItem('at')       || '',
+  ruc:          localStorage.getItem('ar')       || '',
+  email:        localStorage.getItem('email_negocio') || '',
+  pie_recibo:   localStorage.getItem('pie_recibo')|| '¡Gracias por su compra!',
+  mostrar_ruc:  localStorage.getItem('mostrar_ruc')||'1',
+  moneda:       localStorage.getItem('moneda')   || 'GS',
   terminal:     localStorage.getItem('pos_terminal')  || 'Terminal 1',
   sucursal:     localStorage.getItem('pos_sucursal')  || 'Principal',
   deposito:     localStorage.getItem('pos_deposito')  || 'Depósito Principal',
@@ -4594,10 +6507,15 @@ function goToConfig(){
 }
 
 function saveGeneralConfig(){
-  configData.negocio   = document.getElementById('cfgNegocio').value;
-  configData.direccion = document.getElementById('cfgDireccion').value;
-  configData.telefono  = document.getElementById('cfgTelefono').value;
-  configData.ruc       = document.getElementById('cfgRuc').value;
+  configData.negocio   = document.getElementById('cfgNegocio')?.value  || configData.negocio;
+  configData.direccion = document.getElementById('cfgDireccion')?.value || configData.direccion;
+  configData.telefono  = document.getElementById('cfgTelefono')?.value  || configData.telefono;
+  configData.ruc       = document.getElementById('cfgRuc')?.value       || configData.ruc;
+  // Persistir en localStorage
+  localStorage.setItem('an', configData.negocio);
+  localStorage.setItem('ad', configData.direccion);
+  localStorage.setItem('at', configData.telefono);
+  localStorage.setItem('ar', configData.ruc);
 }
 
 function cerrarSesion(){
@@ -4735,6 +6653,254 @@ async function imprimirBluetooth(device, htmlContent, size){
   }
 }
 
+// ══════════════════════════════════════════════════════════
+// SYNC PRODUCTOS Y CATEGORÍAS CON SUPABASE
+// ══════════════════════════════════════════════════════════
+
+// Guardar producto en Supabase (en background, no bloquea)
+function supaUpsertProducto(prod){
+  if(USAR_DEMO || !navigator.onLine) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+  // No guardar descuentos en pos_productos — van en pos_config
+  if(prod.esDescuento) return;
+  const data = {
+    id: prod.id, nombre: prod.name, precio: prod.price||0,
+    precio_variable: prod.precioVariable||false,
+    costo: prod.costo||0, codigo: prod.codigo||'',
+    categoria: prod.cat, iva: prod.iva||'10',
+    color: prod.color, color_propio: prod.colorPropio||false,
+    mitad: prod.mitad||false, inventario: prod.inventario||false,
+    comanda: prod.comanda||false, item_libre: prod.itemLibre||false,
+    activo: prod.activo !== false, licencia_email: email,
+    imagen: prod.imagen || null,
+    updated_at: new Date().toISOString()
+  };
+  fetch(SUPA_URL+'/rest/v1/pos_productos', {
+    method: 'POST',
+    headers:{
+      'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+      'Content-Type':'application/json',
+      'Prefer':'resolution=merge-duplicates'
+    },
+    body: JSON.stringify(data)
+  }).then(r=>{ if(!r.ok) r.text().then(t=>console.warn('[Supa] Prod upsert error:',t)); })
+    .catch(e=>console.warn('[Supa] Prod offline:', e.message));
+}
+
+function supaUpsertCategoria(cat){
+  if(USAR_DEMO || !navigator.onLine) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+  const data = {
+    id: cat.id, nombre: cat.nombre, color: cat.color,
+    licencia_email: email, updated_at: new Date().toISOString()
+  };
+  fetch(SUPA_URL+'/rest/v1/pos_categorias', {
+    method: 'POST',
+    headers:{
+      'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+      'Content-Type':'application/json',
+      'Prefer':'resolution=merge-duplicates'
+    },
+    body: JSON.stringify(data)
+  }).then(r=>{ if(!r.ok) r.text().then(t=>console.warn('[Supa] Cat upsert error:',t)); })
+    .catch(e=>console.warn('[Supa] Cat offline:', e.message));
+}
+
+async function supaLoadProductos(){
+  if(USAR_DEMO) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+  try {
+    const data = await supaGet('pos_productos',
+      'licencia_email=eq.'+encodeURIComponent(email)+'&order=nombre.asc&select=*'
+    );
+    if(!data || !data.length) return;
+
+    // Construir array temporal — NO tocar PRODS hasta tener todo listo
+    const itemLibre = PRODS.find(p=>p.itemLibre);
+    const newProds  = [];
+    if(itemLibre) newProds.push(itemLibre);
+
+    data.forEach(p => {
+      newProds.push({
+        id:             p.id,
+        prodId:         p.id,
+        name:           p.nombre,
+        price:          p.precio || 0,
+        precioVariable: p.precio_variable || false,
+        costo:          p.costo || 0,
+        codigo:         p.codigo || '',
+        cat:            p.categoria || 'Sin categoría',
+        iva:            p.iva || '10',
+        color:          p.color || '#546e7a',
+        colorPropio:    p.color_propio || false,
+        mitad:          p.mitad || false,
+        inventario:     p.inventario || false,
+        comanda:        p.comanda || false,
+        itemLibre:      false,
+        activo:         p.activo !== false && p.activo !== 0,
+        imagen:         p.imagen || null, // null/undefined/true = active
+      });
+    });
+
+    // Solo reemplazar PRODS si todo salió bien
+    PRODS.length = 0;
+    newProds.forEach(p => PRODS.push(p));
+
+    // Actualizar contadores
+    const maxId = Math.max(...PRODS.filter(p=>!p.itemLibre).map(p=>p.id), 0);
+    nextProdId  = maxId + 1;
+    console.log('[Supabase] Productos cargados:', PRODS.length-1);
+    // Reset category to Todos after load to avoid stale filter
+    curCat = 'Todos los artículos';
+    const catLblEl = document.getElementById('catLbl');
+    if(catLblEl) catLblEl.textContent = 'Todos los artículos';
+    renderCatPills();
+    filterP();
+    // Cargar descuentos en background
+    try { await cargarDescuentosConfig(); } catch(ed){ console.warn('[Desc]', ed.message); }
+  } catch(e){
+    if(!e.message?.includes('Failed to fetch'))
+      console.warn('[Supabase] Productos:', e.message);
+    // PRODS queda intacto — no se limpió
+  }
+}
+
+async function supaLoadCategorias(){
+  if(USAR_DEMO) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+  try {
+    const data = await supaGet('pos_categorias',
+      'licencia_email=eq.'+encodeURIComponent(email)+'&order=nombre.asc&select=*'
+    );
+    if(!data || !data.length) return;
+    // Build temp array first — safe pattern
+    const newCats = data.map(c => ({ id:c.id, nombre:c.nombre, color:c.color||'#546e7a' }));
+    CATEGORIAS.length = 0;
+    newCats.forEach(c => CATEGORIAS.push(c));
+    const maxId = Math.max(...CATEGORIAS.map(c=>c.id), 0);
+    nextCatId = maxId + 1;
+    console.log('[Supabase] Categorías cargadas:', CATEGORIAS.length);
+  } catch(e){
+    if(!e.message.includes('Failed to fetch'))
+      console.warn('[Supabase] Categorías:', e.message);
+  }
+}
+
+async function supaGet(tabla, qs){
+  const url = SUPA_URL+'/rest/v1/'+tabla+(qs?'?'+qs:'');
+  const res = await fetch(url, {
+    method: 'GET',
+    headers:{
+      'apikey':          SUPA_ANON,
+      'Authorization':   'Bearer '+SUPA_ANON,
+      'Content-Type':    'application/json',
+      'Accept':          'application/json',
+    }
+  });
+  if(!res.ok){
+    const txt = await res.text();
+    throw new Error('HTTP '+res.status+': '+txt);
+  }
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
+async function supaUpsertProducto(prod){
+  if(USAR_DEMO) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email || prod.itemLibre) return;
+  try {
+    const row = {
+      id:              prod.id,
+      nombre:          prod.name,
+      precio:          prod.price || 0,
+      precio_variable: prod.precioVariable || false,
+      costo:           prod.costo || 0,
+      codigo:          prod.codigo || '',
+      categoria:       prod.cat || 'Sin categoría',
+      iva:             prod.iva || '10',
+      color:           prod.color || '#546e7a',
+      color_propio:    prod.colorPropio || false,
+      mitad:           prod.mitad || false,
+      inventario:      prod.inventario || false,
+      comanda:         prod.comanda || false,
+      activo:          true,
+      licencia_email:  email,
+      terminal:        localStorage.getItem('pos_terminal') || 'Principal',
+      updated_at:      new Date().toISOString(),
+    };
+    const res = await fetch(SUPA_URL+'/rest/v1/pos_productos', {
+      method:  'POST',
+      headers: {
+        'apikey':        SUPA_ANON,
+        'Authorization': 'Bearer '+SUPA_ANON,
+        'Content-Type':  'application/json',
+        'Prefer':        'resolution=merge-duplicates',
+      },
+      body: JSON.stringify(row)
+    });
+    if(!res.ok) throw new Error(await res.text());
+    console.log('[Supabase] Producto guardado:', prod.name);
+  } catch(e){ console.warn('[Supabase] Error guardando producto:', e.message); }
+}
+
+async function supaDeleteProducto(id){
+  if(USAR_DEMO) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+  try {
+    const r = await fetch(
+      SUPA_URL+'/rest/v1/pos_productos?id=eq.'+id+
+      '&licencia_email=eq.'+encodeURIComponent(email), {
+      method:  'PATCH',
+      headers: {
+        'apikey':        SUPA_ANON,
+        'Authorization': 'Bearer '+SUPA_ANON,
+        'Content-Type':  'application/json',
+        'Prefer':        'return=minimal'
+      },
+      body: JSON.stringify({ activo: false })
+    });
+    if(!r.ok){
+      const t = await r.text();
+      console.warn('[Supabase] Error desactivando producto:', t);
+    } else {
+      console.log('[Supabase] Producto desactivado ID:', id);
+    }
+  } catch(e){ console.warn('[Supabase] Error:', e.message); }
+}
+
+async function supaUpsertCategoria(cat){
+  if(USAR_DEMO) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+  try {
+    const row = {
+      id:             cat.id,
+      nombre:         cat.nombre,
+      color:          cat.color,
+      licencia_email: email,
+      updated_at:     new Date().toISOString(),
+    };
+    const res = await fetch(SUPA_URL+'/rest/v1/pos_categorias', {
+      method:  'POST',
+      headers: {
+        'apikey':        SUPA_ANON,
+        'Authorization': 'Bearer '+SUPA_ANON,
+        'Content-Type':  'application/json',
+        'Prefer':        'resolution=merge-duplicates',
+      },
+      body: JSON.stringify(row)
+    });
+    if(!res.ok) throw new Error(await res.text());
+    console.log('[Supabase] Categoría guardada:', cat.nombre);
+  } catch(e){ console.warn('[Supabase] Error guardando categoría:', e.message); }
+}
+
 // UTILS
 function gs(n){ return '₲'+Math.round(n).toLocaleString('es-PY'); }
 
@@ -4754,36 +6920,49 @@ function toast(m){
 let db;
 
 async function initDB(){
-  db = new Dexie('POSDatabase');
+  // Esperar hasta 3 segundos a que Dexie cargue
+  for(let i=0; i<30; i++){
+    if(typeof Dexie !== 'undefined') break;
+    await new Promise(r=>setTimeout(r,100));
+  }
 
-  db.version(1).stores({
-    productos:   '++id, nombre, categoria, activo, updatedAt',
-    categorias:  '++id, nombre, updatedAt',
-    ventas:      '++id, fecha, turno_id, terminal, sincronizado',
-    turno:       '++id, fecha_apertura, estado, terminal',
-    egresos:     '++id, turno_id, fecha, sincronizado',
-    config:      'clave',
-    sync_queue:  '++id, tabla, sincronizado, timestamp',
-  });
+  if(typeof Dexie === 'undefined'){
+    console.warn('[DB] Dexie no disponible — app funciona sin BD local');
+    db = null;
+    return null;
+  }
 
-  await db.open();
-  console.log('[DB] IndexedDB inicializado');
-
-  // Cargar config guardada
-  await dbLoadConfig();
-
-  // Cargar productos desde DB (si hay)
-  await dbLoadProductos();
-
-  return db;
+  try {
+    db = new Dexie('POSDatabase');
+    db.version(1).stores({
+      productos:   '++id, nombre, categoria, activo, updatedAt, imagen',
+      categorias:  '++id, nombre, updatedAt',
+      ventas:      '++id, fecha, turno_id, terminal, sincronizado',
+      turno:       '++id, fecha_apertura, estado, terminal',
+      egresos:     '++id, turno_id, fecha, sincronizado',
+      config:      'clave',
+      sync_queue:  '++id, tabla, sincronizado, timestamp',
+    });
+    await db.open();
+    console.log('[DB] IndexedDB inicializado OK');
+    await dbLoadConfig();
+    await dbLoadProductos();
+    return db;
+  } catch(e){
+    console.warn('[DB] Error al abrir IndexedDB:', e.message);
+    db = null;
+    return null;
+  }
 }
 
 // ── CONFIG ────────────────────────────────────────────────
 async function dbSaveConfig(clave, valor){
+  if(!db) return;
   await db.config.put({ clave, valor });
 }
 
 async function dbGetConfig(clave){
+  if(!db) return null;
   const row = await db.config.get(clave);
   return row ? row.valor : null;
 }
@@ -4818,6 +6997,7 @@ async function dbSaveConfigAll(){
 
 // ── PRODUCTOS ─────────────────────────────────────────────
 async function dbSaveProducto(prod){
+  if(!db) return;
   const data = {
     id:             prod.id,
     nombre:         prod.name,
@@ -4833,7 +7013,8 @@ async function dbSaveProducto(prod){
     inventario:     prod.inventario || false,
     comanda:        prod.comanda || false,
     item_libre:     prod.itemLibre || false,
-    activo:         true,
+    activo:         prod.activo !== false,
+    imagen:         prod.imagen || null,
     updatedAt:      new Date().toISOString(),
   };
   await db.productos.put(data);
@@ -4847,7 +7028,7 @@ async function dbDeleteProducto(id){
 
 async function dbLoadProductos(){
   try {
-    const prods = await db.productos.where('activo').equals(1).toArray();
+    const prods = await db.productos.toArray(); // cargar todos, activos e inactivos
     if(prods.length === 0) return; // usar los hardcodeados
     // Mapear de DB a formato PRODS
     PRODS.length = 0;
@@ -4867,9 +7048,18 @@ async function dbLoadProductos(){
         inventario:     p.inventario,
         comanda:        p.comanda,
         itemLibre:      p.item_libre,
+        activo:         p.activo !== false && p.activo !== 0,
+        imagen:         p.imagen || null,
+        imagen:         p.imagen || null, // null/undefined/true = active
+        esDescuento:    p.es_descuento || false,
+        descTipo:       p.desc_tipo || null,
+        descValor:      p.desc_valor != null ? p.desc_valor : null,
       });
     });
     console.log('[DB] Productos cargados:', PRODS.length);
+    curCat = 'Todos los artículos';
+    const lbl2 = document.getElementById('catLbl');
+    if(lbl2) lbl2.textContent = 'Todos los artículos';
   } catch(e){ console.log('[DB] Productos no disponibles aún'); }
 }
 
@@ -4886,6 +7076,7 @@ async function dbSaveCategoria(cat){
 }
 
 async function dbLoadCategorias(){
+  if(!db) return;
   try {
     const cats = await db.categorias.toArray();
     if(cats.length === 0) return;
@@ -4919,6 +7110,7 @@ async function dbSaveVenta(data){
 
 // ── TURNO ─────────────────────────────────────────────────
 async function dbAbrirTurno(efectivoInicial){
+  if(!db) return null;
   const turno = {
     fecha_apertura:  new Date().toISOString(),
     efectivo_inicial: efectivoInicial,
@@ -4957,6 +7149,7 @@ async function dbSaveEgreso(egreso){
 
 // ── SYNC QUEUE ────────────────────────────────────────────
 async function dbQueueSync(tabla, operacion, datos){
+  if(!db) return;
   await db.sync_queue.add({
     tabla,
     operacion,
@@ -4972,6 +7165,7 @@ let syncEnProceso = false;
 async function syncConSupabase(){
   if(syncEnProceso || !navigator.onLine) return;
   if(typeof SUPA_URL === 'undefined' || SUPA_URL.includes('XXXX')) return;
+  if(!db){ console.log('[Sync] Sin BD local, omitiendo sync'); return; }
 
   syncEnProceso = true;
   try {
@@ -5030,9 +7224,16 @@ async function supaFetch(method, tabla, body, params){
 
 // Sincronizar cada 2 minutos cuando hay internet
 setInterval(syncConSupabase, 2 * 60 * 1000);
+// Verificar licencia cada 30 minutos en background
+setInterval(function(){
+  if(navigator.onLine && licIsActivated()) licVerificarAhora();
+}, 30 * 60 * 1000);
+// También sync ventas pendientes cada 5 minutos
+setInterval(syncVentasPendientes, 5 * 60 * 1000);
 window.addEventListener('online', () => {
   console.log('[Sync] Conexion detectada, sincronizando...');
   setTimeout(syncConSupabase, 2000);
+  setTimeout(syncVentasPendientes, 4000);
 });
 
 // ══════════════════════════════════════════════════════════
@@ -5042,17 +7243,22 @@ const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
-  const res = await fetch(SUPA_URL + '/rest/v1/rpc/' + fn, {
+  const url = SUPA_URL + '/rest/v1/rpc/' + fn;
+  console.log('[RPC] Llamando:', fn, params);
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type':  'application/json',
       'apikey':        SUPA_ANON,
       'Authorization': 'Bearer ' + SUPA_ANON,
+      'Accept':        'application/json',
     },
     body: JSON.stringify(params)
   });
-  if(!res.ok){ const err = await res.text(); throw new Error(err); }
-  return await res.json();
+  const text = await res.text();
+  console.log('[RPC] Respuesta', fn, ':', res.status, text.substring(0,200));
+  if(!res.ok) throw new Error('RPC '+fn+' HTTP '+res.status+': '+text);
+  try { return JSON.parse(text); } catch(e){ return text; }
 }
 
 const SK = {
@@ -5130,15 +7336,31 @@ async function licCheckPeriodico(){
   if(!licIsActivated()) return;
   const next=parseInt(localStorage.getItem(SK.nextCheck)||'0');
   if(Date.now()<next) return;
+  await licVerificarAhora();
+}
+
+// Verificación forzada — llama al servidor sin importar el timer
+async function licVerificarAhora(){
+  if(!licIsActivated()) return false;
+  if(!navigator.onLine) return true; // sin internet, tolerar
   try {
     const activa=await licVerificarServidor();
-    if(!activa){ localStorage.removeItem(SK.activated); licMostrarBloqueo('SUSPENDIDA'); return; }
-    localStorage.setItem(SK.nextCheck,String(Date.now()+24*60*60*1000));
+    if(!activa){
+      localStorage.removeItem(SK.activated);
+      licMostrarBloqueo('SUSPENDIDA');
+      return false;
+    }
+    // Verificación exitosa: resetear timer y fallos
+    localStorage.setItem(SK.nextCheck, String(Date.now()+24*60*60*1000));
     localStorage.setItem(SK.fallos,'0');
+    return true;
   } catch(e){
+    // Error de red — tolerar hasta 3 intentos fallidos consecutivos
     const fallos=parseInt(localStorage.getItem(SK.fallos)||'0')+1;
     localStorage.setItem(SK.fallos,String(fallos));
+    console.warn('[Licencia] Fallo #'+fallos+': '+e.message);
     if(fallos>=3) licMostrarBloqueo('SIN_CONEXION');
+    return true; // tolerar si no hay internet
   }
 }
 
@@ -5161,7 +7383,15 @@ async function licInit(){
     document.getElementById('scActivacion').style.display='flex';
     return false;
   }
-  await licCheckPeriodico();
+  // Siempre verificar al abrir si hay internet
+  // No esperar el timer de 24hs para detectar suspensión inmediata
+  if(navigator.onLine){
+    const ok = await licVerificarAhora();
+    if(!ok) return false;
+  } else {
+    // Sin internet: verificar si el timer expiró (tolerancia offline)
+    await licCheckPeriodico();
+  }
   const neg=localStorage.getItem(SK.negocio);
   if(neg&&typeof configData!=='undefined') configData.negocio=neg;
   return true;
@@ -5293,452 +7523,59 @@ function doDesactivar(){
 
 // ── FUNCIÓN CENTRAL DE INICIO ─────────────────────────────
 async function iniciarApp(){
-  // Restaurar terminal/sucursal desde localStorage
+  // ── PASO 1: Config local (sin red) ───────────────────────
   const terminal = localStorage.getItem('pos_terminal');
   const sucursal = localStorage.getItem('pos_sucursal');
-  if(terminal && typeof configData !== 'undefined') configData.terminal = terminal;
-  if(sucursal && typeof configData !== 'undefined') configData.sucursal = sucursal;
+  const deposito = localStorage.getItem('pos_deposito');
+  if(terminal) configData.terminal = terminal;
+  if(sucursal) configData.sucursal = sucursal;
+  if(deposito) configData.deposito = deposito;
+  cargarConfigLocal();
+  cargarTimbradoSesion();
 
-  try{const rp=localStorage.getItem('pos_pendientes');if(rp){const sp=JSON.parse(rp);if(Array.isArray(sp)&&sp.length){pendientes=sp;const mx=sp.reduce((m,p)=>Math.max(m,p.nro||0),0);if(mx>=ticketCounter)ticketCounter=mx+1;}}}catch(e){}
-  const turnoOk=turnoRestaurar();
-  if(turnoOk){goTo('scSale');renderP(PRODS);toast('Sesion restaurada');}
-  else{goTo('scClosed');renderP(PRODS);}
-  if(!USAR_DEMO&&navigator.onLine){try{await supaLoadCategorias();await supaLoadProductos();}catch(e){}}
-  else if(typeof db!=='undefined'&&db){try{await dbLoadCategorias();await dbLoadProductos();}catch(e){}}
-  setTimeout(sincronizarConfigNegocio,3000);setTimeout(syncConSupabase,5000);
+  // ── PASO 2: Restaurar pendientes ──────────────────────────
+  try {
+    const rp = localStorage.getItem('pos_pendientes');
+    if(rp){
+      const sp = JSON.parse(rp);
+      if(Array.isArray(sp) && sp.length > 0){
+        pendientes = sp;
+        const mx = sp.reduce((m,p)=>Math.max(m, p.nro||0), 0);
+        if(mx >= ticketCounter) ticketCounter = mx + 1;
+        console.log('[App] Pendientes restaurados:', sp.length);
+      }
+    }
+  } catch(e){ console.warn('[Pendientes]', e.message); }
+
+  // ── PASO 3: Restaurar turno ── ANTES de cualquier await ──
+  const turnoOk = turnoRestaurar();
+  if(turnoOk){
+    goTo('scSale');
+    toast('Sesión restaurada — '+turnoData.ventas.length+' venta'+(turnoData.ventas.length!==1?'s':''));
+  } else {
+    goTo('scClosed');
+  }
+
+  // ── PASO 4: Cargar productos/categorías (background) ─────
+  if(!USAR_DEMO && navigator.onLine){
+    try {
+      await supaLoadCategorias();
+      await supaLoadProductos();
+    } catch(e){ console.warn('[App] Carga Supabase:', e.message); }
+  } else if(db){
+    try {
+      await dbLoadCategorias();
+      await dbLoadProductos();
+    } catch(e){ console.warn('[App] Carga DB:', e.message); }
+  }
+
+  // ── PASO 5: Sync background ───────────────────────────────
+  setTimeout(sincronizarConfigNegocio, 3000);
+  setTimeout(syncConSupabase, 5000);
+  setTimeout(syncVentasPendientes, 8000);
 }
 
 // ── ARRANQUE ──────────────────────────────────────────────
-const TURNO_KEY='pos_turno_activo';
-function turnoGuardar(){
-  try {
-    localStorage.setItem(TURNO_KEY, JSON.stringify(turnoData));
-  } catch(e){ console.warn('[Turno] Error guardando:', e.message); }
-}
-
-function turnoRestaurar(){
-  try {
-    const raw = localStorage.getItem(TURNO_KEY);
-    if(!raw) return false;
-    const d = JSON.parse(raw);
-    if(!d || !d.fechaApertura) return false;
-    d.fechaApertura = new Date(d.fechaApertura);
-    if(d.ventas) d.ventas.forEach(v=>{ if(v.fecha) v.fecha=new Date(v.fecha); });
-    if(d.egresos) d.egresos.forEach(e=>{ if(e.fecha) e.fecha=new Date(e.fecha); });
-    Object.assign(turnoData, d);
-    console.log('[Turno] Restaurado:', turnoData.ventas.length, 'ventas');
-    return true;
-  } catch(e) {
-    localStorage.removeItem(TURNO_KEY);
-    return false;
-  }
-}
-
-function renderDescuentosTiles(){
-  const descActivos = DESCUENTOS.filter(d => d.activo !== false);
-  const tiles = descActivos.map(d => ({
-    id: 'desc_'+d.id, name: d.name,
-    price: d.tipo==='monto' ? -d.valor : 0,
-    color: d.color || '#e53935',
-    cat: 'Descuentos', esDescuento: true, descuento: d
-  }));
-  renderP(tiles);
-}
-function guardarPendientesLocal(){
-  try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){}
-}
-async function supaLoadCategorias(){
-  if(USAR_DEMO) return;
-  const email = localStorage.getItem(SK.email);
-  if(!email) return;
-  try {
-    const data = await supaGet('pos_categorias',
-      'licencia_email=eq.'+encodeURIComponent(email)+'&order=nombre.asc&select=*'
-    );
-    if(!data || !data.length) return;
-    // Build temp array first — safe pattern
-    const newCats = data.map(c => ({ id:c.id, nombre:c.nombre, color:c.color||'#546e7a' }));
-    CATEGORIAS.length = 0;
-    newCats.forEach(c => CATEGORIAS.push(c));
-    const maxId = Math.max(...CATEGORIAS.map(c=>c.id), 0);
-    nextCatId = maxId + 1;
-    console.log('[Supabase] Categorías cargadas:', CATEGORIAS.length);
-  } catch(e){
-    if(!e.message.includes('Failed to fetch'))
-      console.warn('[Supabase] Categorías:', e.message);
-  }
-}
-async function supaLoadProductos(){
-  if(USAR_DEMO) return;
-  const email = localStorage.getItem(SK.email);
-  if(!email) return;
-  try {
-    const data = await supaGet('pos_productos',
-      'licencia_email=eq.'+encodeURIComponent(email)+'&order=nombre.asc&select=*'
-    );
-    if(!data || !data.length) return;
-
-    // Construir array temporal — NO tocar PRODS hasta tener todo listo
-    const itemLibre = PRODS.find(p=>p.itemLibre);
-    const newProds  = [];
-    if(itemLibre) newProds.push(itemLibre);
-
-    data.forEach(p => {
-      newProds.push({
-        id:             p.id,
-        prodId:         p.id,
-        name:           p.nombre,
-        price:          p.precio || 0,
-        precioVariable: p.precio_variable || false,
-        costo:          p.costo || 0,
-        codigo:         p.codigo || '',
-        cat:            p.categoria || 'Sin categoría',
-        iva:            p.iva || '10',
-        color:          p.color || '#546e7a',
-        colorPropio:    p.color_propio || false,
-        mitad:          p.mitad || false,
-        inventario:     p.inventario || false,
-        comanda:        p.comanda || false,
-        itemLibre:      false,
-        activo:         p.activo !== false && p.activo !== 0,
-        imagen:         p.imagen || null, // null/undefined/true = active
-      });
-    });
-
-    // Solo reemplazar PRODS si todo salió bien
-    PRODS.length = 0;
-    newProds.forEach(p => PRODS.push(p));
-
-    // Actualizar contadores
-    const maxId = Math.max(...PRODS.filter(p=>!p.itemLibre).map(p=>p.id), 0);
-    nextProdId  = maxId + 1;
-    console.log('[Supabase] Productos cargados:', PRODS.length-1);
-    // Reset category to Todos after load to avoid stale filter
-    curCat = 'Todos los artículos';
-    const catLblEl = document.getElementById('catLbl');
-    if(catLblEl) catLblEl.textContent = 'Todos los artículos';
-    renderCatPills();
-    filterP();
-    // Cargar descuentos en background
-    try { await cargarDescuentosConfig(); } catch(ed){ console.warn('[Desc]', ed.message); }
-  } catch(e){
-    if(!e.message?.includes('Failed to fetch'))
-      console.warn('[Supabase] Productos:', e.message);
-    // PRODS queda intacto — no se limpió
-  }
-}
-async function supaUpsertProducto(prod){
-  if(USAR_DEMO||!navigator.onLine)return;
-  const email=localStorage.getItem(SK.email);if(!email||prod.esDescuento)return;
-  try{await fetch(SUPA_URL+'/rest/v1/pos_productos',{method:'POST',
-    headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-    body:JSON.stringify({id:prod.id,nombre:prod.name,precio:prod.price||0,precio_variable:prod.precioVariable||false,
-      costo:prod.costo||0,codigo:prod.codigo||'',categoria:prod.cat,iva:prod.iva||'10',color:prod.color,
-      color_propio:prod.colorPropio||false,activo:prod.activo!==false,licencia_email:email,
-      imagen:prod.imagen||null,updated_at:new Date().toISOString()})});}catch(e){}
-}
-async function supaDeleteProducto(id){
-  if(USAR_DEMO)return;const email=localStorage.getItem(SK.email);if(!email)return;
-  try{await fetch(SUPA_URL+'/rest/v1/pos_productos?id=eq.'+id+'&licencia_email=eq.'+encodeURIComponent(email),{
-    method:'PATCH',headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
-    body:JSON.stringify({activo:false})});}catch(e){}
-}
-async function reactivarArticulo(prodIdx){
-  const p = PRODS[prodIdx];
-  if(!p) return;
-
-  // 1. Marcar en memoria
-  p.activo = true;
-  delete p.deleted_at;
-
-  // 2. Dexie
-  if(db) await db.productos.update(p.id, {activo:true, updatedAt:new Date().toISOString()});
-
-  // 3. Supabase
-  const email = localStorage.getItem('lic_email');
-  if(email && !USAR_DEMO){
-    try {
-      const r = await fetch(
-        SUPA_URL+'/rest/v1/pos_productos?id=eq.'+p.id+'&licencia_email=eq.'+encodeURIComponent(email),
-        { method:'PATCH',
-          headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-            'Content-Type':'application/json','Prefer':'return=minimal'},
-          body: JSON.stringify({activo:true})
-        }
-      );
-      if(r.ok) console.log('[Producto] Reactivado OK:', p.name);
-      else { const t=await r.text(); console.warn('[Producto] Error reactivar:',t); }
-    } catch(e){ console.warn('[Producto] Sin conexión:', e.message); }
-  }
-
-  filterP();
-  renderArtList();
-  toast('✓ "'+p.name+'" reactivado');
-}
-async function cargarDescuentosConfig(){
-  // 1. Intentar desde Supabase
-  try {
-    const email = localStorage.getItem('lic_email');
-    if(email && !USAR_DEMO){
-      const r = await fetch(
-        SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+
-        '&clave=eq.descuentos_config&select=valor',
-        {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}}
-      );
-      if(r.ok){
-        const data = await r.json();
-        if(data && data[0] && data[0].valor){
-          const parsed = JSON.parse(data[0].valor);
-          if(Array.isArray(parsed) && parsed.length){
-            DESCUENTOS.length = 0;
-            parsed.forEach(d=>DESCUENTOS.push(d));
-            localStorage.setItem('pos_descuentos', JSON.stringify(DESCUENTOS));
-            console.log('[Desc] Cargados desde Supabase:', DESCUENTOS.length);
-            return;
-          }
-        }
-      }
-    }
-  } catch(e){ console.warn('[Desc] Fallback a localStorage'); }
-
-  // 2. Fallback localStorage
-  try {
-    const stored = localStorage.getItem('pos_descuentos');
-    if(stored){
-      const parsed = JSON.parse(stored);
-      if(Array.isArray(parsed)){
-        DESCUENTOS.length = 0;
-        parsed.forEach(d=>DESCUENTOS.push(d));
-        console.log('[Desc] Cargados desde localStorage:', DESCUENTOS.length);
-      }
-    }
-  } catch(e){ console.warn('[Desc] Error cargando descuentos:', e.message); }
-}
-function guardarDescuentosConfig(){
-  // Guardar en localStorage
-  localStorage.setItem('pos_descuentos', JSON.stringify(DESCUENTOS));
-  // Guardar en Supabase pos_config
-  const email = localStorage.getItem('lic_email');
-  if(!email || USAR_DEMO) return;
-  fetch(SUPA_URL+'/rest/v1/pos_config?on_conflict=licencia_email,clave',{
-    method:'POST',
-    headers:{
-      'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-      'Content-Type':'application/json',
-      'Prefer':'resolution=merge-duplicates'
-    },
-    body: JSON.stringify({
-      licencia_email: email,
-      clave: 'descuentos_config',
-      valor: JSON.stringify(DESCUENTOS)
-    })
-  }).catch(e=>console.warn('[Desc] No se pudo guardar en Supabase:', e.message));
-}
-async function sincronizarConfigNegocio(){
-  const email = localStorage.getItem('lic_email');
-  if(!email || USAR_DEMO) return;
-  try {
-    // Descargar todas las claves de config en una sola query
-    const rows = await fetch(
-      SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+
-      '&clave=in.(negocio_config,timbrados_config,timbrados_mapa)',
-      { headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'} }
-    ).then(r=>r.ok?r.json():[]);
-
-    rows.forEach(row => {
-      try {
-        const val = JSON.parse(row.valor||'{}');
-
-        if(row.clave === 'negocio_config'){
-          if(val.an)  configData.negocio   = val.an;
-          if(val.ar)  configData.ruc        = val.ar;
-          if(val.ad)  configData.direccion  = val.ad;
-          if(val.ciudad) configData.ciudad  = val.ciudad;
-          if(val.at)  configData.telefono   = val.at;
-          if(val.email_negocio) configData.email = val.email_negocio;
-          if(val.pie_recibo)    configData.pie_recibo  = val.pie_recibo;
-          if(val.mostrar_ruc)   configData.mostrar_ruc = val.mostrar_ruc;
-          if(val.moneda)        configData.moneda = val.moneda;
-          Object.entries(val).forEach(([k,v])=>{ if(v) localStorage.setItem(k,v); });
-          console.log('[Config] Negocio:', configData.negocio, '| RUC:', configData.ruc);
-        }
-
-        // timbrados_config y timbrados_mapa ahora vienen de tablas específicas
-        // Se cargan via cargarTimbradoSesion()
-
-      } catch(e){ console.warn('[Config] Error parsing', row.clave, e.message); }
-    });
-
-    // Recargar timbrado activo con los nuevos datos
-    cargarTimbradoSesion();
-
-  } catch(e){ console.warn('[Config] Error sync:', e.message); }
-}
-function renderCatPills(){
-  const bar = document.getElementById('catPillBar');
-  if(!bar) return;
-  const todos = 'Todos los artículos';
-  const cats = [todos, ...CATEGORIAS.map(c=>c.nombre)];
-  const hasDescs = DESCUENTOS.filter(d=>d.activo!==false).length ||
-    PRODS.filter(p=>p.cat==='Descuentos'&&p.activo!==false).length;
-  if(hasDescs) cats.push('🏷️ Descuentos');
-
-  bar.innerHTML = cats.map(function(c){
-    const sel = curCat===c ? ' sel' : '';
-    const safe = c.replace(/"/g,'&quot;');
-    return '<button class="cat-pill'+sel+'" onclick="pickCat(this)">'+c+'</button>';
-  }).join('');
-}
-async function licVerificarAhora(){
-  if(!licIsActivated()) return false;
-  if(!navigator.onLine) return true; // sin internet, tolerar
-  try {
-    const activa=await licVerificarServidor();
-    if(!activa){
-      localStorage.removeItem(SK.activated);
-      licMostrarBloqueo('SUSPENDIDA');
-      return false;
-    }
-    // Verificación exitosa: resetear timer y fallos
-    localStorage.setItem(SK.nextCheck, String(Date.now()+24*60*60*1000));
-    localStorage.setItem(SK.fallos,'0');
-    return true;
-  } catch(e){
-    // Error de red — tolerar hasta 3 intentos fallidos consecutivos
-    const fallos=parseInt(localStorage.getItem(SK.fallos)||'0')+1;
-    localStorage.setItem(SK.fallos,String(fallos));
-    console.warn('[Licencia] Fallo #'+fallos+': '+e.message);
-    if(fallos>=3) licMostrarBloqueo('SIN_CONEXION');
-    return true; // tolerar si no hay internet
-  }
-}
-
-function renderDescList(){
-  const list = document.getElementById('descList');
-  if(!list) return;
-
-  // Combinar DESCUENTOS[] + productos de Supabase con cat='Descuentos'
-  const descIds = new Set(DESCUENTOS.map(d=>String(d.id)));
-  const prodsDesc = PRODS.filter(p=>
-    p.cat==='Descuentos' && p.activo!==false && !descIds.has(String(p.id))
-  );
-  const descs = [
-    ...DESCUENTOS.filter(d=>d.activo!==false),
-    ...prodsDesc.map(p=>({
-      id:p.id, name:p.name,
-      tipo:p.descTipo||'%', valor:p.descValor||null,
-      color:'#e53935', activo:true
-    }))
-  ];
-
-  if(!descs.length){
-    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:14px;">'+
-      '<div style="font-size:32px;margin-bottom:8px;">🏷️</div>'+
-      'Sin descuentos creados<br>'+
-      '<span style="font-size:12px;">Tocá + para crear uno</span></div>';
-    return;
-  }
-
-  list.innerHTML = descs.map(d => {
-    const valorStr = d.valor != null
-      ? (d.tipo==='%' ? d.valor+'%' : gs(d.valor))
-      : '<span style="color:#555;font-style:italic;">se ingresa al vender</span>';
-    return '<div class="art-item" onclick="editarDesc('+d.id+')" style="border-left:3px solid #e53935;">'+
-      '<div class="art-item-color" style="background:#e53935;font-size:12px;font-weight:800;">%</div>'+
-      '<div class="art-item-info">'+
-        '<div class="art-item-name">'+d.name+'</div>'+
-        '<div class="art-item-meta">'+
-          '<span>'+(d.tipo==='%'?'Porcentaje':'Monto fijo')+'</span>'+
-          '<span>·</span><span>'+valorStr+'</span>'+
-        '</div>'+
-      '</div>'+
-      '<button onclick="event.stopPropagation();eliminarDesc('+d.id+')" '+
-        'style="background:rgba(239,83,80,.1);border:1px solid var(--red);border-radius:6px;'+
-        'color:var(--red);font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;">✕</button>'+
-    '</div>';
-  }).join('');
-}
-
-function supaInsertVenta(data){
-  const email = localStorage.getItem(SK.email);
-  if(!email) return;
-
-  const venta = {
-    fecha:          (data.fecha || new Date()).toISOString(),
-    turno_id:       turnoData.dbId || null,
-    terminal:       licGetTerminal(),
-    sucursal:       localStorage.getItem('pos_sucursal') || 'Principal',
-    licencia_email: email,
-    total:          data.total || 0,
-    metodo_pago:    (data.metodo || 'EFECTIVO').toUpperCase(),
-    comprobante:    data.comprobante || '',
-    items:          JSON.stringify((data.items||[]).map(i=>({
-                      id:     i.id,
-                      nombre: i.name,
-                      qty:    i.qty,
-                      precio: i.price,
-                      obs:    i.obs||''
-                    }))),
-    tiene_factura:  !!(data.factura && data.factura.ruc),
-    factura_ruc:    data.factura ? (data.factura.ruc||'')   : '',
-    factura_nombre: data.factura ? (data.factura.nombre||'') : '',
-  };
-
-  // También guardar en IndexedDB local
-  if(db) dbSaveVenta({
-    ...data,
-    turnoId: turnoData.dbId,
-  });
-
-  // Enviar a Supabase
-  if(USAR_DEMO || !navigator.onLine){
-    // Sin conexión — encolar para sync posterior
-    if(db) dbQueueSync('ventas','insert', venta);
-    return;
-  }
-
-  fetch(SUPA_URL+'/rest/v1/pos_ventas', {
-    method:  'POST',
-    headers: {
-      'apikey':          SUPA_ANON,
-      'Authorization':   'Bearer '+SUPA_ANON,
-      'Content-Type':    'application/json',
-      'Prefer':          'return=minimal',
-    },
-    body: JSON.stringify(venta)
-  })
-  .then(r => {
-    if(!r.ok) return r.text().then(t => { throw new Error(t); });
-    console.log('[Venta] Guardada en Supabase OK');
-  })
-  .catch(e => {
-    console.warn('[Venta] Error Supabase, encolando:', e.message);
-    if(db) dbQueueSync('ventas','insert', venta);
-  });
-}
-
-function supaInsertTurno(estado, efectivoInicial){
-  const email = localStorage.getItem('lic_email');
-  if(!email) return;
-  const data = {
-    fecha_apertura:   new Date().toISOString(),
-    efectivo_inicial: efectivoInicial || 0,
-    estado:           estado,
-    terminal:         localStorage.getItem('pos_terminal') || 'Terminal 1',
-    sucursal:         localStorage.getItem('pos_sucursal') || 'Principal',
-    licencia_email:   email,
-    total_vendido:    0,
-  };
-  fetch(SUPA_URL+'/rest/v1/pos_turno',{
-    method:'POST',
-    headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=representation'},
-    body: JSON.stringify(data)
-  }).then(r=>r.json()).then(rows=>{
-    if(rows&&rows[0]) turnoData.supaId = rows[0].id;
-  }).catch(e=>console.warn('[Turno] Error Supabase:', e.message));
-}
-
-
 (async function(){
   try {
     await initDB();
@@ -5751,10 +7588,6 @@ function supaInsertTurno(estado, efectivoInicial){
   const ok = await licInit();
   if(ok) await iniciarApp();
 })();
-</script>
-
-<script>
-if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').then(function(r){console.log('[SW]',r.scope);}).catch(function(e){console.warn('[SW]',e.message);});});}
 </script>
 </body>
 </html>
