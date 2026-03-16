@@ -2069,6 +2069,21 @@
       </div>
     </div>
 
+    <!-- Imagen del producto -->
+    <div class="art-section-title">Imagen</div>
+    <div style="padding:0 14px 14px;">
+      <div id="artImgPreview" style="display:none;position:relative;margin-bottom:10px;">
+        <img id="artImgPreviewImg" src="" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px;display:block;">
+        <button onclick="quitarImagen()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);border:none;border-radius:50%;width:28px;height:28px;color:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;">✕</button>
+      </div>
+      <div id="artImgUpload" style="border:2px dashed #2a2a2a;border-radius:10px;padding:20px;text-align:center;cursor:pointer;" onclick="document.getElementById('artImgInput').click()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.5" style="margin-bottom:6px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <div style="font-size:13px;color:#555;">Tocá para subir imagen</div>
+        <div style="font-size:11px;color:#333;margin-top:2px;">JPG, PNG — se recorta a cuadrado</div>
+      </div>
+      <input type="file" id="artImgInput" accept="image/*" style="display:none" onchange="onArtImgChange(this)">
+    </div>
+
   </div>
   <div class="art-form-footer">
     <button class="art-save-btn" onclick="guardarArticulo()">
@@ -2764,7 +2779,15 @@ function renderP(list){
   // Detailed diag
   diag('renderP:'+list.length+' | PRODS:'+PRODS.length+' | cat:'+curCat);
   if(!list.length){g.innerHTML='<div style="grid-column:span 3;padding:40px;text-align:center;color:#555;font-size:14px;">Sin resultados</div>';return;}
-  g.innerHTML=list.map(p=>`<div class="ptile" style="background:${getProductColor(p)}" onclick="addCart(${p.id})"><span class="pname">${p.name}</span></div>`).join('');
+  g.innerHTML=list.map(p=>{
+    if(p.imagen){
+      return `<div class="ptile" style="background:${getProductColor(p)};position:relative;overflow:hidden;" onclick="addCart(${p.id})">
+        <img src="${p.imagen}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.85;">
+        <span class="pname" style="position:relative;z-index:1;text-shadow:0 1px 4px rgba(0,0,0,.8);background:rgba(0,0,0,.35);padding:4px 6px;border-radius:4px;width:100%;box-sizing:border-box;">${p.name}</span>
+      </div>`;
+    }
+    return `<div class="ptile" style="background:${getProductColor(p)}" onclick="addCart(${p.id})"><span class="pname">${p.name}</span></div>`;
+  }).join('');
 }
 function filterP(){
   const q = document.getElementById('sinput').value.toLowerCase();
@@ -2886,7 +2909,14 @@ function toggleTicket(){
 function renderTkt(){
   const tl=document.getElementById('tlist');
   if(!cart.length){tl.innerHTML='<div class="tempty"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg><p>Ticket vacío</p></div>';return;}
-  tl.innerHTML=cart.map(i=>`<div class="titem"><div class="tiname">${i.name}${i.obs?'<div style="font-size:11px;color:#888;font-weight:400;text-transform:none;margin-top:2px;">'+i.obs+'</div>':''}</div><div class="tictrl"><button class="qbtn" onclick="chgQty(${i.lineId},-1)">−</button><span class="qnum">${i.qty}</span><button class="qbtn" onclick="chgQty(${i.lineId},1)">+</button></div><div class="tiprice">${gs(i.price*i.qty)}</div></div>`).join('');
+  tl.innerHTML=cart.map(i=>i.esDescuento
+    ? `<div class="titem" style="border-left:2px solid #ef5350;">
+        <div class="tiname" style="color:#ef9a9a;">${i.name}</div>
+        <div class="tictrl"><button class="qbtn" onclick="chgQty(${i.lineId},-1)">✕</button></div>
+        <div class="tiprice" style="color:#ef5350;">-${gs(i.montoDesc)}</div>
+       </div>`
+    : `<div class="titem"><div class="tiname">${i.name}${i.obs?'<div style="font-size:11px;color:#888;font-weight:400;text-transform:none;margin-top:2px;">'+i.obs+'</div>':''}</div><div class="tictrl"><button class="qbtn" onclick="chgQty(${i.lineId},-1)">−</button><span class="qnum">${i.qty}</span><button class="qbtn" onclick="chgQty(${i.lineId},1)">+</button></div><div class="tiprice">${gs(i.price*i.qty)}</div></div>`
+  ).join('');
 }
 
 // CATEGORIES
@@ -4453,8 +4483,8 @@ function generarHTMLFactura(data, size){
   lineas += '<p class="s b">'+padL('COD.BAR.',c1)+' '+padR('CANT',c2)+' '+padR('PR.UNIT',c3)+' '+padR('IMPORTE',c4)+' '+padR('IVA',c5)+'</p>';
   lineas += '<p class="hr"></p>';
 
-  // Items
-  data.items.forEach(item=>{
+  // Items (excluir descuentos — van en totales)
+  data.items.filter(i=>!i.esDescuento).forEach(item=>{
     const sub = item.desc>0 ? Math.round(item.price*item.qty*(1-item.desc/100)) : item.price*item.qty;
     lineas += '<p class="s">'+item.name+'</p>';
     const cod  = padL(item.codigo||'',c1);
@@ -4529,7 +4559,7 @@ function generarHTMLComanda(data, size){
   lineas += '<p class="row s"><span class="l1">Canc.</span><span class="l2">Descripcion</span></p>';
   lineas += '<p class="hr"></p>';
 
-  data.items.forEach(item=>{
+  data.items.filter(i=>!i.esDescuento).forEach(item=>{
     lineas += '<p class="s">'+item.qty+'    '+item.name+'</p>';
     if(item.obs) lineas += '<p class="s">OBS: '+item.obs+'</p>';
   });
@@ -5532,6 +5562,7 @@ let artColorSel = COLORES_TILE[0];
 let artColorManual = false;
 let artCatSel = 'Comidas';
 let artIvaSel = '10';
+let artImagenBase64 = null; // imagen del producto actual en edición
 let nextProdId = 100;
 
 function getProductColor(prod){
@@ -5552,6 +5583,118 @@ PRODS.forEach((p,i) => {
   if(p.colorPropio === undefined)    p.colorPropio    = false;
 });
 nextProdId = PRODS.length + 1;
+
+// ── IMAGEN DE PRODUCTO — Supabase Storage ───────────────
+async function onArtImgChange(input){
+  const file = input.files[0];
+  if(!file) return;
+
+  // Mostrar preview local inmediatamente
+  const localUrl = URL.createObjectURL(file);
+  mostrarPreviewImagen(localUrl, true); // true = uploading
+
+  try {
+    // Comprimir si es muy grande (max 800px, calidad 80%)
+    const compressed = await comprimirImagen(file, 800, 0.8);
+
+    // Subir a Supabase Storage
+    const email    = localStorage.getItem('lic_email') || 'demo';
+    const ext      = file.name.split('.').pop().toLowerCase() || 'jpg';
+    const filename = 'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)+'.'+ext;
+    const path     = email.replace(/[^a-z0-9]/gi,'_')+'/'+filename;
+
+    const r = await fetch(
+      SUPA_URL+'/storage/v1/object/productos/'+path,
+      {
+        method: 'POST',
+        headers: {
+          'apikey':        SUPA_ANON,
+          'Authorization': 'Bearer '+SUPA_ANON,
+          'Content-Type':  compressed.type || 'image/jpeg',
+          'x-upsert':      'true'
+        },
+        body: compressed
+      }
+    );
+
+    if(!r.ok){
+      const t = await r.text();
+      throw new Error('Upload error: '+t.substring(0,100));
+    }
+
+    // Construir URL pública
+    const publicUrl = SUPA_URL+'/storage/v1/object/public/productos/'+path;
+    artImagenBase64 = publicUrl; // guardamos la URL, no base64
+    mostrarPreviewImagen(publicUrl, false);
+    console.log('[Imagen] Subida OK:', publicUrl);
+
+  } catch(e){
+    console.error('[Imagen] Error:', e.message);
+    toast('Error al subir imagen: '+e.message.substring(0,50));
+    // Fallback: guardar como base64 si Storage falla
+    const reader = new FileReader();
+    reader.onload = function(ev){
+      artImagenBase64 = ev.target.result;
+      mostrarPreviewImagen(artImagenBase64, false);
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+// Comprimir imagen antes de subir
+async function comprimirImagen(file, maxSize, quality){
+  return new Promise((resolve)=>{
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = function(){
+      URL.revokeObjectURL(url);
+      let w = img.width, h = img.height;
+      if(w > maxSize || h > maxSize){
+        if(w > h){ h = Math.round(h * maxSize/w); w = maxSize; }
+        else      { w = Math.round(w * maxSize/h); h = maxSize; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(blob => resolve(blob || file), 'image/jpeg', quality);
+    };
+    img.onerror = ()=>resolve(file);
+    img.src = url;
+  });
+}
+
+function mostrarPreviewImagen(src, uploading){
+  const preview = document.getElementById('artImgPreview');
+  const img     = document.getElementById('artImgPreviewImg');
+  const upload  = document.getElementById('artImgUpload');
+  if(!preview) return;
+  if(src){
+    img.src = src;
+    img.style.opacity = uploading ? '0.5' : '1';
+    preview.style.display = 'block';
+    upload.style.display  = 'none';
+    if(uploading){
+      const lbl = upload.querySelector('div');
+      if(lbl) lbl.textContent = 'Subiendo...';
+    }
+  } else {
+    preview.style.display = 'none';
+    upload.style.display  = 'block';
+  }
+}
+
+function quitarImagen(){
+  artImagenBase64 = null;
+  mostrarPreviewImagen(null, false);
+  document.getElementById('artImgInput').value = '';
+}
+
+function resetArtImagen(){
+  artImagenBase64 = null;
+  mostrarPreviewImagen(null, false);
+  const inp = document.getElementById('artImgInput');
+  if(inp) inp.value = '';
+}
 
 function renderArtList(filter){
   filter = filter || '';
@@ -5687,6 +5830,9 @@ function filterArts(){
 
 function nuevoArticulo(){
   artEditIdx = -1;
+  artImagenBase64 = null;
+  setTimeout(()=>resetArtImagen(), 50);
+  artEditIdx = -1;
   artCatSel = CATEGORIAS.length > 0 ? CATEGORIAS[0].nombre : 'Comidas';
   artIvaSel = '10';
   artColorManual = false;
@@ -5729,6 +5875,9 @@ function editarArticulo(idx){
   selIva(artIvaSel);
   renderColorPicker();
   renderCatSelector();
+  // Cargar imagen existente
+  artImagenBase64 = null; // null = no cambiar
+  setTimeout(()=>mostrarPreviewImagen(p.imagen||null), 80);
   goTo('scArticuloNuevo');
 }
 
@@ -5797,11 +5946,13 @@ function guardarArticulo(){
   if(!nombre){ toast('Ingresá el nombre del artículo'); return; }
 
   if(artEditIdx >= 0){
+    const imgUpdate = artImagenBase64 !== null ? {imagen: artImagenBase64} : {};
     Object.assign(PRODS[artEditIdx], {
       name: nombre.toUpperCase(), price: precioVariable?0:precio,
       precioVariable, costo, codigo, color: artColorSel,
       colorPropio: artColorManual,
-      cat: artCatSel, iva: artIvaSel, mitad, inventario, comanda
+      cat: artCatSel, iva: artIvaSel, mitad, inventario, comanda,
+      ...imgUpdate
     });
     const prod = PRODS[artEditIdx];
     // Guardar en Dexie y Supabase
@@ -6474,6 +6625,7 @@ function supaUpsertProducto(prod){
     mitad: prod.mitad||false, inventario: prod.inventario||false,
     comanda: prod.comanda||false, item_libre: prod.itemLibre||false,
     activo: prod.activo !== false, licencia_email: email,
+    imagen: prod.imagen || null,
     updated_at: new Date().toISOString()
   };
   fetch(SUPA_URL+'/rest/v1/pos_productos', {
@@ -6540,7 +6692,8 @@ async function supaLoadProductos(){
         inventario:     p.inventario || false,
         comanda:        p.comanda || false,
         itemLibre:      false,
-        activo:         p.activo !== false && p.activo !== 0, // null/undefined/true = active
+        activo:         p.activo !== false && p.activo !== 0,
+        imagen:         p.imagen || null, // null/undefined/true = active
       });
     });
 
@@ -6847,7 +7000,8 @@ async function dbLoadProductos(){
         inventario:     p.inventario,
         comanda:        p.comanda,
         itemLibre:      p.item_libre,
-        activo:         p.activo !== false && p.activo !== 0, // null/undefined/true = active
+        activo:         p.activo !== false && p.activo !== 0,
+        imagen:         p.imagen || null, // null/undefined/true = active
         esDescuento:    p.es_descuento || false,
         descTipo:       p.desc_tipo || null,
         descValor:      p.desc_valor != null ? p.desc_valor : null,
