@@ -745,12 +745,13 @@
 
   /* SCREENS */
   .screen {
-    display:none; flex-direction:column; position:absolute;
-    top:0; left:0; right:0;
-    bottom: 0;
+    display:none; flex-direction:column;
+    position:fixed;
+    top:0; left:0; right:0; bottom:0;
     background:var(--bg);
+    z-index:10;
   }
-  .screen.active { display:flex; }
+  .screen.active { display:flex; z-index:20; }
 
   /* HEADER */
   .header {
@@ -4048,7 +4049,7 @@ function onRucInput(){
 
 async function consultarRuc(){
   const rucRaw   = document.getElementById('factRuc').value.trim();
-  const rucLimpio = rucRaw.replace(/[-\.\s]/g,'');
+  const rucLimpio = rucRaw.replace(/[-\\.\\s]/g,'');
 
   if(!rucLimpio || rucLimpio.length < 6){
     setRucStatus('Ingresá un RUC o CI válido', 'error');
@@ -4358,7 +4359,7 @@ function mostrarPreviewRecibo(html, size){
 
   // Escribir el HTML térmico en el iframe
   iframe.contentDocument.open();
-  iframe.contentDocument.write(html.replace(/<div id="printInfo"[\s\S]*?<\/div>/, ''));
+  iframe.contentDocument.write(html.replace(/<div[^>]*id="printInfo"[^<]*<\/div>/, ''));
   iframe.contentDocument.close();
 
   // Auto-altura
@@ -4391,9 +4392,9 @@ function htmlToPreview(html, size){
     })
     .replace(/<[^>]+>/g, '')  // remover tags restantes
     .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&nbsp;/g,' ')
-    .split('\n')
+    .split('\\n')
     .map(l => l.trimEnd())
-    .join('\n');
+    .join('\\n');
 }
 
 // Imprimir comanda del último recibo
@@ -4585,28 +4586,17 @@ function generarHTMLTicket(data, size){
   lineas += '<p class="hr"></p>';
   lineas += '<br><br><br>';
 
-  return '<html><head><style>'+getCSSTermico(size)+'</style>
-</head><body>'+lineas+'
+  return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'
 <script>
-// ── PWA SERVICE WORKER ─────────────────────────────────────
 if('serviceWorker' in navigator){
-  window.addEventListener('load', () => {
+  window.addEventListener('load',function(){
     navigator.serviceWorker.register('/sw.js')
-      .then(r => console.log('[PWA] SW OK:', r.scope))
-      .catch(e => console.warn('[PWA] SW error:', e.message));
+      .then(function(r){console.log('[SW] OK',r.scope);})
+      .catch(function(e){console.warn('[SW] Error',e.message);});
   });
 }
 </script>
-<script>
-if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('/sw.js')
-      .then(r => console.log('[SW] Registrado:', r.scope))
-      .catch(e => console.warn('[SW] Error:', e.message));
-  });
-}
-</script>
-</body></html>';
+</body></html>';;
 }
 
 // ── FACTURA ───────────────────────────────────────────────
@@ -4725,16 +4715,7 @@ function generarHTMLFactura(data, size){
 
   return '<html><head><style>'+getCSSTermico(size)+'</style>
 </head><body>'+lineas+'
-<script>
-// ── PWA SERVICE WORKER ─────────────────────────────────────
-if('serviceWorker' in navigator){
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(r => console.log('[PWA] SW OK:', r.scope))
-      .catch(e => console.warn('[PWA] SW error:', e.message));
-  });
-}
-</script>
+
 </body></html>';
 }
 
@@ -4770,16 +4751,7 @@ function generarHTMLComanda(data, size){
 
   return '<html><head><style>'+getCSSTermico(size)+'</style>
 </head><body>'+lineas+'
-<script>
-// ── PWA SERVICE WORKER ─────────────────────────────────────
-if('serviceWorker' in navigator){
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(r => console.log('[PWA] SW OK:', r.scope))
-      .catch(e => console.warn('[PWA] SW error:', e.message));
-  });
-}
-</script>
+
 </body></html>';
 }
 
@@ -6596,17 +6568,17 @@ function buildCierreTicket(){
     '<div style="text-align:center;font-size:11px;color:#888;margin-top:12px;">'+fmt(ahora)+'</div>';
 
   // Texto plano para WhatsApp
-  var wa = '*RENDICION DE CAJA - MI NEGOCIO*\n';
-  wa += 'Apertura: '+fmt(turnoData.fechaApertura)+'\nCierre: '+fmt(ahora)+'\n\n';
-  wa += '*VENTAS*\nTotal ('+cantVentas+'): '+gs(totalVentas)+'\nEf. inicial: '+gs(turnoData.efectivoInicial)+'\n\n';
-  wa += '*FORMAS DE PAGO*\n';
-  Object.entries(metodos).forEach(function(e){ wa += e[0]+' ('+e[1].ops+' op): '+gs(e[1].total)+'\n'; });
-  if(totalEgresos>0){ wa += '\n*EGRESOS*\nTotal: -'+gs(totalEgresos)+'\n'; }
-  if(totalContado>0){ wa += '\n*CONTEO*\nTotal contado: '+gs(totalContado)+'\nSaldo esperado: '+gs(saldoEsperado)+'\n'; }
+  var wa = '*RENDICION DE CAJA - MI NEGOCIO*\\n';
+  wa += 'Apertura: '+fmt(turnoData.fechaApertura)+'\\nCierre: '+fmt(ahora)+'\\n\\n';
+  wa += '*VENTAS*\\nTotal ('+cantVentas+'): '+gs(totalVentas)+'\\nEf. inicial: '+gs(turnoData.efectivoInicial)+'\\n\\n';
+  wa += '*FORMAS DE PAGO*\\n';
+  Object.entries(metodos).forEach(function(e){ wa += e[0]+' ('+e[1].ops+' op): '+gs(e[1].total)+'\\n'; });
+  if(totalEgresos>0){ wa += '\\n*EGRESOS*\\nTotal: -'+gs(totalEgresos)+'\\n'; }
+  if(totalContado>0){ wa += '\\n*CONTEO*\\nTotal contado: '+gs(totalContado)+'\\nSaldo esperado: '+gs(saldoEsperado)+'\\n'; }
   if(diff!==null){
-    if(diff===0) wa += '\nCUADRE EXACTO';
-    else if(diff>0) wa += '\nSOBRANTE: +'+gs(diff);
-    else wa += '\nFALTANTE: -'+gs(Math.abs(diff));
+    if(diff===0) wa += '\\nCUADRE EXACTO';
+    else if(diff>0) wa += '\\nSOBRANTE: +'+gs(diff);
+    else wa += '\\nFALTANTE: -'+gs(Math.abs(diff));
   }
   cierreTextoPlano = wa;
 }
@@ -6624,7 +6596,7 @@ function imprimirCierre(){
   var css = 'body{font-family:"Courier New",monospace;font-size:12px;padding:16px;max-width:320px;margin:0 auto;}@media print{body{padding:0;}}';
   var w = window.open('','_blank','width=420,height=800');
   w.document.open();
-  w.document.write('<!DOCTYPE html><html><head><title>Ampersand POS</title><style>'+css+'<\/style><\/head><body>'+cierreTicketHTML+'<\/body><\/html>');
+  w.document.write('<!DOCTYPE html><html><head><title>Ampersand POS</title><style>'+css+'<\\/style><\\/head><body>'+cierreTicketHTML+'<\\/body><\\/html>');
   w.document.close();
   w.focus();
   setTimeout(function(){ w.print(); }, 500);
@@ -6780,7 +6752,7 @@ function imprimirTicketConf(htmlContent, tipo){
     // PC/USB o fallback — window.print()
     const css = 'body{font-family:"Courier New",monospace;font-size:11px;width:'+widthPx+';margin:0;padding:8px;}@media print{body{padding:0;}}';
     const w = window.open('','_blank','width=400,height=600');
-    w.document.write('<!DOCTYPE html><html><head><title>Ampersand POS</title><style>'+css+'<\/style><\/head><body>'+htmlContent+'<\/body><\/html>');
+    w.document.write('<!DOCTYPE html><html><head><title>Ampersand POS</title><style>'+css+'<\\/style><\\/head><body>'+htmlContent+'<\\/body><\\/html>');
     w.document.close(); w.focus();
     setTimeout(function(){ w.print(); w.close(); }, 400);
   }
@@ -6807,7 +6779,7 @@ async function imprimirBluetooth(device, htmlContent, size){
     const cut      = [GS, 0x56, 0x41, 0x10];         // Partial cut
 
     const encoder = new TextEncoder();
-    const textBytes = encoder.encode(text + '\n\n\n');
+    const textBytes = encoder.encode(text + '\\n\\n\\n');
 
     const cmd = new Uint8Array([...init, ...left, ...textBytes, ...cut]);
     await char.writeValue(cmd);
@@ -7782,15 +7754,6 @@ async function iniciarApp(){
 })();
 </script>
 
-<script>
-// ── PWA SERVICE WORKER ─────────────────────────────────────
-if('serviceWorker' in navigator){
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(r => console.log('[PWA] SW OK:', r.scope))
-      .catch(e => console.warn('[PWA] SW error:', e.message));
-  });
-}
-</script>
+
 </body>
 </html>
