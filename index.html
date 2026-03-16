@@ -3,12 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>POS - Punto de Venta</title>
-<link rel="manifest" href="manifest.json">
+<title>Ampersand POS</title>
+<meta name="theme-color" content="#7a1020">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Ampersand POS">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/svg+xml" href="./icon.png">
+  <link rel="apple-touch-icon" href="./icon.png">
 <meta name="theme-color" content="#1e1e1e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="POS">
+<meta name="apple-mobile-web-app-title" content="Ampersand POS">
 <link rel="apple-touch-icon" href="icon-192.png">
 <script>
 // Cargar Dexie con múltiples CDN de fallback
@@ -815,6 +822,10 @@
     display:none; flex-shrink:0; border-bottom:1px solid #3a3a3a;
   }
   .search-bar.open { display:flex; }
+  @media(min-width:900px){
+    .search-bar { display:flex !important; border-bottom:1px solid #222; padding:4px 12px 6px; }
+    .fsearch { display:none !important; }
+  }
   .sinput {
     width:100%; background:#3a3a3a; border:1px solid #555; border-radius:6px;
     color:#fff; font-family:'Barlow',sans-serif; font-size:15px; padding:8px 12px; outline:none;
@@ -826,13 +837,42 @@
     display:grid; grid-template-columns:repeat(3,1fr);
     gap:3px; padding:4px 4px; overflow-y:auto; flex:1;
     background:var(--bg); align-content:start;
+    min-width:0; width:100%;
   }
   .ptile {
     aspect-ratio:1/1; display:flex; align-items:center; justify-content:center;
     text-align:center; padding:8px 6px; cursor:pointer; border-radius:0;
-    transition:filter .1s,transform .1s; user-select:none;
+    transition:filter .12s,transform .12s; user-select:none;
+    position:relative; overflow:hidden;
   }
-  .ptile:active { filter:brightness(.78); transform:scale(.95); }
+  .ptile:active { filter:brightness(.75); transform:scale(.93); }
+  .ptile-ripple {
+    position:absolute; border-radius:50%;
+    background:rgba(255,255,255,.3);
+    transform:scale(0); animation:rippleAnim .45s ease-out forwards;
+    pointer-events:none;
+  }
+  @keyframes rippleAnim { to { transform:scale(4); opacity:0; } }
+  /* Flying card animation */
+  .flying-card {
+    position:fixed; z-index:9999; pointer-events:none;
+    border-radius:8px; display:flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:800; color:#fff; text-align:center;
+    overflow:hidden;
+    transition: left .42s cubic-bezier(.4,0,.6,1),
+                top  .38s cubic-bezier(.4,0,.6,1),
+                width .42s cubic-bezier(.4,0,.6,1),
+                height .42s cubic-bezier(.4,0,.6,1),
+                opacity .42s ease,
+                border-radius .42s ease;
+  }
+  @keyframes badgePop {
+    0%  { transform:scale(1); }
+    40% { transform:scale(1.6); }
+    70% { transform:scale(.85); }
+    100%{ transform:scale(1); }
+  }
+  .badge-pop { animation:badgePop .3s ease forwards; }
   .pname {
     font-size:12.5px; font-weight:700; letter-spacing:.2px; line-height:1.35;
     color:#fff; text-transform:uppercase;
@@ -964,27 +1004,30 @@
 
   /* CATEGORY SHEET */
   /* ── CATEGORY OVERLAY ── */
-  .cat-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:100; align-items:flex-end; justify-content:center; }
+  .cat-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:100; align-items:flex-end; justify-content:center; }
   .cat-overlay.open { display:flex; }
-  .cat-sheet { background:var(--card); width:100%; max-width:600px; border-radius:16px 16px 0 0; padding:0 0 24px; animation:su .22s ease; max-height:70vh; overflow-y:auto; }
-  .cat-sheet-hdr { display:flex; align-items:center; justify-content:space-between; padding:14px 16px 10px; border-bottom:1px solid #222; }
-  .cat-sheet-ttl { font-size:12px; font-weight:700; color:var(--muted); letter-spacing:.8px; text-transform:uppercase; }
-  .cat-sheet-cls { background:none; border:none; color:var(--muted); cursor:pointer; font-size:20px; line-height:1; padding:0; }
-  .cat-item { display:flex; align-items:center; gap:10px; padding:14px 16px; font-size:15px; font-weight:600; cursor:pointer; color:#ccc; border-left:3px solid transparent; }
-  .cat-item:active { background:rgba(255,255,255,.04); }
-  .cat-item.sel { color:var(--green); border-left-color:var(--green); background:rgba(76,175,80,.07); }
-  .cat-item-ic { width:8px; height:8px; border-radius:50%; background:#444; flex-shrink:0; transition:background .15s; }
-  .cat-item.sel .cat-item-ic { background:var(--green); }
+  .cat-sheet { background:#1a1a1a; width:100%; max-width:500px; border-radius:20px 20px 0 0; animation:su .2s ease; max-height:75vh; display:flex; flex-direction:column; }
+  .cat-sheet-hdr { display:flex; align-items:center; justify-content:space-between; padding:16px 18px 12px; flex-shrink:0; }
+  .cat-sheet-ttl { font-size:11px; font-weight:800; color:var(--muted); letter-spacing:1px; text-transform:uppercase; }
+  .cat-sheet-cls { background:#2a2a2a; border:none; color:#aaa; cursor:pointer; font-size:12px; padding:6px 12px; border-radius:20px; font-family:inherit; font-weight:700; }
+  .cat-list-scroll { overflow-y:auto; flex:1; padding:4px 10px 16px; }
+  .cat-item { display:flex; align-items:center; gap:12px; padding:13px 10px; font-size:15px; font-weight:600; cursor:pointer; color:#ccc; border-radius:10px; margin-bottom:1px; }
+  .cat-item:active { background:rgba(255,255,255,.06); }
+  .cat-item.sel { color:var(--green); background:rgba(76,175,80,.1); }
+  .cat-item-ic { width:10px; height:10px; border-radius:50%; background:#333; flex-shrink:0; border:2px solid #444; }
+  .cat-item.sel .cat-item-ic { background:var(--green); border-color:var(--green); }
 
   /* Desktop: pill bar */
   @media(min-width:900px){
     #catPillBar { display:flex !important; }
-    .cat-pill-bar { display:flex; gap:6px; padding:10px 16px 4px; overflow-x:auto; scrollbar-width:none; flex-shrink:0; }
+    .cat-pill-bar { display:flex; gap:6px; padding:8px 12px 4px; overflow-x:auto; scrollbar-width:none; flex-shrink:0; }
     .cat-pill-bar::-webkit-scrollbar { display:none; }
     .cat-pill { flex-shrink:0; padding:6px 16px; border-radius:20px; font-size:13px; font-weight:700; cursor:pointer; border:1.5px solid #2a2a2a; background:transparent; color:#888; white-space:nowrap; font-family:inherit; transition:all .15s; }
     .cat-pill.sel { background:var(--green); border-color:var(--green); color:#fff; }
     .cat-pill:hover:not(.sel) { border-color:#555; color:#ddd; }
-    .filter-bar { display:none; }
+    .fdrop { display:none; }
+    .filter-bar { border:none; background:transparent; }
+    .fsearch { background:transparent; }
   }
   .cat-item.sel { color:var(--green); }
 
@@ -1333,19 +1376,26 @@
       display: flex !important;
       flex: 1;
       overflow: hidden;
+      min-width: 0;
     }
 
     #prodView {
-      flex: 1 !important;
+      flex: 1 1 0 !important;
+      min-width: 0 !important;
+      max-width: calc(100% - 300px) !important;
+      overflow: hidden !important;
       border-right: 1px solid #333;
     }
 
     /* Panel derecho del ticket — oculto en móvil, visible en tablet */
     .tablet-right {
       display: flex !important;
+      width: 300px !important;
+      flex-shrink: 0 !important;
+      min-width: 300px !important;
     }
 
-    /* Grilla de 5 columnas en tablet */
+    /* Grilla de 4 columnas en tablet */
     .products-grid {
       grid-template-columns: repeat(4, 1fr) !important;
     }
@@ -1429,7 +1479,7 @@
   .tab-footer-total { font-size: 20px; font-weight: 800; }
 
   /* tablet-split div — invisible en móvil */
-  .tablet-split { display: flex; flex: 1; overflow: hidden; }
+  .tablet-split { display: flex; flex: 1; overflow: hidden; min-width:0; }
   @media (max-width: 699px) {
     .tablet-split { display: contents; }
     .tablet-right { display: none !important; }
@@ -1441,7 +1491,7 @@
   ::-webkit-scrollbar { width:2px; }
   ::-webkit-scrollbar-thumb { background:#444; border-radius:2px; }
 </style>
-</head>
+
 <body>
 
 <!-- ======== SCREEN: RECIBO ======== -->
@@ -2431,7 +2481,7 @@
   <div class="tablet-split">
 
     <!-- Products view -->
-    <div id="prodView" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+    <div id="prodView" style="display:flex;flex-direction:column;flex:1;overflow:hidden;min-width:0;">
       <!-- Desktop pill bar -->
   <div class="cat-pill-bar" id="catPillBar" style="display:none;"></div>
   <div class="filter-bar">
@@ -2701,9 +2751,11 @@
   <div class="cat-sheet">
     <div class="cat-sheet-hdr">
       <span class="cat-sheet-ttl">Categorías</span>
-      <button class="cat-sheet-cls" onclick="document.getElementById('catOv').classList.remove('open')">✕</button>
+      <button class="cat-sheet-cls" onclick="document.getElementById('catOv').classList.remove('open')">✕ Cerrar</button>
     </div>
-    <div id="catSheetContent"></div>
+    <div class="cat-list-scroll">
+      <div id="catSheetContent"></div>
+    </div>
   </div>
 </div>
 
@@ -2795,14 +2847,14 @@ function renderP(list){
   if(!list.length){g.innerHTML='<div style="grid-column:span 3;padding:40px;text-align:center;color:#555;font-size:14px;">Sin resultados</div>';return;}
   g.innerHTML=list.map(p=>{
     if(p.imagen){
-      return '<div class="ptile" style="background:'+getProductColor(p)+';position:relative;overflow:hidden;" onclick="addCart('+p.id+')">'+
+      return '<div class="ptile" style="background:'+getProductColor(p)+';position:relative;overflow:hidden;" onclick="addCart('+p.id+',this)">'+
         '<img src="'+p.imagen+'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;" onerror="this.remove()">'+
         '<div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.75));padding:6px 4px 4px;">'+
           '<span class="pname" style="text-shadow:0 1px 3px rgba(0,0,0,.9);">'+p.name+'</span>'+
         '</div>'+
       '</div>';
     }
-    return '<div class="ptile" style="background:'+getProductColor(p)+'" onclick="addCart('+p.id+')"><span class="pname">'+p.name+'</span></div>';
+    return '<div class="ptile" style="background:'+getProductColor(p)+'" onclick="addCart('+p.id+',this)"><span class="pname">'+p.name+'</span></div>';
   }).join('');
 }
 function filterP(){
@@ -2863,15 +2915,84 @@ function toggleSearch(){
 }
 
 // CART
-function addCart(id){
+function addCart(id, tileEl){
   const p=PRODS.find(x=>x.id===id); if(!p)return;
-  // si precio variable, pedir precio primero
   if(p.precioVariable){ addCartConPrecioVariable(id); return; }
   const existing = cart.find(l=>l.id===id && !l.obs);
   if(existing){ existing.qty++; }
   else { cart.push({lineId: Date.now()*1000+Math.floor(Math.random()*1000), ...p, qty:1, obs:''}); }
-  updUI(); updBtnGuardar(); toast('+'+p.name.substring(0,16));
-  if(showTkt)renderTkt();
+  updUI(); updBtnGuardar();
+  if(showTkt) renderTkt();
+  // Trigger animation
+  if(tileEl) animAddToCart(tileEl, p.color||'#4caf50');
+}
+
+function animAddToCart(tileEl, color){
+  // 1. Ripple on tile
+  const rect = tileEl.getBoundingClientRect();
+  const ripple = document.createElement('div');
+  ripple.className = 'ptile-ripple';
+  const size = Math.max(rect.width, rect.height);
+  ripple.style.cssText = 'width:'+size+'px;height:'+size+'px;'+
+    'left:'+(rect.width/2 - size/2)+'px;top:'+(rect.height/2 - size/2)+'px;';
+  tileEl.appendChild(ripple);
+  setTimeout(()=>ripple.remove(), 500);
+
+  // 2. Flying card — clone del tile que vuela al ticket
+  const badge = document.getElementById('sBadge');
+  const target = document.getElementById('sAmt') || badge;
+  if(!target) return;
+
+  const targetRect = target.getBoundingClientRect();
+
+  // Crear mini-card con el color y nombre del producto
+  const card = document.createElement('div');
+  card.className = 'flying-card';
+  const name = tileEl.querySelector('.pname')?.textContent || '';
+  const img  = tileEl.querySelector('img');
+
+  card.style.cssText =
+    'left:'+rect.left+'px;'+
+    'top:'+rect.top+'px;'+
+    'width:'+rect.width+'px;'+
+    'height:'+rect.height+'px;'+
+    'background:'+color+';'+
+    'opacity:1;'+
+    'border-radius:0px;';
+
+  if(img){
+    const imgClone = img.cloneNode();
+    imgClone.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;';
+    card.appendChild(imgClone);
+  }
+  const lbl = document.createElement('span');
+  lbl.textContent = name.substring(0,12);
+  lbl.style.cssText = 'position:relative;z-index:1;font-size:9px;font-weight:800;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8);padding:2px;';
+  card.appendChild(lbl);
+
+  document.body.appendChild(card);
+
+  // Animar: card vuela encogiendo hacia el badge del ticket
+  const destX = targetRect.left + targetRect.width/2;
+  const destY = targetRect.top  + targetRect.height/2;
+  const finalSize = 24;
+
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      card.style.left   = (destX - finalSize/2)+'px';
+      card.style.top    = (destY - finalSize/2)+'px';
+      card.style.width  = finalSize+'px';
+      card.style.height = finalSize+'px';
+      card.style.opacity = '0';
+      card.style.borderRadius = '50%';
+    });
+  });
+
+  setTimeout(()=>{
+    card.remove();
+    // Badge pop
+    if(badge){ badge.classList.remove('badge-pop'); void badge.offsetWidth; badge.classList.add('badge-pop'); }
+  }, 440);
 }
 function chgQty(lineId,d){
   const idx=cart.findIndex(l=>l.lineId===lineId);
@@ -4464,7 +4585,36 @@ function generarHTMLTicket(data, size){
   lineas += '<p class="hr"></p>';
   lineas += '<br><br><br>';
 
-  return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
+  return '<html><head><style>'+getCSSTermico(size)+'</style>
+</head><body>'+lineas+'
+<script>
+// ── PWA SERVICE WORKER ─────────────────────────────────────
+if('serviceWorker' in navigator){
+  const swCode = [
+    "const CACHE='pos-v1';",
+    "self.addEventListener('install',e=>{self.skipWaiting();});",
+    "self.addEventListener('activate',e=>{e.waitUntil(clients.claim());});",
+    "self.addEventListener('fetch',e=>{",
+    "  e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));",
+    "});"
+  ].join('\n');
+  const blob = new Blob([swCode], {type:'application/javascript'});
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl)
+    .then(()=>console.log('[PWA] Service Worker OK'))
+    .catch(e=>console.warn('[PWA] SW:', e.message));
+}
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('./sw.js')
+      .then(r => console.log('[SW] Registrado:', r.scope))
+      .catch(e => console.warn('[SW] Error:', e.message));
+  });
+}
+</script>
+</body></html>';
 }
 
 // ── FACTURA ───────────────────────────────────────────────
@@ -4581,7 +4731,27 @@ function generarHTMLFactura(data, size){
   lineas += '<p class="hr"></p>';
   lineas += '<br><br><br>';
 
-  return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
+  return '<html><head><style>'+getCSSTermico(size)+'</style>
+</head><body>'+lineas+'
+<script>
+// ── PWA SERVICE WORKER ─────────────────────────────────────
+if('serviceWorker' in navigator){
+  const swCode = [
+    "const CACHE='pos-v1';",
+    "self.addEventListener('install',e=>{self.skipWaiting();});",
+    "self.addEventListener('activate',e=>{e.waitUntil(clients.claim());});",
+    "self.addEventListener('fetch',e=>{",
+    "  e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));",
+    "});"
+  ].join('\n');
+  const blob = new Blob([swCode], {type:'application/javascript'});
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl)
+    .then(()=>console.log('[PWA] Service Worker OK'))
+    .catch(e=>console.warn('[PWA] SW:', e.message));
+}
+</script>
+</body></html>';
 }
 
 // ── COMANDA ───────────────────────────────────────────────
@@ -4614,7 +4784,27 @@ function generarHTMLComanda(data, size){
   lineas += '<p class="hr"></p>';
   lineas += '<br><br><br>';
 
-  return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
+  return '<html><head><style>'+getCSSTermico(size)+'</style>
+</head><body>'+lineas+'
+<script>
+// ── PWA SERVICE WORKER ─────────────────────────────────────
+if('serviceWorker' in navigator){
+  const swCode = [
+    "const CACHE='pos-v1';",
+    "self.addEventListener('install',e=>{self.skipWaiting();});",
+    "self.addEventListener('activate',e=>{e.waitUntil(clients.claim());});",
+    "self.addEventListener('fetch',e=>{",
+    "  e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));",
+    "});"
+  ].join('\n');
+  const blob = new Blob([swCode], {type:'application/javascript'});
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl)
+    .then(()=>console.log('[PWA] Service Worker OK'))
+    .catch(e=>console.warn('[PWA] SW:', e.message));
+}
+</script>
+</body></html>';
 }
 
 // ── IMPRIMIR RECIBO (ticket o factura según si tiene timbrado) ──
@@ -6458,7 +6648,7 @@ function imprimirCierre(){
   var css = 'body{font-family:"Courier New",monospace;font-size:12px;padding:16px;max-width:320px;margin:0 auto;}@media print{body{padding:0;}}';
   var w = window.open('','_blank','width=420,height=800');
   w.document.open();
-  w.document.write('<!DOCTYPE html><html><head><title>Rendicion</title><style>'+css+'<\/style><\/head><body>'+cierreTicketHTML+'<\/body><\/html>');
+  w.document.write('<!DOCTYPE html><html><head><title>Ampersand POS</title><style>'+css+'<\/style><\/head><body>'+cierreTicketHTML+'<\/body><\/html>');
   w.document.close();
   w.focus();
   setTimeout(function(){ w.print(); }, 500);
@@ -6614,7 +6804,7 @@ function imprimirTicketConf(htmlContent, tipo){
     // PC/USB o fallback — window.print()
     const css = 'body{font-family:"Courier New",monospace;font-size:11px;width:'+widthPx+';margin:0;padding:8px;}@media print{body{padding:0;}}';
     const w = window.open('','_blank','width=400,height=600');
-    w.document.write('<!DOCTYPE html><html><head><title>Ticket</title><style>'+css+'<\/style><\/head><body>'+htmlContent+'<\/body><\/html>');
+    w.document.write('<!DOCTYPE html><html><head><title>Ampersand POS</title><style>'+css+'<\/style><\/head><body>'+htmlContent+'<\/body><\/html>');
     w.document.close(); w.focus();
     setTimeout(function(){ w.print(); w.close(); }, 400);
   }
@@ -6676,16 +6866,42 @@ function supaUpsertProducto(prod){
     imagen: prod.imagen || null,
     updated_at: new Date().toISOString()
   };
+  const bodySize = JSON.stringify(data).length;
+  console.log('[Producto] Guardando:', prod.name, '| imagen:', prod.imagen ? (prod.imagen.startsWith('http')?'URL':'base64 '+Math.round(prod.imagen.length/1024)+'KB') : 'ninguna');
+
+  // Si imagen es base64 muy grande, intentar sin imagen primero
+  if(prod.imagen && prod.imagen.startsWith('data:') && prod.imagen.length > 500000){
+    console.warn('[Producto] Imagen base64 muy grande ('+Math.round(prod.imagen.length/1024)+'KB), guardando sin imagen');
+    data.imagen = null;
+    toast('⚠️ Imagen muy grande. Ejecutá supabase_storage.sql para habilitar Storage');
+  }
+
   fetch(SUPA_URL+'/rest/v1/pos_productos', {
     method: 'POST',
     headers:{
       'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
       'Content-Type':'application/json',
-      'Prefer':'resolution=merge-duplicates'
+      'Prefer':'resolution=merge-duplicates,return=minimal'
     },
     body: JSON.stringify(data)
-  }).then(r=>{ if(!r.ok) r.text().then(t=>console.warn('[Supa] Prod upsert error:',t)); })
-    .catch(e=>console.warn('[Supa] Prod offline:', e.message));
+  }).then(async r=>{
+    if(!r.ok){
+      const t = await r.text();
+      console.warn('[Producto] Error guardando:', t.substring(0,150));
+      // Si falla por imagen, reintentar sin ella
+      if(t.includes('imagen') || t.includes('column')){
+        console.warn('[Producto] Reintentando sin imagen...');
+        data.imagen = null;
+        fetch(SUPA_URL+'/rest/v1/pos_productos', {
+          method:'POST',
+          headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+          body:JSON.stringify(data)
+        }).then(r2=>{ if(r2.ok) console.log('[Producto] Guardado OK sin imagen'); });
+      }
+    } else {
+      console.log('[Producto] Guardado OK:', prod.name);
+    }
+  }).catch(e=>console.warn('[Supa] Prod offline:', e.message));
 }
 
 function supaUpsertCategoria(cat){
@@ -7588,6 +7804,25 @@ async function iniciarApp(){
   const ok = await licInit();
   if(ok) await iniciarApp();
 })();
+</script>
+
+<script>
+// ── PWA SERVICE WORKER ─────────────────────────────────────
+if('serviceWorker' in navigator){
+  const swCode = [
+    "const CACHE='pos-v1';",
+    "self.addEventListener('install',e=>{self.skipWaiting();});",
+    "self.addEventListener('activate',e=>{e.waitUntil(clients.claim());});",
+    "self.addEventListener('fetch',e=>{",
+    "  e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));",
+    "});"
+  ].join('\n');
+  const blob = new Blob([swCode], {type:'application/javascript'});
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl)
+    .then(()=>console.log('[PWA] Service Worker OK'))
+    .catch(e=>console.warn('[PWA] SW:', e.message));
+}
 </script>
 </body>
 </html>

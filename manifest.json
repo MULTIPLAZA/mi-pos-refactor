@@ -1,24 +1,22 @@
 {
-  "name": "POS - Punto de Venta",
-  "short_name": "POS",
-  "description": "Sistema de punto de venta",
-  "start_url": "/",
+  "name": "Ampersand POS",
+  "short_name": "Ampersand",
+  "description": "Sistema de punto de venta Ampersand POS",
+  "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#2e2e2e",
-  "theme_color": "#1e1e1e",
-  "orientation": "portrait-primary",
+  "background_color": "#7a1020",
+  "theme_color": "#7a1020",
+  "orientation": "any",
   "icons": [
     {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icon-512.png",
+      "src": "./icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "categories": [
+    "business",
+    "productivity"
   ]
 }
