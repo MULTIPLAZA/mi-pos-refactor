@@ -7279,9 +7279,51 @@ const DEMO_KEYS = {
 const USAR_DEMO = (SUPA_URL === 'https://XXXXXXXXXXXXXXXX.supabase.co');
 
 function licGetDeviceId(){
-  let id=localStorage.getItem(SK.deviceId)||sessionStorage.getItem(SK.deviceId);
-  if(!id){ id='dev_'+Date.now()+'_'+Math.random().toString(36).slice(2,10); }
-  localStorage.setItem(SK.deviceId,id); sessionStorage.setItem(SK.deviceId,id);
+  // Try all storage layers - most persistent first
+  let id = localStorage.getItem(SK.deviceId)
+         || sessionStorage.getItem(SK.deviceId);
+  if(!id){
+    // Generate stable ID based on browser fingerprint + random
+    const fp = [navigator.userAgent.length, screen.width, screen.height,
+                screen.colorDepth, navigator.hardwareConcurrency||0,
+                navigator.language, new Date().getTimezoneOffset()].join('_');
+    const hash = Math.abs(fp.split('').reduce((a,c)=>((a<<5)-a+c.charCodeAt(0))|0,0));
+    id = 'dev_' + hash.toString(36) + '_' + Math.random().toString(36).slice(2,8);
+  }
+  // Persist in all layers
+  localStorage.setItem(SK.deviceId, id);
+  sessionStorage.setItem(SK.deviceId, id);
+  // Also save in IndexedDB via dbSaveConfig if available
+  if(typeof db !== 'undefined' && db) {
+    try { db.config.put({key:'device_id', value:id}); } catch(e){}
+  }
+  return id;
+}
+
+async function licGetDeviceIdAsync(){
+  // Try localStorage/sessionStorage first (fast)
+  let id = localStorage.getItem(SK.deviceId) || sessionStorage.getItem(SK.deviceId);
+  if(id) return id;
+  // Try IndexedDB (survives localStorage clear)
+  try {
+    if(typeof db !== 'undefined' && db){
+      const row = await db.config.get('device_id');
+      if(row && row.value){ id = row.value; }
+    }
+  } catch(e){}
+  if(!id){
+    // Generate new ID
+    const fp = [navigator.userAgent.length, screen.width, screen.height,
+                screen.colorDepth, navigator.hardwareConcurrency||0,
+                navigator.language, new Date().getTimezoneOffset()].join('_');
+    const hash = Math.abs(fp.split('').reduce((a,c)=>((a<<5)-a+c.charCodeAt(0))|0,0));
+    id = 'dev_' + hash.toString(36) + '_' + Math.random().toString(36).slice(2,8);
+  }
+  localStorage.setItem(SK.deviceId, id);
+  sessionStorage.setItem(SK.deviceId, id);
+  if(typeof db !== 'undefined' && db){
+    try { db.config.put({key:'device_id', value:id}); } catch(e){}
+  }
   return id;
 }
 function licIsActivated(){ return !!localStorage.getItem(SK.activated); }
@@ -7400,7 +7442,11 @@ async function licInit(){
   const neg=localStorage.getItem(SK.negocio);
   if(neg&&typeof configData!=='undefined') configData.negocio=neg;
   if(!localStorage.getItem('pos_terminal')||!localStorage.getItem('pos_sucursal')){
-    try{const cfg=await recuperarConfigTerminalSupabase();if(cfg)aplicarConfigTerminal(cfg);}catch(e){}
+    try{
+      await licGetDeviceIdAsync();
+      const cfg=await recuperarConfigTerminalSupabase();
+      if(cfg){ aplicarConfigTerminal(cfg); console.log('[licInit] Terminal recuperada:', cfg.terminal); }
+    }catch(e){}
   }
   return true;
 }
@@ -7428,15 +7474,22 @@ async function doActivar(){
   document.getElementById('activadoPlan').textContent='Plan '+res.plan;
   document.getElementById('activadoSub').textContent='Licencia activa hasta '+res.vence+'. Bienvenido.';
   document.getElementById('activadoNegocio').value='';
+  // Mostrar spinner mientras buscamos config previa
+  const btnEntrar = document.getElementById('scActivado');
   try{
-    const cfg=await recuperarConfigTerminalSupabase();
-    if(cfg&&cfg.terminal&&cfg.sucursal){
+    // Asegurar que tenemos el deviceId correcto (incluyendo IndexedDB)
+    await licGetDeviceIdAsync();
+    const cfg = await recuperarConfigTerminalSupabase();
+    if(cfg && cfg.terminal && cfg.sucursal){
+      // ✅ Dispositivo ya registrado — restaurar config y entrar directo
       aplicarConfigTerminal(cfg);
-      await guardarConfigTerminalSupabase(cfg);
+      await guardarConfigTerminalSupabase(cfg); // actualizar con nuevo deviceId si cambió
       document.getElementById('scActivado').style.display='none';
-      await iniciarApp(); return;
+      await iniciarApp();
+      return;
     }
-  }catch(e){}
+  }catch(e){ console.warn('[Activar] No se pudo recuperar config:', e.message); }
+  // No hay config previa → mostrar formulario de setup
   document.getElementById('scActivado').style.display='flex';
 }
 
@@ -7509,7 +7562,11 @@ async function doEntrar(){
     } catch(e){ console.log('Setup Supabase:', e.message); }
   }
 
+  await licGetDeviceIdAsync();
   await guardarConfigTerminalSupabase({negocio, terminal, sucursal, deposito});
+  if(typeof db!=='undefined'&&db){
+    try{await db.config.put({key:'terminal_cfg',value:JSON.stringify({negocio,terminal,sucursal,deposito})});}catch(e){}
+  }
   document.getElementById('scActivado').style.display='none';
   await iniciarApp();
 }
