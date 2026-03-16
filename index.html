@@ -745,13 +745,12 @@
 
   /* SCREENS */
   .screen {
-    display:none; flex-direction:column;
-    position:fixed;
-    top:0; left:0; right:0; bottom:0;
+    display:none; flex-direction:column; position:absolute;
+    top:0; left:0; right:0;
+    bottom: 0;
     background:var(--bg);
-    z-index:10;
   }
-  .screen.active { display:flex; z-index:20; }
+  .screen.active { display:flex; }
 
   /* HEADER */
   .header {
@@ -4359,7 +4358,7 @@ function mostrarPreviewRecibo(html, size){
 
   // Escribir el HTML térmico en el iframe
   iframe.contentDocument.open();
-  iframe.contentDocument.write(html.replace(/<div[^>]*id="printInfo"[^<]*<\/div>/, ''));
+  iframe.contentDocument.write(html.replace(/<div id="printInfo"[\s\S]*?<\/div>/, ''));
   iframe.contentDocument.close();
 
   // Auto-altura
@@ -4591,8 +4590,8 @@ function generarHTMLTicket(data, size){
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){
     navigator.serviceWorker.register('/sw.js')
-      .then(function(r){console.log('[SW] OK',r.scope);})
-      .catch(function(e){console.warn('[SW] Error',e.message);});
+      .then(function(r){console.log('[SW]',r.scope);})
+      .catch(function(e){console.warn('[SW]',e.message);});
   });
 }
 </script>
