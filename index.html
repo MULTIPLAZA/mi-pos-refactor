@@ -5315,6 +5315,35 @@ function turnoGuardar(){
     localStorage.setItem(TURNO_KEY, JSON.stringify(turnoData));
   } catch(e){ console.warn('[Turno] Error guardando:', e.message); }
 }
+
+function turnoRestaurar(){
+  try {
+    const raw = localStorage.getItem(TURNO_KEY);
+    if(!raw) return false;
+    const d = JSON.parse(raw);
+    if(!d || !d.fechaApertura) return false;
+    d.fechaApertura = new Date(d.fechaApertura);
+    if(d.ventas) d.ventas.forEach(v=>{ if(v.fecha) v.fecha=new Date(v.fecha); });
+    if(d.egresos) d.egresos.forEach(e=>{ if(e.fecha) e.fecha=new Date(e.fecha); });
+    Object.assign(turnoData, d);
+    console.log('[Turno] Restaurado:', turnoData.ventas.length, 'ventas');
+    return true;
+  } catch(e) {
+    localStorage.removeItem(TURNO_KEY);
+    return false;
+  }
+}
+
+function renderDescuentosTiles(){
+  const descActivos = DESCUENTOS.filter(d => d.activo !== false);
+  const tiles = descActivos.map(d => ({
+    id: 'desc_'+d.id, name: d.name,
+    price: d.tipo==='monto' ? -d.valor : 0,
+    color: d.color || '#e53935',
+    cat: 'Descuentos', esDescuento: true, descuento: d
+  }));
+  renderP(tiles);
+}
 function guardarPendientesLocal(){
   try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){}
 }
