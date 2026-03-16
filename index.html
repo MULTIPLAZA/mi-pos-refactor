@@ -974,28 +974,63 @@
   /* ── CATEGORY OVERLAY ── */
   .cat-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:100; align-items:flex-end; justify-content:center; }
   .cat-overlay.open { display:flex; }
+  /* Category overlay — bottom sheet */
+  #catOv {
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:300;
+    background:rgba(0,0,0,0);
+    align-items:flex-end;
+    justify-content:center;
+    transition:background .22s ease;
+  }
+  #catOv.open {
+    display:flex;
+    background:rgba(0,0,0,.55);
+  }
   .cat-sheet {
     background:#1e1e1e;
-    width:100%; max-width:600px;
+    width:100%;
     border-radius:20px 20px 0 0;
-    padding:0 0 env(safe-area-inset-bottom,16px);
-    animation:su .22s ease;
-    max-height:75vh;
+    padding:0 0 env(safe-area-inset-bottom,20px);
+    animation:su .25s cubic-bezier(.32,1,.32,1);
+    max-height:70vh;
     overflow-y:auto;
+    box-shadow:0 -4px 32px rgba(0,0,0,.5);
   }
-  .cat-sheet-hdr { display:flex; align-items:center; justify-content:space-between; padding:14px 16px 10px; border-bottom:1px solid #222; }
+  .cat-sheet-hdr {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 20px 12px; border-bottom:1px solid #2a2a2a;
+    position:sticky; top:0; background:#1e1e1e; z-index:1;
+  }
+  .cat-sheet-ttl { font-size:13px; font-weight:700; color:#666; letter-spacing:.8px; text-transform:uppercase; }
+  .cat-sheet-cls {
+    width:32px; height:32px; border-radius:50%;
+    background:#2a2a2a; border:none; color:#aaa;
+    font-size:16px; cursor:pointer; display:flex;
+    align-items:center; justify-content:center; font-family:inherit;
+  }
+  .cat-sheet-cls:active { background:#333; }
   .cat-sheet-ttl { font-size:12px; font-weight:700; color:var(--muted); letter-spacing:.8px; text-transform:uppercase; }
   .cat-sheet-cls { background:none; border:none; color:var(--muted); cursor:pointer; font-size:20px; line-height:1; padding:0; }
   .cat-item {
-    display:flex; align-items:center; gap:12px;
-    padding:14px 20px; font-size:15px; font-weight:600;
-    cursor:pointer; color:#bbb; border-left:4px solid transparent;
-    transition:background .12s, color .12s;
+    display:flex; align-items:center; gap:14px;
+    padding:15px 20px; font-size:15px; font-weight:600;
+    cursor:pointer; color:#bbb; border-left:none;
+    transition:background .1s;
+    border-bottom:1px solid #252525;
   }
-  .cat-item:active { background:rgba(255,255,255,.04); }
-  .cat-item.sel { color:#fff; border-left-color:var(--green); background:rgba(76,175,80,.08); }
-  .cat-item-ic { width:10px; height:10px; border-radius:50%; background:#555; flex-shrink:0; }
-  .cat-item.sel .cat-item-ic { background:var(--green); }
+  .cat-item:last-child { border-bottom:none; }
+  .cat-item:active { background:rgba(255,255,255,.05); }
+  .cat-item.sel { color:#fff; background:rgba(76,175,80,.1); }
+  .cat-item-ic {
+    width:12px; height:12px; border-radius:50%;
+    background:#444; flex-shrink:0;
+    transition:background .15s;
+  }
+  .cat-item.sel .cat-item-ic { background:var(--green); box-shadow:0 0 6px var(--green); }
+  .cat-check { margin-left:auto; color:var(--green); }
   .cat-item:active { background:rgba(255,255,255,.04); }
   .cat-item.sel { color:var(--green); border-left-color:var(--green); background:rgba(76,175,80,.07); }
   .cat-item-ic { width:8px; height:8px; border-radius:50%; background:#444; flex-shrink:0; transition:background .15s; }
@@ -1010,7 +1045,7 @@
   }
   .cat-item.sel { color:var(--green); }
 
-  @keyframes su { from{transform:translateY(100%)} to{transform:translateY(0)} }
+  @keyframes su { from{transform:translateY(100%); opacity:.5} to{transform:translateY(0); opacity:1} }
 
   /* TOAST */
   .toast {
@@ -2976,12 +3011,11 @@ function openCat(){
 
   function catItem(nombre, color){
     const sel = curCat===nombre;
-    const colorStyle = color ? 'color:'+color+';border-left-color:'+color+';' : '';
-    const ic = color ? 'background:'+color+';' : '';
-    return '<div class="cat-item'+(sel?' sel':'')+'" onclick="pickCat(this)" style="'+colorStyle+'">'
+    const ic = (color||sel) ? 'background:'+(color||'var(--green)')+';' : '';
+    return '<div class="cat-item'+(sel?' sel':'')+'" onclick="pickCat(this)">'
       +'<div class="cat-item-ic" style="'+ic+'"></div>'
-      +nombre
-      +(sel?'<svg style="margin-left:auto" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>':'')
+      +'<span style="flex:1">'+nombre+'</span>'
+      +(sel?'<svg class="cat-check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>':'')
       +'</div>';
   }
 
