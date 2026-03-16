@@ -3353,14 +3353,11 @@ function imprimirRecibo(){
     '.rec-obs{font-size:11px;color:#777;padding-left:8px;}'+
     '.rec-footer-text{text-align:center;font-size:11px;color:#888;margin-top:8px;}'+
     '.rec-nro{font-size:11px;color:#777;}'+
-    '</style></head><body>'+papel.innerHTML+'
-<script>
-if('serviceWorker' in navigator){
-  window.addEventListener('load',function(){
-    navigator.serviceWorker.register('/sw.js').then(function(r){console.log('[SW]',r.scope);}).catch(function(e){console.warn('[SW]',e.message);});
-  });
-}
-</script>
+    '</style></head><body>'+papel.innerHTML+'</body></html>');
+  w.document.close();
+  w.focus();
+  setTimeout(function(){ w.print(); }, 200);
+}</script>
 </body></html>');
   w.document.close();
   w.focus();
@@ -5518,6 +5515,10 @@ async function iniciarApp(){
   const ok = await licInit();
   if(ok) await iniciarApp();
 })();
+</script>
+
+<script>
+if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').then(function(r){console.log('[SW]',r.scope);}).catch(function(e){console.warn('[SW]',e.message);});});}
 </script>
 </body>
 </html>
