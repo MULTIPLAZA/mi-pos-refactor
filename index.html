@@ -4590,19 +4590,11 @@ function generarHTMLTicket(data, size){
 <script>
 // ── PWA SERVICE WORKER ─────────────────────────────────────
 if('serviceWorker' in navigator){
-  const swCode = [
-    "const CACHE='pos-v1';",
-    "self.addEventListener('install',e=>{self.skipWaiting();});",
-    "self.addEventListener('activate',e=>{e.waitUntil(clients.claim());});",
-    "self.addEventListener('fetch',e=>{",
-    "  e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));",
-    "});"
-  ].join('\n');
-  const blob = new Blob([swCode], {type:'application/javascript'});
-  const swUrl = URL.createObjectURL(blob);
-  navigator.serviceWorker.register(swUrl)
-    .then(()=>console.log('[PWA] Service Worker OK'))
-    .catch(e=>console.warn('[PWA] SW:', e.message));
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(r => console.log('[PWA] SW OK:', r.scope))
+      .catch(e => console.warn('[PWA] SW error:', e.message));
+  });
 }
 </script>
 <script>
@@ -4736,19 +4728,11 @@ function generarHTMLFactura(data, size){
 <script>
 // ── PWA SERVICE WORKER ─────────────────────────────────────
 if('serviceWorker' in navigator){
-  const swCode = [
-    "const CACHE='pos-v1';",
-    "self.addEventListener('install',e=>{self.skipWaiting();});",
-    "self.addEventListener('activate',e=>{e.waitUntil(clients.claim());});",
-    "self.addEventListener('fetch',e=>{",
-    "  e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));",
-    "});"
-  ].join('\n');
-  const blob = new Blob([swCode], {type:'application/javascript'});
-  const swUrl = URL.createObjectURL(blob);
-  navigator.serviceWorker.register(swUrl)
-    .then(()=>console.log('[PWA] Service Worker OK'))
-    .catch(e=>console.warn('[PWA] SW:', e.message));
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(r => console.log('[PWA] SW OK:', r.scope))
+      .catch(e => console.warn('[PWA] SW error:', e.message));
+  });
 }
 </script>
 </body></html>';
@@ -4789,19 +4773,11 @@ function generarHTMLComanda(data, size){
 <script>
 // ── PWA SERVICE WORKER ─────────────────────────────────────
 if('serviceWorker' in navigator){
-  const swCode = [
-    "const CACHE='pos-v1';",
-    "self.addEventListener('install',e=>{self.skipWaiting();});",
-    "self.addEventListener('activate',e=>{e.waitUntil(clients.claim());});",
-    "self.addEventListener('fetch',e=>{",
-    "  e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));",
-    "});"
-  ].join('\n');
-  const blob = new Blob([swCode], {type:'application/javascript'});
-  const swUrl = URL.createObjectURL(blob);
-  navigator.serviceWorker.register(swUrl)
-    .then(()=>console.log('[PWA] Service Worker OK'))
-    .catch(e=>console.warn('[PWA] SW:', e.message));
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(r => console.log('[PWA] SW OK:', r.scope))
+      .catch(e => console.warn('[PWA] SW error:', e.message));
+  });
 }
 </script>
 </body></html>';
@@ -7809,19 +7785,11 @@ async function iniciarApp(){
 <script>
 // ── PWA SERVICE WORKER ─────────────────────────────────────
 if('serviceWorker' in navigator){
-  const swCode = [
-    "const CACHE='pos-v1';",
-    "self.addEventListener('install',e=>{self.skipWaiting();});",
-    "self.addEventListener('activate',e=>{e.waitUntil(clients.claim());});",
-    "self.addEventListener('fetch',e=>{",
-    "  e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));",
-    "});"
-  ].join('\n');
-  const blob = new Blob([swCode], {type:'application/javascript'});
-  const swUrl = URL.createObjectURL(blob);
-  navigator.serviceWorker.register(swUrl)
-    .then(()=>console.log('[PWA] Service Worker OK'))
-    .catch(e=>console.warn('[PWA] SW:', e.message));
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(r => console.log('[PWA] SW OK:', r.scope))
+      .catch(e => console.warn('[PWA] SW error:', e.message));
+  });
 }
 </script>
 </body>
