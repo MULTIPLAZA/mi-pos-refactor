@@ -2587,9 +2587,29 @@ function renderP(list){
   g.innerHTML=list.map(p=>`<div class="ptile" style="background:${getProductColor(p)}" onclick="addCart(${p.id})"><span class="pname">${p.name}</span></div>`).join('');
 }
 function filterP(){
-  const q=document.getElementById('sinput').value.toLowerCase();
-  let l=curCat==='Todos los artículos'?PRODS:PRODS.filter(p=>p.cat===curCat);
-  if(q)l=l.filter(p=>p.name.toLowerCase().includes(q));
+  const q = document.getElementById('sinput').value.toLowerCase();
+
+  // Categoría especial: Descuentos
+  if(curCat==='Descuentos' || curCat==='🏷️ Descuentos'){
+    renderDescuentosTiles();
+    return;
+  }
+
+  // Si la categoría seleccionada ya no existe, resetear a Todos
+  if(curCat !== 'Todos los artículos'){
+    const catExiste = CATEGORIAS.some(c=>c.nombre===curCat);
+    if(!catExiste){
+      curCat = 'Todos los artículos';
+      const lbl = document.getElementById('catLbl');
+      if(lbl) lbl.textContent = 'Todos los artículos';
+    }
+  }
+
+  // Productos normales — excluir inactivos e ítem libre
+  // NO filtrar por cat=Descuentos ya que eso rompe productos mal categorizados
+  let l = (curCat==='Todos los artículos' ? PRODS : PRODS.filter(p=>p.cat===curCat))
+           .filter(p=>!p.itemLibre && p.activo!==false && p.activo!==0);
+  if(q) l = l.filter(p=>p.name.toLowerCase().includes(q));
   renderP(l);
 }
 function toggleSearch(){
@@ -3200,60 +3220,99 @@ function onRucInput(){
 }
 
 async function consultarRuc(){
-  const rucRaw = document.getElementById('factRuc').value.trim();
-  const ruc = rucRaw.replace(/-/g,'').replace(/\./g,'').replace(/\s/g,'');
-  if(!ruc){ setRucStatus('Ingresá un RUC o CI válido', 'error'); return; }
+  const rucRaw   = document.getElementById('factRuc').value.trim();
+  const rucLimpio = rucRaw.replace(/[-\\.\\s]/g,'');
+
+  if(!rucLimpio || rucLimpio.length < 6){
+    setRucStatus('Ingresá un RUC o CI válido', 'error');
+    return;
+  }
 
   setRucStatus('Consultando...', 'loading');
-  document.getElementById('btnBuscarRuc').disabled = true;
+  const btn = document.getElementById('btnBuscarRuc');
+  if(btn) btn.disabled = true;
 
   try {
-    // Buscar en tabla contribuyentes de Supabase
-    const url = SUPA_URL + '/rest/v1/contribuyentes?ruc=eq.' + encodeURIComponent(ruc) + '&limit=1&select=ruc,nombre,tipo';
-    const resp = await fetch(url, {
-      headers: {
-        'apikey': SUPA_ANON,
-        'Authorization': 'Bearer ' + SUPA_ANON,
-        'Accept': 'application/json'
-      }
-    });
+    // Buscar en tabla contribuyentes:
+    // 1. RUC exacto (ej: 1000001)
+    // 2. RUC sin dígito verificador (ej: 100000 → busca 1000001, 1000009, etc.)
+    // 3. RUC con dígito (ej: 1000001-1)
 
-    if(resp.ok){
-      const data = await resp.json();
-      if(data && data.length > 0){
-        const contrib = data[0];
-        document.getElementById('factNombre').value = contrib.nombre || '';
-        setRucStatus('✓ ' + (contrib.nombre || 'Contribuyente encontrado'), 'ok');
-      } else {
-        // No encontrado en Supabase — intentar con dígito verificador
-        const rucSinDv = ruc.length > 1 ? ruc.slice(0,-1) : ruc;
-        const url2 = SUPA_URL + '/rest/v1/contribuyentes?ruc=eq.' + encodeURIComponent(rucSinDv) + '&limit=1&select=ruc,nombre,tipo';
-        const resp2 = await fetch(url2, {
-          headers: {'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON, 'Accept': 'application/json'}
-        });
-        if(resp2.ok){
-          const data2 = await resp2.json();
-          if(data2 && data2.length > 0){
-            document.getElementById('factNombre').value = data2[0].nombre || '';
-            setRucStatus('✓ ' + (data2[0].nombre || 'Contribuyente encontrado'), 'ok');
-          } else {
-            setRucStatus('No encontrado — ingresá los datos manualmente', 'warn');
-            document.getElementById('factNombre').focus();
-          }
-        } else {
-          setRucStatus('No encontrado — ingresá los datos manualmente', 'warn');
-          document.getElementById('factNombre').focus();
+    let encontrado = false;
+
+    // Query: buscar por RUC exacto O por RUC que empiece con el número ingresado
+    const query = rucLimpio.length >= 7
+      ? 'ruc=eq.'+encodeURIComponent(rucLimpio)
+          +'&limit=1'
+      : 'ruc=like.'+encodeURIComponent(rucLimpio+'%')
+          +'&estado=eq.ACTIVO&limit=1';
+
+    const r = await fetch(
+      SUPA_URL+'/rest/v1/contribuyentes?'+query+'&select=ruc,razon_social,dv,estado',
+      {
+        headers:{
+          'apikey':        SUPA_ANON,
+          'Authorization': 'Bearer '+SUPA_ANON,
+          'Accept':        'application/json'
         }
       }
-    } else {
-      setRucStatus('Error al consultar — ingresá los datos manualmente', 'error');
+    );
+
+    if(r.ok){
+      const data = await r.json();
+      if(data && data.length > 0){
+        const c = data[0];
+        document.getElementById('factNombre').value = c.razon_social;
+        // Completar el RUC con dígito verificador si no lo tiene
+        const rucCompleto = c.ruc + (c.dv ? '-'+c.dv : '');
+        document.getElementById('factRuc').value = rucCompleto;
+        const estadoColor = c.estado==='ACTIVO' ? 'ok' : 'warn';
+        setRucStatus('✓ '+c.razon_social+(c.estado!=='ACTIVO'?' ('+c.estado+')':''), estadoColor);
+        encontrado = true;
+      }
     }
-  } catch(e) {
-    setRucStatus('Sin conexión — ingresá los datos manualmente', 'warn');
-    document.getElementById('factNombre').focus();
-  } finally {
-    document.getElementById('btnBuscarRuc').disabled = false;
+
+    // Si no encontró con RUC exacto, intentar sin el último dígito
+    if(!encontrado && rucLimpio.length >= 7){
+      const sinDv = rucLimpio.slice(0,-1);
+      const r2 = await fetch(
+        SUPA_URL+'/rest/v1/contribuyentes?ruc=eq.'+encodeURIComponent(sinDv)
+          +'&select=ruc,razon_social,dv,estado&limit=1',
+        { headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'} }
+      );
+      if(r2.ok){
+        const data2 = await r2.json();
+        if(data2 && data2.length > 0){
+          const c = data2[0];
+          document.getElementById('factNombre').value = c.razon_social;
+          document.getElementById('factRuc').value = c.ruc+(c.dv?'-'+c.dv:'');
+          setRucStatus('✓ '+c.razon_social+(c.estado!=='ACTIVO'?' ('+c.estado+')':''), c.estado==='ACTIVO'?'ok':'warn');
+          encontrado = true;
+        }
+      }
+    }
+
+    // Fallback demo si no hay internet o no encontró
+    if(!encontrado){
+      const demo = RUC_DEMO[rucLimpio] || RUC_DEMO[rucLimpio.slice(0,-1)];
+      if(demo){
+        document.getElementById('factNombre').value = demo.nombre;
+        setRucStatus('✓ '+demo.nombre, 'ok');
+        encontrado = true;
+      }
+    }
+
+    if(!encontrado){
+      setRucStatus('No encontrado — ingresá los datos manualmente', 'warn');
+      document.getElementById('factNombre').focus();
+    }
+
+  } catch(e){
+    console.warn('[RUC]', e.message);
+    setRucStatus('Error de conexión — ingresá manualmente', 'error');
   }
+
+  if(btn) btn.disabled = false;
 }
 
 function setRucStatus(msg, type){
@@ -3867,6 +3926,8 @@ let CATEGORIAS = [
   { id:4, nombre:'Extras',   color:'#827717' },
   { id:5, nombre:'Otros',    color:'#546e7a' },
 ];
+let DESCUENTOS = []; // {id, name, tipo:'%'|'monto', valor, activo:true}
+let nextDescId = 1;
 let nextCatId = 6;
 const CATEGORIAS_DEFAULT = CATEGORIAS.map(c => c.nombre);
 let artEditIdx = -1;
@@ -3900,47 +3961,42 @@ function renderArtList(filter){
   const list = document.getElementById('artList');
   if(!list) return;
 
-  const activos = PRODS.filter(p => !p.itemLibre && p.activo !== false &&
-    (!filter || p.name.toLowerCase().includes(filter.toLowerCase()) ||
-     (p.codigo && p.codigo.includes(filter))));
+  // Todos los productos (excluir ítem libre y descuentos — esos tienen su propia pantalla)
+  let items = PRODS.filter(p =>
+    !p.itemLibre &&
+    (!filter ||
+      p.name.toLowerCase().includes(filter.toLowerCase()) ||
+      (p.codigo && p.codigo.includes(filter)))
+  );
 
-  const inactivos = PRODS.filter(p => !p.itemLibre && (p.activo === false || p.activo === 0) &&
-    (!filter || p.name.toLowerCase().includes(filter.toLowerCase()) ||
-     (p.codigo && p.codigo.includes(filter))));
-
-  list.innerHTML = '';
-
-  function makeItem(p, inactive){
-    const priceStr = p.precioVariable ? '<span style="color:#ff9800;font-size:12px;">Precio variable</span>' : gs(p.price);
-    const ivaStr = p.iva==='exento' ? 'Exento' : 'IVA '+p.iva+'%';
-    const div = document.createElement('div');
-    div.className = 'art-item' + (inactive ? ' art-item-inactive' : '');
-    if(!inactive) div.onclick = () => editarArticulo(PRODS.indexOf(p));
-    div.innerHTML =
-      '<div class="art-item-color" style="background:'+(inactive?'#444':getProductColor(p))+';opacity:'+(inactive?'0.5':'1')+'">'+p.name.substring(0,2)+'</div>'+
-      '<div class="art-item-info">'+
-        '<div class="art-item-name" style="'+(inactive?'color:#666;text-decoration:line-through;':'')+'">'+p.name+'</div>'+
-        '<div class="art-item-meta"><span>'+p.cat+'</span><span>·</span><span>'+ivaStr+'</span>'+(p.codigo?'<span>·</span><span style="color:#666">'+p.codigo+'</span>':'')+'</div>'+
-      '</div>'+
-      (inactive
-        ? '<button class="btn-reactivar" onclick="event.stopPropagation();reactivarArticulo('+PRODS.indexOf(p)+')">Activar</button>'
-        : '<div class="art-item-price">'+priceStr+'</div>');
-    list.appendChild(div);
-  }
+  // Separar activos e inactivos
+  const activos   = items.filter(p => p.activo !== false);
+  const inactivos = items.filter(p => p.activo === false || p.activo === 0);
 
   if(!activos.length && !inactivos.length){
     list.innerHTML = '<div class="art-empty"><p>No hay artículos</p></div>';
     return;
   }
 
-  activos.forEach(p => makeItem(p, false));
+  list.innerHTML = '';
 
+  // ── Artículos ACTIVOS ──
+  activos.forEach(p => {
+    list.appendChild(buildArtItem(p, false));
+  });
+
+  // ── Separador + INACTIVOS ──
   if(inactivos.length){
     const sep = document.createElement('div');
-    sep.style.cssText = 'padding:12px 16px 6px;font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;';
-    sep.textContent = 'Desactivados (' + inactivos.length + ')';
+    sep.style.cssText = 'padding:10px 14px 4px;font-size:10px;font-weight:700;'+
+      'color:var(--muted);letter-spacing:1px;text-transform:uppercase;'+
+      'border-top:1px solid #1e1e1e;margin-top:6px;';
+    sep.textContent = '── Desactivados ('+inactivos.length+') ──';
     list.appendChild(sep);
-    inactivos.forEach(p => makeItem(p, true));
+
+    inactivos.forEach(p => {
+      list.appendChild(buildArtItem(p, true));
+    });
   }
 }
 
@@ -4084,16 +4140,42 @@ function guardarArticulo(){
 
 async function eliminarArticulo(){
   if(artEditIdx < 0) return;
-  const p = PRODS[artEditIdx];
-  if(!p) return;
-  if(!confirm('¿Desactivar "'+p.name+'"? Seguirá en el historial pero no aparecerá en el POS.')) return;
-  p.activo = false;
-  p.deleted_at = new Date().toISOString();
-  if(db) try{ await db.productos.update(p.id, {activo:false, updatedAt:new Date().toISOString()}); }catch(e){}
-  await supaDeleteProducto(p.id);
-  filterP(); renderArtList();
+  const prod = PRODS[artEditIdx];
+  if(!confirm('¿Desactivar "'+prod.name+'"? No aparecerá en ventas pero sus datos se conservan.')) return;
+
+  // 1. Marcar en memoria
+  PRODS[artEditIdx].activo = false;
+  PRODS[artEditIdx].deleted_at = new Date().toISOString();
+
+  // 2. Guardar en Dexie (local)
+  if(db) await db.productos.update(prod.id, { activo: false, updatedAt: new Date().toISOString() });
+
+  // 3. Guardar en Supabase
+  const email = localStorage.getItem('lic_email');
+  if(email && !USAR_DEMO){
+    try {
+      const r = await fetch(
+        SUPA_URL+'/rest/v1/pos_productos?id=eq.'+prod.id+'&licencia_email=eq.'+encodeURIComponent(email),
+        { method:'PATCH',
+          headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+            'Content-Type':'application/json','Prefer':'return=minimal'},
+          body: JSON.stringify({activo:false})
+        }
+      );
+      if(r.ok){
+        console.log('[Producto] Desactivado OK:', prod.name);
+      } else {
+        const t = await r.text();
+        console.warn('[Producto] Error desactivar:', t);
+        toast('⚠️ Error al guardar en servidor — intenta de nuevo');
+      }
+    } catch(e){ console.warn('[Producto] Sin conexión:', e.message); }
+  }
+
+  filterP();
+  renderArtList();
   goTo('scArticulosList');
-  toast('"'+p.name.substring(0,20)+'" desactivado');
+  toast('Producto desactivado: '+prod.name.substring(0,20));
 }
 
 // ── PRECIO VARIABLE ──────────────────────────────────────────────────────────
@@ -5228,48 +5310,93 @@ async function iniciarApp(){
 
 // ── ARRANQUE ──────────────────────────────────────────────
 const TURNO_KEY='pos_turno_activo';
-function turnoGuardar(){try{localStorage.setItem(TURNO_KEY,JSON.stringify(turnoData));}catch(e){}}
-function turnoRestaurar(){
-  try{const raw=localStorage.getItem(TURNO_KEY);if(!raw)return false;
-    const d=JSON.parse(raw);if(!d||!d.fechaApertura)return false;
-    d.fechaApertura=new Date(d.fechaApertura);
-    if(d.ventas)d.ventas.forEach(v=>{if(v.fecha)v.fecha=new Date(v.fecha);});
-    if(d.egresos)d.egresos.forEach(e=>{if(e.fecha)e.fecha=new Date(e.fecha);});
-    Object.assign(turnoData,d);return true;
-  }catch(e){localStorage.removeItem(TURNO_KEY);return false;}
+function turnoGuardar(){
+  try {
+    localStorage.setItem(TURNO_KEY, JSON.stringify(turnoData));
+  } catch(e){ console.warn('[Turno] Error guardando:', e.message); }
 }
-function guardarPendientesLocal(){try{localStorage.setItem('pos_pendientes',JSON.stringify(pendientes));}catch(e){}}
-async function supaGet(table,query){
-  const r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+query,{headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
-  if(!r.ok)throw new Error(table+' HTTP '+r.status);return r.json();
+function guardarPendientesLocal(){
+  try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){}
 }
 async function supaLoadCategorias(){
-  if(USAR_DEMO)return;const email=localStorage.getItem(SK.email);if(!email)return;
-  try{const data=await supaGet('pos_categorias','licencia_email=eq.'+encodeURIComponent(email)+'&order=nombre.asc');
-    if(!data||!data.length)return;
-    CATEGORIAS.length=0;data.forEach(c=>CATEGORIAS.push({id:c.id,nombre:c.nombre,color:c.color||'#546e7a'}));
-    if(typeof nextCatId!=='undefined')nextCatId=Math.max(...CATEGORIAS.map(c=>c.id),0)+1;
-  }catch(e){console.warn('[Supa] Cats:',e.message);}
+  if(USAR_DEMO) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+  try {
+    const data = await supaGet('pos_categorias',
+      'licencia_email=eq.'+encodeURIComponent(email)+'&order=nombre.asc&select=*'
+    );
+    if(!data || !data.length) return;
+    // Build temp array first — safe pattern
+    const newCats = data.map(c => ({ id:c.id, nombre:c.nombre, color:c.color||'#546e7a' }));
+    CATEGORIAS.length = 0;
+    newCats.forEach(c => CATEGORIAS.push(c));
+    const maxId = Math.max(...CATEGORIAS.map(c=>c.id), 0);
+    nextCatId = maxId + 1;
+    console.log('[Supabase] Categorías cargadas:', CATEGORIAS.length);
+  } catch(e){
+    if(!e.message.includes('Failed to fetch'))
+      console.warn('[Supabase] Categorías:', e.message);
+  }
 }
 async function supaLoadProductos(){
-  if(USAR_DEMO)return;const email=localStorage.getItem(SK.email);if(!email)return;
-  try{const data=await supaGet('pos_productos','licencia_email=eq.'+encodeURIComponent(email)+'&order=nombre.asc');
-    if(!data||!data.length)return;
-    const libre=PRODS.find(p=>p.itemLibre);const newProds=libre?[libre]:[];
-    data.forEach(p=>{if(p.activo===false)return;
-      newProds.push({id:p.id,prodId:p.id,name:p.nombre,price:p.precio||0,
-        precioVariable:p.precio_variable||false,costo:p.costo||0,codigo:p.codigo||'',
-        cat:p.categoria||'Sin categor\u00eda',iva:p.iva||'10',color:p.color||'#546e7a',
-        colorPropio:p.color_propio||false,mitad:p.mitad||false,inventario:p.inventario||false,
-        comanda:p.comanda||false,itemLibre:false,activo:true,imagen:p.imagen||null});
+  if(USAR_DEMO) return;
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+  try {
+    const data = await supaGet('pos_productos',
+      'licencia_email=eq.'+encodeURIComponent(email)+'&order=nombre.asc&select=*'
+    );
+    if(!data || !data.length) return;
+
+    // Construir array temporal — NO tocar PRODS hasta tener todo listo
+    const itemLibre = PRODS.find(p=>p.itemLibre);
+    const newProds  = [];
+    if(itemLibre) newProds.push(itemLibre);
+
+    data.forEach(p => {
+      newProds.push({
+        id:             p.id,
+        prodId:         p.id,
+        name:           p.nombre,
+        price:          p.precio || 0,
+        precioVariable: p.precio_variable || false,
+        costo:          p.costo || 0,
+        codigo:         p.codigo || '',
+        cat:            p.categoria || 'Sin categoría',
+        iva:            p.iva || '10',
+        color:          p.color || '#546e7a',
+        colorPropio:    p.color_propio || false,
+        mitad:          p.mitad || false,
+        inventario:     p.inventario || false,
+        comanda:        p.comanda || false,
+        itemLibre:      false,
+        activo:         p.activo !== false && p.activo !== 0,
+        imagen:         p.imagen || null, // null/undefined/true = active
+      });
     });
-    PRODS.length=0;newProds.forEach(p=>PRODS.push(p));
-    if(typeof nextProdId!=='undefined')nextProdId=Math.max(...PRODS.filter(p=>!p.itemLibre).map(p=>p.id),0)+1;
-    curCat='Todos los art\u00edculos';
-    const lbl=document.getElementById('catLbl');if(lbl)lbl.textContent=curCat;
-    renderCatPills();filterP();
-    try{await cargarDescuentosConfig();}catch(ed){}
-  }catch(e){console.warn('[Supa] Prods:',e.message);}
+
+    // Solo reemplazar PRODS si todo salió bien
+    PRODS.length = 0;
+    newProds.forEach(p => PRODS.push(p));
+
+    // Actualizar contadores
+    const maxId = Math.max(...PRODS.filter(p=>!p.itemLibre).map(p=>p.id), 0);
+    nextProdId  = maxId + 1;
+    console.log('[Supabase] Productos cargados:', PRODS.length-1);
+    // Reset category to Todos after load to avoid stale filter
+    curCat = 'Todos los artículos';
+    const catLblEl = document.getElementById('catLbl');
+    if(catLblEl) catLblEl.textContent = 'Todos los artículos';
+    renderCatPills();
+    filterP();
+    // Cargar descuentos en background
+    try { await cargarDescuentosConfig(); } catch(ed){ console.warn('[Desc]', ed.message); }
+  } catch(e){
+    if(!e.message?.includes('Failed to fetch'))
+      console.warn('[Supabase] Productos:', e.message);
+    // PRODS queda intacto — no se limpió
+  }
 }
 async function supaUpsertProducto(prod){
   if(USAR_DEMO||!navigator.onLine)return;
@@ -5288,51 +5415,300 @@ async function supaDeleteProducto(id){
     body:JSON.stringify({activo:false})});}catch(e){}
 }
 async function reactivarArticulo(prodIdx){
-  const p=PRODS[prodIdx];if(!p)return;
-  p.activo=true; delete p.deleted_at;
-  if(db) try{ await db.productos.update(p.id,{activo:true,updatedAt:new Date().toISOString()}); }catch(e){}
-  await supaUpsertProducto(p);
-  filterP(); renderArtList();
-  toast('"'+p.name+'" reactivado ✓');
+  const p = PRODS[prodIdx];
+  if(!p) return;
+
+  // 1. Marcar en memoria
+  p.activo = true;
+  delete p.deleted_at;
+
+  // 2. Dexie
+  if(db) await db.productos.update(p.id, {activo:true, updatedAt:new Date().toISOString()});
+
+  // 3. Supabase
+  const email = localStorage.getItem('lic_email');
+  if(email && !USAR_DEMO){
+    try {
+      const r = await fetch(
+        SUPA_URL+'/rest/v1/pos_productos?id=eq.'+p.id+'&licencia_email=eq.'+encodeURIComponent(email),
+        { method:'PATCH',
+          headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+            'Content-Type':'application/json','Prefer':'return=minimal'},
+          body: JSON.stringify({activo:true})
+        }
+      );
+      if(r.ok) console.log('[Producto] Reactivado OK:', p.name);
+      else { const t=await r.text(); console.warn('[Producto] Error reactivar:',t); }
+    } catch(e){ console.warn('[Producto] Sin conexión:', e.message); }
+  }
+
+  filterP();
+  renderArtList();
+  toast('✓ "'+p.name+'" reactivado');
 }
 async function cargarDescuentosConfig(){
-  const email=localStorage.getItem(SK.email);if(!email||USAR_DEMO)return;
-  try{const rows=await supaGet('pos_config','licencia_email=eq.'+encodeURIComponent(email)+'&clave=eq.descuentos_config');
-    if(rows&&rows[0]){const val=JSON.parse(rows[0].valor||'[]');if(Array.isArray(val)){DESCUENTOS.length=0;val.forEach(d=>DESCUENTOS.push(d));}}
-  }catch(e){}
+  // 1. Intentar desde Supabase
+  try {
+    const email = localStorage.getItem('lic_email');
+    if(email && !USAR_DEMO){
+      const r = await fetch(
+        SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+
+        '&clave=eq.descuentos_config&select=valor',
+        {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}}
+      );
+      if(r.ok){
+        const data = await r.json();
+        if(data && data[0] && data[0].valor){
+          const parsed = JSON.parse(data[0].valor);
+          if(Array.isArray(parsed) && parsed.length){
+            DESCUENTOS.length = 0;
+            parsed.forEach(d=>DESCUENTOS.push(d));
+            localStorage.setItem('pos_descuentos', JSON.stringify(DESCUENTOS));
+            console.log('[Desc] Cargados desde Supabase:', DESCUENTOS.length);
+            return;
+          }
+        }
+      }
+    }
+  } catch(e){ console.warn('[Desc] Fallback a localStorage'); }
+
+  // 2. Fallback localStorage
+  try {
+    const stored = localStorage.getItem('pos_descuentos');
+    if(stored){
+      const parsed = JSON.parse(stored);
+      if(Array.isArray(parsed)){
+        DESCUENTOS.length = 0;
+        parsed.forEach(d=>DESCUENTOS.push(d));
+        console.log('[Desc] Cargados desde localStorage:', DESCUENTOS.length);
+      }
+    }
+  } catch(e){ console.warn('[Desc] Error cargando descuentos:', e.message); }
 }
-async function guardarDescuentosConfig(){
-  const email=localStorage.getItem(SK.email);if(!email||USAR_DEMO)return;
-  try{await fetch(SUPA_URL+'/rest/v1/pos_config',{method:'POST',
-    headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-    body:JSON.stringify({clave:'descuentos_config',valor:JSON.stringify(DESCUENTOS),licencia_email:email})});}catch(e){}
+function guardarDescuentosConfig(){
+  // Guardar en localStorage
+  localStorage.setItem('pos_descuentos', JSON.stringify(DESCUENTOS));
+  // Guardar en Supabase pos_config
+  const email = localStorage.getItem('lic_email');
+  if(!email || USAR_DEMO) return;
+  fetch(SUPA_URL+'/rest/v1/pos_config?on_conflict=licencia_email,clave',{
+    method:'POST',
+    headers:{
+      'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+      'Content-Type':'application/json',
+      'Prefer':'resolution=merge-duplicates'
+    },
+    body: JSON.stringify({
+      licencia_email: email,
+      clave: 'descuentos_config',
+      valor: JSON.stringify(DESCUENTOS)
+    })
+  }).catch(e=>console.warn('[Desc] No se pudo guardar en Supabase:', e.message));
 }
 async function sincronizarConfigNegocio(){
-  if(USAR_DEMO)return;const email=localStorage.getItem(SK.email);if(!email)return;
-  try{const rows=await supaGet('pos_config','licencia_email=eq.'+encodeURIComponent(email)+'&clave=eq.negocio_config');
-    if(rows&&rows[0]){const val=JSON.parse(rows[0].valor||'{}');if(val.an)configData.negocio=val.an;}
-  }catch(e){}
+  const email = localStorage.getItem('lic_email');
+  if(!email || USAR_DEMO) return;
+  try {
+    // Descargar todas las claves de config en una sola query
+    const rows = await fetch(
+      SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+
+      '&clave=in.(negocio_config,timbrados_config,timbrados_mapa)',
+      { headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'} }
+    ).then(r=>r.ok?r.json():[]);
+
+    rows.forEach(row => {
+      try {
+        const val = JSON.parse(row.valor||'{}');
+
+        if(row.clave === 'negocio_config'){
+          if(val.an)  configData.negocio   = val.an;
+          if(val.ar)  configData.ruc        = val.ar;
+          if(val.ad)  configData.direccion  = val.ad;
+          if(val.ciudad) configData.ciudad  = val.ciudad;
+          if(val.at)  configData.telefono   = val.at;
+          if(val.email_negocio) configData.email = val.email_negocio;
+          if(val.pie_recibo)    configData.pie_recibo  = val.pie_recibo;
+          if(val.mostrar_ruc)   configData.mostrar_ruc = val.mostrar_ruc;
+          if(val.moneda)        configData.moneda = val.moneda;
+          Object.entries(val).forEach(([k,v])=>{ if(v) localStorage.setItem(k,v); });
+          console.log('[Config] Negocio:', configData.negocio, '| RUC:', configData.ruc);
+        }
+
+        // timbrados_config y timbrados_mapa ahora vienen de tablas específicas
+        // Se cargan via cargarTimbradoSesion()
+
+      } catch(e){ console.warn('[Config] Error parsing', row.clave, e.message); }
+    });
+
+    // Recargar timbrado activo con los nuevos datos
+    cargarTimbradoSesion();
+
+  } catch(e){ console.warn('[Config] Error sync:', e.message); }
 }
 function renderCatPills(){
-  const bar=document.getElementById('catPillBar');if(!bar)return;
-  const cats=['Todos los art\u00edculos',...CATEGORIAS.map(c=>c.nombre)];
-  const hasDescs=typeof DESCUENTOS!=='undefined'&&DESCUENTOS.filter(d=>d.activo!==false).length;
-  if(hasDescs)cats.push('\uD83C\uDFF7\uFE0F Descuentos');
-  bar.innerHTML=cats.map(c=>'<button class="cat-pill'+(curCat===c?' sel':'')+'" onclick="pickCat(this)">'+c+'</button>').join('');
+  const bar = document.getElementById('catPillBar');
+  if(!bar) return;
+  const todos = 'Todos los artículos';
+  const cats = [todos, ...CATEGORIAS.map(c=>c.nombre)];
+  const hasDescs = DESCUENTOS.filter(d=>d.activo!==false).length ||
+    PRODS.filter(p=>p.cat==='Descuentos'&&p.activo!==false).length;
+  if(hasDescs) cats.push('🏷️ Descuentos');
+
+  bar.innerHTML = cats.map(function(c){
+    const sel = curCat===c ? ' sel' : '';
+    const safe = c.replace(/"/g,'&quot;');
+    return '<button class="cat-pill'+sel+'" onclick="pickCat(this)">'+c+'</button>';
+  }).join('');
 }
 async function licVerificarAhora(){
-  if(!licIsActivated())return false;if(!navigator.onLine)return true;
-  try{const ok=await licVerificarServidor();
-    if(!ok){localStorage.removeItem(SK.activated);licMostrarBloqueo('SUSPENDIDA');return false;}
-    localStorage.setItem(SK.nextCheck,String(Date.now()+24*60*60*1000));
-    localStorage.setItem(SK.fallos,'0');return true;
-  }catch(e){
-    const f=parseInt(localStorage.getItem(SK.fallos)||'0')+1;
-    localStorage.setItem(SK.fallos,String(f));
-    if(f>=3){licMostrarBloqueo('SIN_CONEXION');return false;}
+  if(!licIsActivated()) return false;
+  if(!navigator.onLine) return true; // sin internet, tolerar
+  try {
+    const activa=await licVerificarServidor();
+    if(!activa){
+      localStorage.removeItem(SK.activated);
+      licMostrarBloqueo('SUSPENDIDA');
+      return false;
+    }
+    // Verificación exitosa: resetear timer y fallos
+    localStorage.setItem(SK.nextCheck, String(Date.now()+24*60*60*1000));
+    localStorage.setItem(SK.fallos,'0');
     return true;
+  } catch(e){
+    // Error de red — tolerar hasta 3 intentos fallidos consecutivos
+    const fallos=parseInt(localStorage.getItem(SK.fallos)||'0')+1;
+    localStorage.setItem(SK.fallos,String(fallos));
+    console.warn('[Licencia] Fallo #'+fallos+': '+e.message);
+    if(fallos>=3) licMostrarBloqueo('SIN_CONEXION');
+    return true; // tolerar si no hay internet
   }
 }
+
+function renderDescList(){
+  const list = document.getElementById('descList');
+  if(!list) return;
+
+  // Combinar DESCUENTOS[] + productos de Supabase con cat='Descuentos'
+  const descIds = new Set(DESCUENTOS.map(d=>String(d.id)));
+  const prodsDesc = PRODS.filter(p=>
+    p.cat==='Descuentos' && p.activo!==false && !descIds.has(String(p.id))
+  );
+  const descs = [
+    ...DESCUENTOS.filter(d=>d.activo!==false),
+    ...prodsDesc.map(p=>({
+      id:p.id, name:p.name,
+      tipo:p.descTipo||'%', valor:p.descValor||null,
+      color:'#e53935', activo:true
+    }))
+  ];
+
+  if(!descs.length){
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:14px;">'+
+      '<div style="font-size:32px;margin-bottom:8px;">🏷️</div>'+
+      'Sin descuentos creados<br>'+
+      '<span style="font-size:12px;">Tocá + para crear uno</span></div>';
+    return;
+  }
+
+  list.innerHTML = descs.map(d => {
+    const valorStr = d.valor != null
+      ? (d.tipo==='%' ? d.valor+'%' : gs(d.valor))
+      : '<span style="color:#555;font-style:italic;">se ingresa al vender</span>';
+    return '<div class="art-item" onclick="editarDesc('+d.id+')" style="border-left:3px solid #e53935;">'+
+      '<div class="art-item-color" style="background:#e53935;font-size:12px;font-weight:800;">%</div>'+
+      '<div class="art-item-info">'+
+        '<div class="art-item-name">'+d.name+'</div>'+
+        '<div class="art-item-meta">'+
+          '<span>'+(d.tipo==='%'?'Porcentaje':'Monto fijo')+'</span>'+
+          '<span>·</span><span>'+valorStr+'</span>'+
+        '</div>'+
+      '</div>'+
+      '<button onclick="event.stopPropagation();eliminarDesc('+d.id+')" '+
+        'style="background:rgba(239,83,80,.1);border:1px solid var(--red);border-radius:6px;'+
+        'color:var(--red);font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;">✕</button>'+
+    '</div>';
+  }).join('');
+}
+
+function supaInsertVenta(data){
+  const email = localStorage.getItem(SK.email);
+  if(!email) return;
+
+  const venta = {
+    fecha:          (data.fecha || new Date()).toISOString(),
+    turno_id:       turnoData.dbId || null,
+    terminal:       licGetTerminal(),
+    sucursal:       localStorage.getItem('pos_sucursal') || 'Principal',
+    licencia_email: email,
+    total:          data.total || 0,
+    metodo_pago:    (data.metodo || 'EFECTIVO').toUpperCase(),
+    comprobante:    data.comprobante || '',
+    items:          JSON.stringify((data.items||[]).map(i=>({
+                      id:     i.id,
+                      nombre: i.name,
+                      qty:    i.qty,
+                      precio: i.price,
+                      obs:    i.obs||''
+                    }))),
+    tiene_factura:  !!(data.factura && data.factura.ruc),
+    factura_ruc:    data.factura ? (data.factura.ruc||'')   : '',
+    factura_nombre: data.factura ? (data.factura.nombre||'') : '',
+  };
+
+  // También guardar en IndexedDB local
+  if(db) dbSaveVenta({
+    ...data,
+    turnoId: turnoData.dbId,
+  });
+
+  // Enviar a Supabase
+  if(USAR_DEMO || !navigator.onLine){
+    // Sin conexión — encolar para sync posterior
+    if(db) dbQueueSync('ventas','insert', venta);
+    return;
+  }
+
+  fetch(SUPA_URL+'/rest/v1/pos_ventas', {
+    method:  'POST',
+    headers: {
+      'apikey':          SUPA_ANON,
+      'Authorization':   'Bearer '+SUPA_ANON,
+      'Content-Type':    'application/json',
+      'Prefer':          'return=minimal',
+    },
+    body: JSON.stringify(venta)
+  })
+  .then(r => {
+    if(!r.ok) return r.text().then(t => { throw new Error(t); });
+    console.log('[Venta] Guardada en Supabase OK');
+  })
+  .catch(e => {
+    console.warn('[Venta] Error Supabase, encolando:', e.message);
+    if(db) dbQueueSync('ventas','insert', venta);
+  });
+}
+
+function supaInsertTurno(estado, efectivoInicial){
+  const email = localStorage.getItem('lic_email');
+  if(!email) return;
+  const data = {
+    fecha_apertura:   new Date().toISOString(),
+    efectivo_inicial: efectivoInicial || 0,
+    estado:           estado,
+    terminal:         localStorage.getItem('pos_terminal') || 'Terminal 1',
+    sucursal:         localStorage.getItem('pos_sucursal') || 'Principal',
+    licencia_email:   email,
+    total_vendido:    0,
+  };
+  fetch(SUPA_URL+'/rest/v1/pos_turno',{
+    method:'POST',
+    headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=representation'},
+    body: JSON.stringify(data)
+  }).then(r=>r.json()).then(rows=>{
+    if(rows&&rows[0]) turnoData.supaId = rows[0].id;
+  }).catch(e=>console.warn('[Turno] Error Supabase:', e.message));
+}
+
 
 (async function(){
   try {
