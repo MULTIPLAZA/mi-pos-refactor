@@ -1909,8 +1909,8 @@ async function renderCompras(tab){
   c.innerHTML='<div class="loading"><span class="sp"></span>Cargando...</div>';
   try{ await movCargarMaestros(); } catch(e){ c.innerHTML='<div style="padding:24px;color:var(--red)">Error: '+e.message+'</div>'; return; }
   var tabs='<div class="admin-tabs">'
-    +'<button class="atab'+(tab==='lista'?' on':'')+'" onclick="renderCompras('lista')">📋 Lista de compras</button>'
-    +'<button class="atab'+(tab==='nuevo'?' on':'')+'" onclick="renderCompras('nuevo')">+ Nueva compra</button>'
+    +'<button class="atab'+(tab==='lista'?' on':'')+'" onclick="renderCompras(&apos;lista&apos;)">📋 Lista de compras</button>'
+    +'<button class="atab'+(tab==='nuevo'?' on':'')+'" onclick="renderCompras(&apos;nuevo&apos;)">+ Nueva compra</button>'
     +'</div>';
   if(tab==='lista'){
     c.innerHTML=tabs+'<div id="movListaWrap"></div>';
@@ -1934,8 +1934,8 @@ async function renderMovStock(tab){
   c.innerHTML='<div class="loading"><span class="sp"></span>Cargando...</div>';
   try{ await movCargarMaestros(); } catch(e){ c.innerHTML='<div style="padding:24px;color:var(--red)">Error: '+e.message+'</div>'; return; }
   var tabs='<div class="admin-tabs">'
-    +'<button class="atab'+(tab==='lista'?' on':'')+'" onclick="renderMovStock('lista')">📋 Lista de movimientos</button>'
-    +'<button class="atab'+(tab==='nuevo'?' on':'')+'" onclick="renderMovStock('nuevo')">+ Nuevo movimiento</button>'
+    +'<button class="atab'+(tab==='lista'?' on':'')+'" onclick="renderMovStock(&apos;lista&apos;)">📋 Lista de movimientos</button>'
+    +'<button class="atab'+(tab==='nuevo'?' on':'')+'" onclick="renderMovStock(&apos;nuevo&apos;)">+ Nuevo movimiento</button>'
     +'</div>';
   if(tab==='lista'){
     c.innerHTML=tabs+'<div id="movListaWrap"></div>';
