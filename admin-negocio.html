@@ -179,7 +179,7 @@ tr:last-child td{border-bottom:none;}
     <div class="l-s">Ingresá con el email de tu licencia</div>
     <div class="fi"><label>Email</label><input type="email" id="loginEmail" placeholder="tu@email.com"></div>
     <div class="fi"><label>Clave de licencia</label><input type="text" id="loginClave" placeholder="XXXX-XXXX-XXXX" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <button class="btn-p" onclick="doLogin()">INGRESAR</button>
+    <button class="btn-p" id="loginBtn" onclick="doLogin()">INGRESAR</button>
     <div class="l-err" id="loginErr"></div>
   </div>
 </div>
@@ -461,20 +461,84 @@ function getFD(f){
 
 // ── LOGIN ─────────────────────────────────────────────────
 async function doLogin(){
-  var email = document.getElementById('loginEmail').value.trim();
+  var email = document.getElementById('loginEmail').value.trim().toLowerCase();
   var clave = document.getElementById('loginClave').value.trim().toUpperCase();
   var err   = document.getElementById('loginErr');
+  var btn   = document.getElementById('loginBtn');
   err.style.display='none';
+
   if(!email||!clave){err.textContent='Completá todos los campos';err.style.display='block';return;}
+  if(!email.includes('@')){err.textContent='Ingresá un email válido';err.style.display='block';return;}
+  if(clave.length < 6){err.textContent='Código de licencia inválido';err.style.display='block';return;}
+
+  if(btn){btn.disabled=true;btn.textContent='Verificando...';}
+
   try{
-    var d = await srpc('activar_licencia',{p_clave:clave,p_email:email,p_device_id:'admin_'+Date.now()});
-    if(!d.ok){err.textContent=d.error||'Datos incorrectos';err.style.display='block';return;}
-    SE=email; SP=d.plan; SV=d.vence;
-    localStorage.setItem('ae',email); localStorage.setItem('ap',d.plan); localStorage.setItem('av',d.vence);
+    // Primero detectar columnas reales de licencias consultando sin filtro
+    var sample = await sg('licencias','limit=1');
+    var lic = null;
+
+    if(sample && sample.length > 0){
+      var cols = Object.keys(sample[0]);
+      console.log('[Login] licencias columns:', cols);
+
+      // Determinar nombre de columna de email
+      var emailCol = cols.find(function(c){return c==='email'||c==='licencia_email'||c==='correo'||c==='user_email';}) || 'licencia_email';
+      // Determinar nombre de columna de clave
+      var claveCol = cols.find(function(c){return c==='clave'||c==='codigo'||c==='code'||c==='license_key';}) || 'clave';
+      var planCol  = cols.find(function(c){return c==='plan'||c==='tipo'||c==='type';}) || 'plan';
+      var venceCol = cols.find(function(c){return c==='vence'||c==='vencimiento'||c==='expires_at'||c==='expira';}) || 'vence';
+      var activaCol= cols.find(function(c){return c==='activa'||c==='activo'||c==='active';}) || 'activa';
+
+      console.log('[Login] Using cols:', emailCol, claveCol, planCol, venceCol);
+
+      // Buscar por email + clave
+      var q = emailCol+'=ilike.'+encodeURIComponent(email)+'&'+claveCol+'=eq.'+encodeURIComponent(clave);
+      if(cols.includes(activaCol)) q += '&'+activaCol+'=eq.true';
+      var rows = await sg('licencias', q+'&select=*');
+
+      if(rows && rows.length > 0){
+        lic = { plan: rows[0][planCol]||'Pro', vence: rows[0][venceCol]||'—' };
+      }
+    }
+
+    // Si no encontramos nada, intentar con la RPC como fallback
+    if(!lic){
+      try{
+        var d = await srpc('activar_licencia',{p_clave:clave,p_email:email,p_device_id:'admin_web_'+Date.now()});
+        if(d && d.ok){
+          lic = { plan: d.plan||'Pro', vence: d.vence||'—' };
+        }
+      }catch(e2){ console.warn('[Login] RPC fallback failed:', e2.message); }
+    }
+
+    if(!lic){
+      err.textContent='Email o código de licencia incorrecto';
+      err.style.display='block';
+      if(btn){btn.disabled=false;btn.textContent='INGRESAR';}
+      return;
+    }
+
+    // Verificar vencimiento
+    if(lic.vence && lic.vence!=='—' && lic.vence!=='2999-12-31'){
+      if(new Date(lic.vence+'T23:59:59') < new Date()){
+        err.textContent='Tu licencia venció el '+lic.vence+'. Contactá al administrador.';
+        err.style.display='block';
+        if(btn){btn.disabled=false;btn.textContent='INGRESAR';}
+        return;
+      }
+    }
+
+    // Login exitoso
+    SE=email; SP=lic.plan; SV=lic.vence;
+    localStorage.setItem('ae',SE); localStorage.setItem('ap',SP); localStorage.setItem('av',SV);
     showApp();
+
   }catch(e){
-    if(clave.length>5){SE=email;SP='Demo';SV='—';localStorage.setItem('ae',email);localStorage.setItem('ap','Demo');showApp();}
-    else{err.textContent='Error: '+e.message;err.style.display='block';}
+    err.textContent='Error de conexión: '+e.message+'. Verificá tu internet.';
+    err.style.display='block';
+    if(btn){btn.disabled=false;btn.textContent='INGRESAR';}
+    console.warn('[Login] Error:', e.message);
   }
 }
 
@@ -541,7 +605,7 @@ function setFD(f,b){
 async function loadDashData(f){
   var fd=getFD(f||'hoy');
   try{
-    var v=await sg('pos_ventas','licencia_email=eq.'+encodeURIComponent(SE)+'&fecha=gte.'+fd.d+'&fecha=lte.'+fd.h+'&order=fecha.desc&limit=300');
+    var v=await sg('pos_ventas','licencia_email=ilike.'+encodeURIComponent(SE)+'&fecha=gte.'+fd.d+'&fecha=lte.'+fd.h+'&order=fecha.desc&limit=300');
     var tot=v.reduce(function(s,x){return s+(x.total||0);},0), cnt=v.length;
     var ef=v.filter(function(x){return (x.metodo_pago||'').toUpperCase()==='EFECTIVO';});
     var el=v.filter(function(x){return (x.metodo_pago||'').toUpperCase()!=='EFECTIVO';});
@@ -571,7 +635,7 @@ function setFV(f,b){ filtroV=f; document.querySelectorAll('.dbtn').forEach(funct
 async function loadVData(f){
   var fd=getFD(f);
   try{
-    allVP=await sg('pos_ventas','licencia_email=eq.'+encodeURIComponent(SE)+'&fecha=gte.'+fd.d+'&fecha=lte.'+fd.h+'&order=fecha.desc&limit=500');
+    allVP=await sg('pos_ventas','licencia_email=ilike.'+encodeURIComponent(SE)+'&fecha=gte.'+fd.d+'&fecha=lte.'+fd.h+'&order=fecha.desc&limit=500');
     renderVT(allVP);
   }catch(e){if(document.getElementById('vBody'))document.getElementById('vBody').innerHTML='<tr><td colspan="5" class="loading">Error</td></tr>';}
 }
@@ -591,19 +655,50 @@ function filtrV(q){
 
 // ── TERMINALES ────────────────────────────────────────────
 async function renderTerminales(){
-  document.getElementById('content').innerHTML='<div class="ph"><div><div class="pt">Terminales</div><div class="ps">Dispositivos activos</div></div></div><div id="terBody"><div class="loading"><span class="sp"></span>Cargando...</div></div>';
+  document.getElementById('content').innerHTML='<div class="ph"><div><div class="pt">Terminales</div><div class="ps">Dispositivos registrados</div></div></div><div id="terBody"><div class="loading"><span class="sp"></span>Cargando...</div></div>';
   try{
-    var v=await sg('pos_ventas','licencia_email=eq.'+encodeURIComponent(SE)+'&order=fecha.desc&limit=500');
-    var m={};var now=new Date();
-    v.forEach(function(x){var k=(x.terminal||'P')+'|'+(x.sucursal||'—');if(!m[k])m[k]={t:x.terminal||'Principal',s:x.sucursal||'—',tot:0,ops:0,ul:null};m[k].tot+=x.total||0;m[k].ops++;if(!m[k].ul||x.fecha>m[k].ul)m[k].ul=x.fecha;});
-    document.getElementById('terBody').innerHTML='<div class="tg">'+Object.values(m).map(function(t){var ul=t.ul?new Date(t.ul):null;var on=ul&&(now-ul)<25*3600000;return '<div class="tc '+(on?'on':'')+'"><div class="tc-h"><div><div class="tc-n">'+t.t+'</div><div class="tc-s">'+t.s+'</div></div><span class="tag '+(on?'tag-g':'tag-gr')+'">'+(on?'Online':'Offline')+'</span></div><div class="tc-r"><span style="color:var(--muted)">Ventas</span><span style="color:var(--green);font-weight:700">'+gs(t.tot)+'</span></div><div class="tc-r"><span style="color:var(--muted)">Ops</span><span style="font-weight:700">'+t.ops+'</span></div><div class="tc-r"><span style="color:var(--muted)">Última</span><span>'+fmtDT(t.ul)+'</span></div></div>';}).join('')+'</div>';
-  }catch(e){document.getElementById('terBody').innerHTML='<div class="loading">Sin datos</div>';}
+    var now=new Date();
+    // Query activaciones (source of truth for registered terminals)
+    var acts=[];
+    try{acts=await sg('activaciones','email=ilike.'+encodeURIComponent(SE)+'&activa=eq.true&select=id,device_id,nombre_terminal,sucursal,updated_at');}catch(e2){console.warn('activaciones err:',e2.message);}
+    // Also query pos_ventas to get activity stats per terminal
+    var v=[];
+    try{v=await sg('pos_ventas','licencia_email=ilike.'+encodeURIComponent(SE)+'&order=fecha.desc&limit=1000');}catch(e3){console.warn('ventas err:',e3.message);}
+    var m={};
+    v.forEach(function(x){
+      var k=(x.terminal||'Principal');
+      if(!m[k])m[k]={t:x.terminal||'Principal',s:x.sucursal||'—',tot:0,ops:0,ul:null};
+      m[k].tot+=x.total||0;m[k].ops++;
+      if(!m[k].ul||x.fecha>m[k].ul)m[k].ul=x.fecha;
+    });
+    // Merge activaciones into map (show all registered terminals, even those with no sales)
+    acts.forEach(function(a){
+      var k=a.nombre_terminal||a.device_id||'—';
+      if(!m[k])m[k]={t:k,s:a.sucursal||'—',tot:0,ops:0,ul:a.updated_at||null};
+      else{m[k].t=k;if(a.sucursal)m[k].s=a.sucursal;}
+      m[k].device_id=a.device_id;
+      m[k].activ_id=a.id;
+    });
+    var items=Object.values(m);
+    if(!items.length){document.getElementById('terBody').innerHTML='<div class="empty"><div class="empty-i">📱</div><div class="empty-t">Sin terminales registradas</div></div>';return;}
+    document.getElementById('terBody').innerHTML='<div class="tg">'+items.map(function(t){
+      var ul=t.ul?new Date(t.ul):null;
+      var on=ul&&(now-ul)<25*3600000;
+      return '<div class="tc '+(on?'on':'')+'">'
+        +'<div class="tc-h"><div><div class="tc-n">'+t.t+'</div><div class="tc-s">'+t.s+(t.device_id?'<br><span style="font-size:10px;color:var(--muted);font-family:monospace;">'+t.device_id+'</span>':'')+'</div></div>'
+        +'<span class="tag '+(on?'tag-g':'tag-gr')+'">'+(on?'Online':'Offline')+'</span></div>'
+        +'<div class="tc-r"><span style="color:var(--muted)">Ventas</span><span style="color:var(--green);font-weight:700">'+gs(t.tot)+'</span></div>'
+        +'<div class="tc-r"><span style="color:var(--muted)">Ops</span><span style="font-weight:700">'+t.ops+'</span></div>'
+        +'<div class="tc-r"><span style="color:var(--muted)">Última act.</span><span>'+fmtDT(t.ul)+'</span></div>'
+        +'</div>';
+    }).join('')+'</div>';
+  }catch(e){document.getElementById('terBody').innerHTML='<div class="loading">Error: '+e.message+'</div>';console.error(e);}
 }
 
 // ── CAJAS ─────────────────────────────────────────────────
 async function renderCajas(){
   document.getElementById('content').innerHTML='<div class="ph"><div><div class="pt">Cajas / Turnos</div><div class="ps">Control por terminal</div></div><div class="dbar"><button class="dbtn on" onclick="filtrCj(\'todas\',this)">Todas</button><button class="dbtn" onclick="filtrCj(\'abiertas\',this)">Abiertas</button><button class="dbtn" onclick="filtrCj(\'cerradas\',this)">Cerradas</button></div></div><div class="kg k3"><div class="kc" style="--c:var(--green)"><div class="kc-l">Abiertas</div><div class="kc-v" id="cjA">—</div></div><div class="kc" style="--c:var(--orange)"><div class="kc-l">Cerradas hoy</div><div class="kc-v" id="cjC">—</div></div><div class="kc" style="--c:var(--blue)"><div class="kc-l">Recaudado hoy</div><div class="kc-v" id="cjT">₲0</div></div></div><div id="cajasBody"><div class="loading"><span class="sp"></span>Cargando...</div></div>';
-  try{allCjs=await sg('pos_turno','licencia_email=eq.'+encodeURIComponent(SE)+'&order=fecha_apertura.desc&limit=100');}
+  try{allCjs=await sg('pos_turno','licencia_email=ilike.'+encodeURIComponent(SE)+'&order=fecha_apertura.desc&limit=100');}
   catch(e){allCjs=[];}
   renderCajasData();
 }
@@ -630,7 +725,7 @@ function togCj(i){var b=document.getElementById('cjB'+i);if(b)b.classList.toggle
 async function renderProductos(){
   document.getElementById('content').innerHTML='<div class="ph"><div><div class="pt">Productos</div><div class="ps">Catálogo sincronizado</div></div></div><div class="card"><div class="card-h"><span class="card-t" id="pCount">—</span><input class="c-srch" placeholder="Buscar..." oninput="filtrP(this.value)"></div><table><thead><tr><th>Producto</th><th>Categoría</th><th>IVA</th><th style="text-align:right">Precio</th></tr></thead><tbody id="pBody"><tr><td colspan="4" class="loading"><span class="sp"></span></td></tr></tbody></table></div>';
   try{
-    allPrds=await sg('pos_productos','licencia_email=eq.'+encodeURIComponent(SE)+'&activo=eq.true&order=nombre.asc&limit=500');
+    allPrds=await sg('pos_productos','licencia_email=ilike.'+encodeURIComponent(SE)+'&activo=eq.true&order=nombre.asc&limit=500');
     renderPT(allPrds);
   }catch(e){document.getElementById('pBody').innerHTML='<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted)">Sin productos sincronizados</td></tr>';}
 }
@@ -662,8 +757,8 @@ async function testConexion(){
 async function cargarTimbradosDesdeSupabase(){
   if(!SE){try{timbrados=JSON.parse(localStorage.getItem(TIM_KEY)||'[]');}catch(e){timbrados=[];}return;}
   try{
-    var rows=await sg('timbrados','licencia_email=eq.'+encodeURIComponent(SE)+'&activo=eq.true&order=created_at.asc');
-    var ters=await sg('timbrado_terminales','licencia_email=eq.'+encodeURIComponent(SE)+'&activo=eq.true');
+    var rows=await sg('timbrados','licencia_email=ilike.'+encodeURIComponent(SE)+'&activo=eq.true&order=created_at.asc');
+    var ters=await sg('timbrado_terminales','licencia_email=ilike.'+encodeURIComponent(SE)+'&activo=eq.true');
     timbrados=rows.map(function(t){
       return {
         _db_id:t.id, nro:t.nro, tipo:t.tipo,
@@ -767,7 +862,7 @@ async function abrirModalAsignar(timIdx){
 
   var terminales=[];
   try{
-    var rows=await sg('activaciones','email=eq.'+encodeURIComponent(SE)+'&activa=eq.true&select=id,device_id,nombre_terminal,sucursal');
+    var rows=await sg('activaciones','email=ilike.'+encodeURIComponent(SE)+'&activa=eq.true&select=id,device_id,nombre_terminal,sucursal,updated_at');
     console.log('[Modal] activaciones:', rows.length, rows);
     terminales=rows.filter(function(r){return r.nombre_terminal||r.device_id;})
                    .map(function(r){return {nombre:r.nombre_terminal||r.device_id,sucursal:r.sucursal||''};});
@@ -893,7 +988,7 @@ async function elimAsig(j){
     if(a._ter_id){
       await supaPatch('timbrado_terminales','id=eq.'+a._ter_id,{activo:false});
     } else {
-      await supaPatch('timbrado_terminales','licencia_email=eq.'+encodeURIComponent(SE)+'&terminal=eq.'+encodeURIComponent(a.terminal),{activo:false});
+      await supaPatch('timbrado_terminales','licencia_email=ilike.'+encodeURIComponent(SE)+'&terminal=eq.'+encodeURIComponent(a.terminal),{activo:false});
     }
     await cargarTimbradosDesdeSupabase();
     toast('Terminal desasignada');
@@ -951,7 +1046,7 @@ async function elimTim(i){
     if(t._db_id){
       await supaPatch('timbrados','id=eq.'+t._db_id,{activo:false});
     } else {
-      await supaPatch('timbrados','licencia_email=eq.'+encodeURIComponent(SE)+'&nro=eq.'+t.nro,{activo:false});
+      await supaPatch('timbrados','licencia_email=ilike.'+encodeURIComponent(SE)+'&nro=eq.'+t.nro,{activo:false});
     }
     await refreshTimListaFromServer();
     toast('Timbrado eliminado');
@@ -1055,7 +1150,7 @@ async function renderSucursalesTab(tc){
   tc.innerHTML='<div class="loading"><span class="sp"></span>Cargando...</div>';
   try{
     var fd=getFD('mes');
-    var v=await sg('pos_ventas','licencia_email=eq.'+encodeURIComponent(SE)+'&fecha=gte.'+fd.d+'&fecha=lte.'+fd.h+'&select=sucursal,total&limit=500');
+    var v=await sg('pos_ventas','licencia_email=ilike.'+encodeURIComponent(SE)+'&fecha=gte.'+fd.d+'&fecha=lte.'+fd.h+'&select=sucursal,total&limit=500');
     var m={};
     v.forEach(function(x){var s=x.sucursal||'Principal';if(!m[s])m[s]={tot:0,ops:0};m[s].tot+=x.total||0;m[s].ops++;});
     tc.innerHTML=Object.entries(m).length?Object.entries(m).map(function(entry){var s=entry[0];var d=entry[1];return '<div class="li"><div class="li-ic" style="background:var(--g2);color:var(--green)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="li-inf"><div class="li-t">'+s+'</div><div class="li-s">'+d.ops+' ventas este mes</div></div><div class="li-r"><div class="li-v" style="color:var(--green)">'+gs(d.tot)+'</div></div></div>';}).join(''):'<div class="empty"><div class="empty-i">🏢</div><div class="empty-t">Sin sucursales</div></div>';
@@ -1082,7 +1177,8 @@ async function saveConf(){
 (function(){
   applyAdminTheme();
   var e=localStorage.getItem('ae'),p=localStorage.getItem('ap'),v=localStorage.getItem('av');
-  if(e&&p){SE=e;SP=p;SV=v;showApp();}
+  // Solo auto-login si hay sesión previamente validada (no Demo)
+  if(e&&p&&p!=='Demo'){SE=e.toLowerCase().trim();SP=p;SV=v;showApp();}
 })();
 
 
