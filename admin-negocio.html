@@ -235,6 +235,8 @@ tr:last-child td{border-bottom:none;}
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>Reporte de Compras</div>
       <div class="sb-i" id="sbi-balance" onclick="goTo(&apos;balance&apos;)">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Balance P&amp;G</div>
+      <div class="sb-i" id="sbi-iva" onclick="goTo(&apos;iva&apos;)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>Liquidación IVA</div>
       <div style="font-size:10px;color:#3a3a3a;letter-spacing:1px;text-transform:uppercase;font-weight:700;padding:10px 14px 3px;">Sistema</div>
       <div class="sb-i" id="sbi-admin" onclick="goTo('admin')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>Administración</div>
@@ -579,7 +581,7 @@ function goTo(p){
   curPage=p; closeSB();
   document.querySelectorAll('.sb-i').forEach(function(el){el.classList.toggle('on',el.id==='sbi-'+p);});
   document.querySelectorAll('.bn').forEach(function(el){el.classList.toggle('on',el.id==='bni-'+p);});
-  var titles={dashboard:'Dashboard',ventas:'Ventas',terminales:'Terminales',cajas:'Cajas / Turnos',productos:'Productos',inventarios:'Inventarios',extracto:'Extracto de Producto',compras:'Compras',movstock:'Movimientos de Stock',conteo:'Conteo Físico','rep-productos':'Ventas por Producto','rep-compras':'Reporte de Compras',gastos:'Gastos Fijos','plan-gastos':'Plan de Gastos',balance:'Balance P&G',admin:'Administración',config:'Configuración'};
+  var titles={dashboard:'Dashboard',ventas:'Ventas',terminales:'Terminales',cajas:'Cajas / Turnos',productos:'Productos',inventarios:'Inventarios',extracto:'Extracto de Producto',compras:'Compras',movstock:'Movimientos de Stock',conteo:'Conteo Físico','rep-productos':'Ventas por Producto','rep-compras':'Reporte de Compras',gastos:'Gastos Fijos','plan-gastos':'Plan de Gastos',balance:'Balance P&G',iva:'Liquidación IVA',admin:'Administración',config:'Configuración'};
   document.getElementById('topTitle').textContent=titles[p]||p;
   var c=document.getElementById('content');
   c.innerHTML='<div class="loading"><span class="sp"></span>Cargando...</div>';
@@ -602,6 +604,7 @@ function renderPage(p){
   else if(p==='gastos') renderGastos();
   else if(p==='plan-gastos') renderPlanGastos();
   else if(p==='balance') renderBalance();
+  else if(p==='iva') renderIVA();
   else if(p==='admin')  renderAdmin();
   else if(p==='config') renderConfig();
 }
@@ -4170,6 +4173,11 @@ async function renderGastos(tab){
             +'<input type="date" id="gFecha" class="cfg-inp" style="width:100%" value="'+hoy+'"></div>'
           +'<div style="grid-column:1/-1"><label style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:5px">Observación (opcional)</label>'
             +'<input type="text" id="gObs" class="cfg-inp" style="width:100%" placeholder="Notas adicionales..."></div>'
+          +'<div style="grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--card2);border-radius:8px">'
+            +'<input type="checkbox" id="gTieneFact" style="width:16px;height:16px;cursor:pointer">'
+            +'<div><div style="font-size:13px;font-weight:600">Tiene factura (genera crédito fiscal IVA)</div>'
+              +'<div style="font-size:11px;color:var(--muted)">Marcá si este gasto tiene factura timbrada del proveedor</div></div>'
+          +'</div>'
           +'<div style="grid-column:1/-1;display:flex;gap:10px;justify-content:flex-end">'
             +'<button onclick="renderGastos(&apos;lista&apos;)" class="btn-dn" style="padding:11px 22px">Cancelar</button>'
             +'<button onclick="gastoGuardar()" class="btn-sv" style="padding:11px 28px">💾 Guardar gasto</button>'
@@ -4233,6 +4241,7 @@ async function gastoGuardar(){
       concepto_id:conId, categoria_id:catId,
       monto:monto, fecha:fecha,
       observacion:obs||null, usuario:SE,
+      tiene_factura:!!(document.getElementById('gTieneFact')||{}).checked,
       created_at:new Date().toISOString()
     },null);
     toast('✓ Gasto guardado — '+gs(monto));
@@ -4463,15 +4472,340 @@ async function balanceBuscar(licId){
         +'</div>'
         +(gastosHTML||'<div style="padding:16px 18px;color:var(--muted);font-size:13px">Sin gastos registrados en el período</div>')
       +'</div>'
+      // IVA estimado del período
+      var ivaData=null;
+      try{
+        var ivaRows=await sg('iva_liquidaciones','licencia_id=eq.'+licId
+          +'&periodo=gte.'+fd.substring(0,7)
+          +'&select=iva_pagar,iva_favor,debito_total,credito_total,periodo&limit=1');
+        if(ivaRows&&ivaRows.length) ivaData=ivaRows[0];
+      }catch(e){}
+      var utilidadAntesIva=utilidadNeta;
+      var ivaAPagar=ivaData?Math.round(ivaData.iva_pagar||0):null;
+      var utilidadFinal=ivaAPagar!==null?utilidadNeta-ivaAPagar:utilidadNeta;
+      var utilFinalColor=utilidadFinal>=0?'var(--green)':'var(--red)';
+
       // RESULTADO NETO
       +'<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;background:'+utilColor+';border-radius:12px;margin-top:4px">'
-        +'<span style="font-size:16px;font-weight:800;color:#fff">'+(utilidadNeta>=0?'UTILIDAD NETA':'PÉRDIDA NETA')+'</span>'
+        +'<span style="font-size:16px;font-weight:800;color:#fff">'+(utilidadNeta>=0?'UTILIDAD ANTES DE IVA':'PÉRDIDA ANTES DE IVA')+'</span>'
         +'<span style="font-size:24px;font-weight:800;color:#fff">'+gs(Math.abs(utilidadNeta))+'</span>'
-      +'</div>';
+      +'</div>'
+      // IVA
+      +(ivaAPagar!==null
+        ?'<div style="display:flex;justify-content:space-between;align-items:center;padding:13px 20px;background:var(--r2);border:1px solid var(--red);border-radius:10px;margin-top:8px">'
+          +'<div><div style="font-size:13px;font-weight:800;color:var(--red)">IVA A PAGAR (estimado)</div>'
+          +'<div style="font-size:11px;color:var(--muted);margin-top:2px">Según liquidación '+ivaData.periodo+' — <button onclick="goTo(&apos;iva&apos;)" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:11px;text-decoration:underline;font-family:Barlow,sans-serif">Ver detalle</button></div></div>'
+          +'<span style="font-size:20px;font-weight:800;color:var(--red)">−'+gs(ivaAPagar)+'</span>'
+        +'</div>'
+        :'<div style="padding:10px 16px;font-size:12px;color:var(--muted);background:var(--card2);border-radius:8px;margin-top:8px">'
+          +'💡 <button onclick="goTo(&apos;iva&apos;)" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:12px;text-decoration:underline;font-family:Barlow,sans-serif">Calculá la liquidación de IVA</button> para ver el resultado neto real.'
+        +'</div>'
+      )
+      // UTILIDAD FINAL (después de IVA)
+      +(ivaAPagar!==null
+        ?'<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;background:'+utilFinalColor+';border-radius:12px;margin-top:8px">'
+          +'<div><div style="font-size:16px;font-weight:800;color:#fff">'+(utilidadFinal>=0?'UTILIDAD NETA':'PÉRDIDA NETA')+'</div>'
+          +'<div style="font-size:12px;color:rgba(255,255,255,.7);margin-top:2px">Después de IVA estimado</div></div>'
+          +'<span style="font-size:24px;font-weight:800;color:#fff">'+gs(Math.abs(utilidadFinal))+'</span>'
+        +'</div>'
+        :'')
+      ;
 
   }catch(e){
     body.innerHTML='<div style="padding:24px;color:var(--red)">Error: '+e.message+'</div>';
   }
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// LIQUIDACIÓN DE IVA — PARAGUAY
+// ═══════════════════════════════════════════════════════════
+// Reglas IVA Paraguay:
+//   IVA 10%: débito = precio_venta / 11     crédito = precio_compra / 11
+//   IVA  5%: débito = precio_venta / 21     crédito = precio_compra / 21
+//   Exento:  sin IVA
+//   IVA a pagar = Débito Total - Crédito Total (si positivo)
+
+var _iva = { licId: null, prodMap: {} };
+
+async function ivaGetLicId(){
+  if(_iva.licId) return _iva.licId;
+  if(SLI){ _iva.licId=SLI; return SLI; }
+  var r=await sg('licencias','email_cliente=ilike.'+encodeURIComponent(SE)+'&activa=eq.true&select=id&limit=1');
+  if(r&&r.length){ _iva.licId=r[0].id; return r[0].id; }
+  throw new Error('No se encontró licencia');
+}
+
+async function renderIVA(){
+  var c=document.getElementById('content');
+  c.innerHTML='<div class="loading"><span class="sp"></span>Cargando...</div>';
+  var licId=await ivaGetLicId();
+
+  // Cargar mapa de IVA por producto
+  try{
+    var prds=await sg('pos_productos',
+      'licencia_email=ilike.'+encodeURIComponent(SE)+'&activo=eq.true&select=id,iva&limit=1000'
+    );
+    _iva.prodMap={};
+    prds.forEach(function(p){ _iva.prodMap[p.id]=p.iva||'10'; });
+  }catch(e){ _iva.prodMap={}; }
+
+  // Período default: mes actual
+  var hoy=new Date();
+  var periodoVal=hoy.getFullYear()+'-'+pad(hoy.getMonth()+1);
+
+  // Historial de liquidaciones
+  var historial=[];
+  try{ historial=await sg('iva_liquidaciones','licencia_id=eq.'+licId+'&order=periodo.desc&limit=24'); }catch(e){}
+
+  c.innerHTML=
+    '<div class="ph"><div><div class="pt">Liquidación de IVA</div>'
+      +'<div class="ps">Débito fiscal − Crédito fiscal = IVA a pagar (Paraguay)</div></div></div>'
+    // Selector de período
+    +'<div class="card" style="margin-bottom:12px">'
+      +'<div style="padding:16px 18px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">'
+        +'<div><label style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:5px">Período (mes)</label>'
+          +'<input type="month" id="ivaPeriodo" class="cfg-inp" value="'+periodoVal+'"></div>'
+        +'<button onclick="ivaCalcular()" class="btn-sv" style="padding:10px 22px;font-size:14px">Calcular IVA</button>'
+        +(historial.length?'<div style="margin-left:auto;font-size:12px;color:var(--muted)">Períodos anteriores: '
+          +historial.slice(0,6).map(function(h){
+            return '<button onclick="ivaCargarPeriodo(\''+h.periodo+'\')" style="background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text2);font-family:Barlow,sans-serif;font-size:11px;font-weight:600;padding:3px 8px;cursor:pointer;margin-left:4px">'
+              +h.periodo+(h.estado==='cerrado'?' ✓':'')+'</button>';
+          }).join('')+'</div>':'')
+      +'</div>'
+    +'</div>'
+    +'<div id="ivaBody"></div>';
+
+  // Si hay un período cerrado para este mes, mostrarlo
+  var periodoActual=periodoVal;
+  var liquidActual=historial.find(function(h){return h.periodo===periodoActual;});
+  if(liquidActual) ivaRenderResultado(liquidActual);
+}
+
+async function ivaCalcular(){
+  var periodo=document.getElementById('ivaPeriodo').value;
+  if(!periodo){ toast('Seleccioná un período'); return; }
+  var licId=await ivaGetLicId();
+  var body=document.getElementById('ivaBody');
+  body.innerHTML='<div class="loading"><span class="sp"></span>Calculando IVA del período '+periodo+'...</div>';
+
+  var fd=periodo+'-01T00:00:00';
+  // Último día del mes
+  var partes=periodo.split('-');
+  var ultimoDia=new Date(parseInt(partes[0]),parseInt(partes[1]),0).getDate();
+  var fh=periodo+'-'+ultimoDia+'T23:59:59';
+
+  try{
+    // ── DÉBITO FISCAL (desde pos_ventas) ─────────────────────
+    var ventas=await sg('pos_ventas',
+      'licencia_email=ilike.'+encodeURIComponent(SE)
+      +'&fecha=gte.'+fd+'&fecha=lte.'+fh
+      +'&select=items,total,tiene_factura&limit=5000'
+    );
+
+    var venta10=0, venta5=0, ventaExenta=0;
+    ventas.forEach(function(v){
+      var items=[];
+      try{ items=typeof v.items==='string'?JSON.parse(v.items):(v.items||[]); }catch(e){}
+      items.forEach(function(it){
+        var qty=parseFloat(it.qty)||1;
+        var precio=parseFloat(it.precio||it.price)||0;
+        var total=precio*qty;
+        var ivaRate=_iva.prodMap[it.id]||'10';
+        if(ivaRate==='exento'||ivaRate==='0') ventaExenta+=total;
+        else if(ivaRate==='5') venta5+=total;
+        else venta10+=total; // default 10%
+      });
+    });
+    // Si no hay items detallados, usar el total de la venta como 10%
+    if(venta10===0&&venta5===0&&ventaExenta===0){
+      ventas.forEach(function(v){ venta10+=(v.total||0); });
+    }
+
+    var debito10=Math.round(venta10/11);
+    var debito5 =Math.round(venta5/21);
+    var debitoTotal=debito10+debito5;
+
+    // ── CRÉDITO FISCAL COMPRAS ────────────────────────────────
+    // Tomar compras con tiene_factura=true O todas las compras
+    // (Paraguay: cualquier factura de compra genera crédito)
+    var compras=await sg('stock_comprobantes',
+      'licencia_id=eq.'+licId
+      +'&tipo=eq.compra'
+      +'&fecha=gte.'+fd+'&fecha=lte.'+fh
+      +'&select=id,total_monto,tiene_factura&limit=1000'
+    );
+    // Cargar items de compras para determinar IVA por producto
+    var compIds=compras.map(function(c){return c.id;});
+    var compra10=0, compra5=0;
+    if(compIds.length){
+      var compItems=await sg('stock_comprobante_items',
+        'comprobante_id=in.('+compIds.join(',')+')'
+        +'&select=producto_id,cantidad,costo_unitario&limit=5000'
+      );
+      compItems.forEach(function(i){
+        var cant=Math.abs(parseFloat(i.cantidad)||0);
+        var costo=parseFloat(i.costo_unitario)||0;
+        var total=cant*costo;
+        var ivaRate=_iva.prodMap[i.producto_id]||'10';
+        if(ivaRate==='5') compra5+=total;
+        else if(ivaRate!=='exento'&&ivaRate!=='0') compra10+=total;
+      });
+    }
+    var creditoCompras10=Math.round(compra10/11);
+    var creditoCompras5 =Math.round(compra5/21);
+    var creditoCompras  =creditoCompras10+creditoCompras5;
+
+    // ── CRÉDITO FISCAL GASTOS ─────────────────────────────────
+    var gastosConFact=await sg('gastos',
+      'licencia_id=eq.'+licId
+      +'&fecha=gte.'+periodo+'-01'
+      +'&fecha=lte.'+periodo+'-'+ultimoDia
+      +'&tiene_factura=eq.true'
+      +'&select=monto,categoria&limit=500'
+    );
+    // Gastos generales se asume IVA 10% (servicios, alquiler, etc.)
+    var gasto10=gastosConFact.reduce(function(s,g){return s+(g.monto||0);},0);
+    var creditoGastos10=Math.round(gasto10/11);
+    var creditoGastosTotal=creditoGastos10;
+
+    var creditoTotal=creditoCompras+creditoGastosTotal;
+    var saldo=debitoTotal-creditoTotal;
+    var ivaPagar=Math.max(0,saldo);
+    var ivaFavor=Math.max(0,-saldo);
+
+    var data={
+      periodo:periodo, licencia_id:licId,
+      venta_10:Math.round(venta10), venta_5:Math.round(venta5), venta_exenta:Math.round(ventaExenta),
+      debito_10:debito10, debito_5:debito5, debito_total:debitoTotal,
+      compra_10:Math.round(compra10), compra_5:Math.round(compra5),
+      credito_compras:creditoCompras,
+      gasto_10:Math.round(gasto10), gasto_5:0,
+      credito_gastos:creditoGastosTotal,
+      credito_total:creditoTotal,
+      iva_pagar:ivaPagar, iva_favor:ivaFavor,
+      estado:'borrador', usuario:SE,
+      updated_at:new Date().toISOString()
+    };
+
+    // Guardar/actualizar en DB
+    try{
+      var existe=await sg('iva_liquidaciones','licencia_id=eq.'+licId+'&periodo=eq.'+periodo+'&select=id');
+      if(existe&&existe.length){
+        await supaPatch('iva_liquidaciones','id=eq.'+existe[0].id,data);
+        data.id=existe[0].id;
+      } else {
+        var r=await supaPost('iva_liquidaciones',data,null);
+        data.id=Array.isArray(r)?r[0].id:r.id;
+      }
+    }catch(e){ console.warn('[IVA] save error:', e.message); }
+
+    ivaRenderResultado(data);
+
+  }catch(e){
+    body.innerHTML='<div style="padding:24px;color:var(--red)">Error: '+e.message+'</div>';
+  }
+}
+
+async function ivaCargarPeriodo(periodo){
+  document.getElementById('ivaPeriodo').value=periodo;
+  await ivaCalcular();
+}
+
+function ivaRenderResultado(d){
+  var body=document.getElementById('ivaBody');
+  if(!body) return;
+
+  var saldoColor=d.iva_pagar>0?'var(--red)':'var(--green)';
+  var saldoLabel=d.iva_pagar>0?'IVA A PAGAR':'SALDO A FAVOR';
+  var saldoVal=d.iva_pagar>0?d.iva_pagar:d.iva_favor;
+
+  body.innerHTML=
+    // ESTADO y PERÍODO
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">'
+      +'<div style="font-size:15px;font-weight:700">Período: <span style="color:var(--green)">'+d.periodo+'</span>'
+        +'&nbsp; <span class="tag '+(d.estado==='cerrado'?'tag-g':'tag-o')+'">'+d.estado.toUpperCase()+'</span></div>'
+      +(d.estado!=='cerrado'?'<button onclick="ivaCerrar(\''+d.id+'\')" style="background:var(--g2);border:1px solid var(--green);border-radius:8px;color:var(--green);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:8px 16px;cursor:pointer">✓ Cerrar período</button>':'')
+    +'</div>'
+
+    // ── DÉBITO FISCAL ──
+    +'<div class="card" style="margin-bottom:10px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:rgba(76,175,80,.1);border-bottom:1px solid var(--border)">'
+        +'<span style="font-size:14px;font-weight:800;color:var(--green)">DÉBITO FISCAL (Ventas)</span>'
+        +'<span style="font-size:18px;font-weight:800;color:var(--green)">'+gs(d.debito_total)+'</span>'
+      +'</div>'
+      +'<div style="padding:4px 0">'
+        +ivaFila('Ventas gravadas 10% — Base imponible', gs(d.venta_10), '')
+        +ivaFila('IVA incluido (÷11)', '', gs(d.debito_10), 'var(--green)')
+        +ivaFila('Ventas gravadas 5% — Base imponible', gs(d.venta_5), '')
+        +ivaFila('IVA incluido (÷21)', '', gs(d.debito_5), 'var(--green)')
+        +ivaFila('Ventas exentas', gs(d.venta_exenta), 'sin IVA', 'var(--muted)')
+      +'</div>'
+    +'</div>'
+
+    // ── CRÉDITO FISCAL ──
+    +'<div class="card" style="margin-bottom:10px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:rgba(66,165,245,.1);border-bottom:1px solid var(--border)">'
+        +'<span style="font-size:14px;font-weight:800;color:var(--blue)">CRÉDITO FISCAL (Compras + Gastos)</span>'
+        +'<span style="font-size:18px;font-weight:800;color:var(--blue)">'+gs(d.credito_total)+'</span>'
+      +'</div>'
+      +'<div style="padding:4px 0">'
+        +'<div style="padding:6px 18px;font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;background:var(--card2)">Compras de mercadería</div>'
+        +ivaFila('Base imponible compras 10%', gs(d.compra_10), '')
+        +ivaFila('Crédito IVA compras 10% (÷11)', '', gs(d.credito_compras - Math.round(d.compra_5/21)), 'var(--blue)')
+        +(d.compra_5>0?ivaFila('Base imponible compras 5%', gs(d.compra_5), ''):'')
+        +(d.compra_5>0?ivaFila('Crédito IVA compras 5% (÷21)', '', gs(Math.round(d.compra_5/21)), 'var(--blue)'):'')
+        +'<div style="padding:6px 18px;font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;background:var(--card2)">Gastos con factura</div>'
+        +ivaFila('Base imponible gastos (10%)', gs(d.gasto_10), '')
+        +ivaFila('Crédito IVA gastos (÷11)', '', gs(d.credito_gastos), 'var(--blue)')
+        +(d.gasto_10===0?'<div style="padding:8px 18px;font-size:12px;color:var(--muted);font-style:italic">Sin gastos con factura — marcá "Tiene factura" al registrar gastos</div>':'')
+      +'</div>'
+    +'</div>'
+
+    // ── RESULTADO ──
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+      +'<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px">'
+        +'<div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Débito fiscal</div>'
+        +'<div style="font-size:22px;font-weight:800;color:var(--green)">'+gs(d.debito_total)+'</div>'
+      +'</div>'
+      +'<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px">'
+        +'<div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Crédito fiscal</div>'
+        +'<div style="font-size:22px;font-weight:800;color:var(--blue)">'+gs(d.credito_total)+'</div>'
+      +'</div>'
+    +'</div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 22px;background:'+saldoColor+';border-radius:12px;margin-bottom:14px">'
+      +'<div>'
+        +'<div style="font-size:16px;font-weight:800;color:#fff">'+saldoLabel+'</div>'
+        +'<div style="font-size:12px;color:rgba(255,255,255,.75);margin-top:2px">Débito '+gs(d.debito_total)+' − Crédito '+gs(d.credito_total)+'</div>'
+      +'</div>'
+      +'<span style="font-size:28px;font-weight:800;color:#fff">'+gs(saldoVal)+'</span>'
+    +'</div>'
+
+    // NOTAS
+    +'<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:12px;color:var(--muted)">'
+      +'⚠️ <strong style="color:var(--text)">Importante:</strong> Este cálculo es una estimación. '
+      +'El crédito de gastos solo incluye los gastos marcados como "Tiene factura". '
+      +'Verificá con tu contador antes de presentar la declaración.'
+    +'</div>';
+}
+
+function ivaFila(label, valor1, valor2, color2){
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 18px;border-bottom:1px solid var(--border);font-size:13px">'
+    +'<span style="color:var(--muted)">'+label+'</span>'
+    +'<div style="display:flex;gap:24px;text-align:right">'
+      +(valor1?'<span style="color:var(--text2)">'+valor1+'</span>':'<span></span>')
+      +'<span style="font-weight:700;min-width:80px;'+(color2?'color:'+color2:'')+'">'+valor2+'</span>'
+    +'</div>'
+  +'</div>';
+}
+
+async function ivaCerrar(id){
+  if(!confirm('¿Cerrar el período? Una vez cerrado no se recalcula automáticamente.')) return;
+  try{
+    await supaPatch('iva_liquidaciones','id=eq.'+id,{estado:'cerrado',updated_at:new Date().toISOString()});
+    toast('✓ Período cerrado');
+    await ivaCalcular();
+  }catch(e){ toast('Error: '+e.message); }
 }
 
 // ════════════════════════════════════════════════════════
