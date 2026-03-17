@@ -5243,11 +5243,191 @@ function supaInsertVenta(data){
   .then(r => {
     if(!r.ok) return r.text().then(t => { throw new Error(t); });
     console.log('[Venta] Guardada en Supabase OK');
+    // Descontar stock en background
+    const ventaItems=(data.items||[]).map(i=>({id:i.id,name:i.name,nombre:i.name,qty:i.qty,costo:i.costo||0}));
+    stockDescontarVenta(ventaItems,data.comprobante||venta.comprobante,null).catch(()=>{});
   })
   .catch(e => {
     console.warn('[Venta] Error Supabase, encolando:', e.message);
     if(db) dbQueueSync('ventas','insert', venta);
   });
+}
+
+
+// ── STOCK: descontar al vender, reponer al anular ──────────────────────
+async function stockDescontarVenta(items, comprobante, ventaId){
+  if(USAR_DEMO || !navigator.onLine) return;
+  const email    = localStorage.getItem(SK.email);
+  const depId    = parseInt(localStorage.getItem('pos_deposito_id'))  || null;
+  const sucId    = parseInt(localStorage.getItem('pos_sucursal_id'))  || null;
+  const terminal = licGetTerminal();
+  if(!depId || !email) return;
+
+  const itemsStock = (items||[]).filter(i => i.id && !isNaN(i.id) && (i.qty||0) > 0);
+  if(!itemsStock.length) return;
+
+  let licId = parseInt(localStorage.getItem('pos_licencia_id')||'0');
+  if(!licId){
+    try{
+      const r = await fetch(SUPA_URL+'/rest/v1/licencias?email_cliente=ilike.'+encodeURIComponent(email)+'&activa=eq.true&select=id&limit=1',
+        {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}});
+      const d = await r.json();
+      if(d&&d[0]){ licId=d[0].id; localStorage.setItem('pos_licencia_id', licId); }
+    }catch(e){ console.warn('[Stock] licencia_id:', e.message); return; }
+  }
+  if(!licId) return;
+
+  try{
+    // Leer stock actual de los productos involucrados
+    const prodIds = itemsStock.map(i=>i.id);
+    const r = await fetch(
+      SUPA_URL+'/rest/v1/stock?deposito_id=eq.'+depId+'&producto_id=in.('+prodIds.join(',')+')'
+      +'&licencia_id=eq.'+licId+'&select=id,producto_id,cantidad',
+      {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}}
+    );
+    const stockActual = r.ok ? await r.json() : [];
+    const stockMap = {};
+    stockActual.forEach(s => stockMap[s.producto_id] = s);
+
+    // 1. Crear comprobante encabezado
+    const compResp = await fetch(SUPA_URL+'/rest/v1/stock_comprobantes', {
+      method: 'POST',
+      headers: {'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+        'Content-Type':'application/json','Prefer':'return=representation'},
+      body: JSON.stringify({
+        licencia_id: licId, deposito_id: depId, sucursal_id: sucId,
+        tipo: 'venta', referencia: comprobante||('V-'+(ventaId||Date.now())),
+        venta_id: ventaId||null, terminal, usuario: email,
+        fecha: new Date().toISOString()
+      })
+    });
+    if(!compResp.ok) throw new Error(await compResp.text());
+    const compData = await compResp.json();
+    const compId = Array.isArray(compData) ? compData[0]?.id : compData?.id;
+    if(!compId) throw new Error('No se obtuvo comprobante_id');
+
+    // 2. Armar ítems + actualizaciones de stock
+    const itemsToInsert = [];
+    for(const item of itemsStock){
+      const sk    = stockMap[item.id];
+      const antes = sk ? (sk.cantidad||0) : 0;
+      const desp  = antes - (item.qty||0);
+      itemsToInsert.push({
+        comprobante_id: compId, producto_id: item.id,
+        nombre_producto: item.name||item.nombre||'',
+        cantidad: -(item.qty||0),
+        cantidad_antes: antes, cantidad_despues: desp,
+        costo_unitario: item.costo||0
+      });
+      // Upsert stock (fire and forget)
+      fetch(SUPA_URL+'/rest/v1/stock?on_conflict=deposito_id,producto_id', {
+        method:'POST',
+        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+          'Content-Type':'application/json',
+          'Prefer':'resolution=merge-duplicates,return=minimal'},
+        body: JSON.stringify({
+          deposito_id: depId, sucursal_id: sucId, licencia_id: licId,
+          producto_id: item.id, nombre_producto: item.name||item.nombre||'',
+          cantidad: desp, updated_at: new Date().toISOString()
+        })
+      }).catch(e=>console.warn('[Stock] upsert:', e.message));
+    }
+
+    // 3. Insertar ítems en bloque
+    await fetch(SUPA_URL+'/rest/v1/stock_comprobante_items', {
+      method:'POST',
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+        'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify(itemsToInsert)
+    });
+
+    console.log('[Stock] Venta descontada — comp', compId, '| prods:', itemsToInsert.length);
+  } catch(e){
+    console.warn('[Stock] Error descontar:', e.message);
+  }
+}
+
+async function stockReponerAnulacion(venta){
+  if(USAR_DEMO || !navigator.onLine) return;
+  const email    = localStorage.getItem(SK.email);
+  const depId    = parseInt(localStorage.getItem('pos_deposito_id'))  || null;
+  const sucId    = parseInt(localStorage.getItem('pos_sucursal_id'))  || null;
+  const terminal = licGetTerminal();
+  if(!depId || !email) return;
+
+  let items = [];
+  try{ items = typeof venta.items==='string' ? JSON.parse(venta.items) : (venta.items||[]); }catch(e){}
+  const itemsStock = items.filter(i => i.id && !isNaN(i.id) && (i.qty||0) > 0);
+  if(!itemsStock.length) return;
+
+  let licId = parseInt(localStorage.getItem('pos_licencia_id')||'0');
+  if(!licId) return;
+
+  try{
+    const prodIds = itemsStock.map(i=>i.id);
+    const r = await fetch(
+      SUPA_URL+'/rest/v1/stock?deposito_id=eq.'+depId+'&producto_id=in.('+prodIds.join(',')+')'
+      +'&licencia_id=eq.'+licId+'&select=id,producto_id,cantidad',
+      {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}}
+    );
+    const stockActual = r.ok ? await r.json() : [];
+    const stockMap = {};
+    stockActual.forEach(s => stockMap[s.producto_id] = s);
+
+    // Comprobante anulación
+    const compResp = await fetch(SUPA_URL+'/rest/v1/stock_comprobantes', {
+      method:'POST',
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+        'Content-Type':'application/json','Prefer':'return=representation'},
+      body: JSON.stringify({
+        licencia_id: licId, deposito_id: depId, sucursal_id: sucId,
+        tipo: 'anulacion', referencia: venta.comprobante||('ANU-'+venta.id),
+        venta_id: venta.id||null, terminal, usuario: email,
+        observacion: 'Anulación de venta',
+        fecha: new Date().toISOString()
+      })
+    });
+    if(!compResp.ok) throw new Error(await compResp.text());
+    const compData = await compResp.json();
+    const compId = Array.isArray(compData) ? compData[0]?.id : compData?.id;
+    if(!compId) throw new Error('No se obtuvo comprobante_id');
+
+    const itemsToInsert = [];
+    for(const item of itemsStock){
+      const sk    = stockMap[item.id];
+      const antes = sk ? (sk.cantidad||0) : 0;
+      const desp  = antes + (item.qty||0);
+      itemsToInsert.push({
+        comprobante_id: compId, producto_id: item.id,
+        nombre_producto: item.nombre||item.name||'',
+        cantidad: +(item.qty||0),
+        cantidad_antes: antes, cantidad_despues: desp,
+        costo_unitario: 0
+      });
+      fetch(SUPA_URL+'/rest/v1/stock?on_conflict=deposito_id,producto_id', {
+        method:'POST',
+        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+          'Content-Type':'application/json',
+          'Prefer':'resolution=merge-duplicates,return=minimal'},
+        body: JSON.stringify({
+          deposito_id: depId, sucursal_id: sucId, licencia_id: licId,
+          producto_id: item.id, nombre_producto: item.nombre||item.name||'',
+          cantidad: desp, updated_at: new Date().toISOString()
+        })
+      }).catch(e=>console.warn('[Stock] reposición:', e.message));
+    }
+
+    await fetch(SUPA_URL+'/rest/v1/stock_comprobante_items', {
+      method:'POST',
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+        'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify(itemsToInsert)
+    });
+
+    console.log('[Stock] Reposición anulación — comp', compId, '| prods:', itemsToInsert.length);
+  } catch(e){
+    console.warn('[Stock] Error reponer:', e.message);
+  }
 }
 
 // Sincronizar ventas pendientes de la cola
@@ -8761,6 +8941,7 @@ async function anularVentaConfirmar(id){
 
     const msgFac = venta.tiene_factura ? ' · Factura anulada' : '';
     toast('Venta anulada' + msgFac);
+    stockReponerAnulacion(venta).catch(()=>{});
     await renderVentasList();
 
     // 4. Si el turno está visible, refrescarlo también
