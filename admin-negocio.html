@@ -372,7 +372,7 @@ const SUPA_URL  = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
 const SUPA_ANON = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 const TIM_KEY   = 'pos_timbrados';
 
-let SE=null, SP=null, SV=null, curPage='dashboard';
+let SE=null, SP=null, SV=null, SLI=null, curPage='dashboard';
 let filtroD='hoy', filtroV='hoy', filtroCj='todas';
 let allVP=[], allPrds=[], allCjs=[];
 let timbrados=[], timEditIdx=null;
@@ -477,17 +477,11 @@ async function doLogin(){
 
   try{
     var lic = null;
-
-    // Buscar directamente con los nombres reales de columnas de la tabla licencias
     var rows = await sg('licencias',
-      'email_cliente=ilike.'+encodeURIComponent(email)+
-      '&clave=eq.'+encodeURIComponent(clave)+
-      '&activa=eq.true'+
-      '&select=*'
+      'email_cliente=ilike.'+encodeURIComponent(email)+'&clave=eq.'+encodeURIComponent(clave)+'&activa=eq.true&select=id,plan_id,fecha_vence'
     );
-
     if(rows && rows.length > 0){
-      lic = { plan: rows[0]['plan_id']||'Pro', vence: rows[0]['fecha_vence']||'—' };
+      lic = { id: rows[0]['id'], plan: rows[0]['plan_id']||'Pro', vence: rows[0]['fecha_vence']||'—' };
     }
 
     // Si no encontramos nada, intentar con la RPC como fallback
@@ -518,8 +512,8 @@ async function doLogin(){
     }
 
     // Login exitoso
-    SE=email; SP=lic.plan; SV=lic.vence;
-    localStorage.setItem('ae',SE); localStorage.setItem('ap',SP); localStorage.setItem('av',SV);
+    SE=email; SP=lic.plan; SV=lic.vence; SLI=lic.id||null;
+    localStorage.setItem('ae',SE); localStorage.setItem('ap',SP); localStorage.setItem('av',SV); if(SLI) localStorage.setItem('ali',SLI);
     showApp();
 
   }catch(e){
@@ -701,45 +695,17 @@ function renderCajasData(){
   if(document.getElementById('cjA')) document.getElementById('cjA').textContent=allCjs.filter(function(c){return c.estado==='abierto';}).length;
   if(document.getElementById('cjC')) document.getElementById('cjC').textContent=allCjs.filter(function(c){return c.estado==='cerrado'&&(c.fecha_cierre||'').startsWith(fd);}).length;
   if(document.getElementById('cjT')) document.getElementById('cjT').textContent=gs(allCjs.filter(function(c){return (c.fecha_apertura||'').startsWith(fd);}).reduce(function(s,c){return s+(c.total_vendido||0);},0));
-  if(!l.length){document.getElementById('cajasBody').innerHTML='<div class="empty"><div class="empty-i">\uD83D\uDDC3\uFE0F</div><div class="empty-t">Sin cajas</div><div class="empty-s">No hay turnos registrados</div></div>';return;}
+  if(!l.length){document.getElementById('cajasBody').innerHTML='<div class="empty"><div class="empty-i">\U0001F5C3\uFE0F</div><div class="empty-t">Sin cajas</div><div class="empty-s">No hay turnos registrados</div></div>';return;}
   document.getElementById('cajasBody').innerHTML=l.map(function(c,i){
     var ab=c.estado==='abierto';
-    // Calcular duracion del turno
     var durTxt='';
-    if(c.fecha_apertura&&c.fecha_cierre){
-      var ms=new Date(c.fecha_cierre)-new Date(c.fecha_apertura);
-      var hh=Math.floor(ms/3600000),mm=Math.floor((ms%3600000)/60000);
-      durTxt=hh+'h '+mm+'m';
-    } else if(c.fecha_apertura&&ab){
-      var ms2=Date.now()-new Date(c.fecha_apertura);
-      var hh2=Math.floor(ms2/3600000),mm2=Math.floor((ms2%3600000)/60000);
-      durTxt=hh2+'h '+mm2+'m (en curso)';
-    }
-    // Metodos de pago desde resumen_pagos o campos individuales
+    if(c.fecha_apertura&&c.fecha_cierre){var ms=new Date(c.fecha_cierre)-new Date(c.fecha_apertura);durTxt=Math.floor(ms/3600000)+'h '+Math.floor((ms%3600000)/60000)+'m';}
+    else if(c.fecha_apertura&&ab){var ms2=Date.now()-new Date(c.fecha_apertura);durTxt=Math.floor(ms2/3600000)+'h '+Math.floor((ms2%3600000)/60000)+'m (en curso)';}
     var pagos='';
-    if(c.resumen_pagos){
-      try{
-        var rp=typeof c.resumen_pagos==='string'?JSON.parse(c.resumen_pagos):c.resumen_pagos;
-        pagos=Object.keys(rp).map(function(k){
-          return '<div class="cj-dr"><span style="color:var(--muted)">'+k+'</span><span style="font-weight:600">'+gs(rp[k])+'</span></div>';
-        }).join('');
-      }catch(e2){pagos='';}
-    }
-    if(!pagos){
-      if(c.total_efectivo!=null) pagos+='<div class="cj-dr"><span style="color:var(--muted)">Efectivo cobrado</span><span style="font-weight:600">'+gs(c.total_efectivo)+'</span></div>';
-      if(c.total_tarjeta!=null)  pagos+='<div class="cj-dr"><span style="color:var(--muted)">Tarjeta / POS</span><span style="font-weight:600">'+gs(c.total_tarjeta)+'</span></div>';
-      if(c.total_transfer!=null) pagos+='<div class="cj-dr"><span style="color:var(--muted)">Transferencia</span><span style="font-weight:600">'+gs(c.total_transfer)+'</span></div>';
-    }
-    // Diferencia de caja
+    if(c.resumen_pagos){try{var rp=typeof c.resumen_pagos==='string'?JSON.parse(c.resumen_pagos):c.resumen_pagos;pagos=Object.keys(rp).map(function(k){return '<div class="cj-dr"><span style="color:var(--muted)">'+k+'</span><span style="font-weight:600">'+gs(rp[k])+'</span></div>';}).join('');}catch(ex){}}
+    if(!pagos){if(c.total_efectivo!=null)pagos+='<div class="cj-dr"><span style="color:var(--muted)">Efectivo</span><span style="font-weight:600">'+gs(c.total_efectivo)+'</span></div>';if(c.total_tarjeta!=null)pagos+='<div class="cj-dr"><span style="color:var(--muted)">Tarjeta/POS</span><span style="font-weight:600">'+gs(c.total_tarjeta)+'</span></div>';if(c.total_transfer!=null)pagos+='<div class="cj-dr"><span style="color:var(--muted)">Transferencia</span><span style="font-weight:600">'+gs(c.total_transfer)+'</span></div>';}
     var difHTML='';
-    if(!ab&&c.efectivo_inicial!=null&&c.total_efectivo!=null&&c.efectivo_cierre!=null){
-      var esperado=(c.efectivo_inicial||0)+(c.total_efectivo||0);
-      var dif=(c.efectivo_cierre||0)-esperado;
-      var difColor=dif===0?'var(--muted)':dif>0?'var(--green)':'var(--red)';
-      difHTML='<div class="cj-dr"><span style="color:var(--muted)">Efectivo esperado</span><span style="font-weight:600">'+gs(esperado)+'</span></div>'
-             +'<div class="cj-dr"><span style="color:var(--muted)">Efectivo al cierre</span><span style="font-weight:600">'+gs(c.efectivo_cierre)+'</span></div>'
-             +'<div class="cj-dr"><span style="color:var(--muted)">Diferencia</span><span style="font-weight:700;color:'+difColor+'">'+(dif>=0?'+':'')+gs(dif)+'</span></div>';
-    }
+    if(!ab&&c.efectivo_inicial!=null&&c.total_efectivo!=null&&c.efectivo_cierre!=null){var esp=(c.efectivo_inicial||0)+(c.total_efectivo||0),dif=(c.efectivo_cierre||0)-esp,dc=dif===0?'var(--muted)':dif>0?'var(--green)':'var(--red)';difHTML='<div class="cj-dr"><span style="color:var(--muted)">Esperado</span><span>'+gs(esp)+'</span></div><div class="cj-dr"><span style="color:var(--muted)">Al cierre</span><span>'+gs(c.efectivo_cierre)+'</span></div><div class="cj-dr"><span style="color:var(--muted)">Diferencia</span><span style="font-weight:700;color:'+dc+'">'+(dif>=0?'+':'')+gs(dif)+'</span></div>';}
     return '<div class="cj '+(ab?'op':'cl')+'">'
       +'<div class="cj-h" onclick="togCj('+i+')">'
         +'<div style="width:40px;height:40px;border-radius:10px;background:'+(ab?'var(--g2)':'var(--card2)')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'
@@ -747,22 +713,17 @@ function renderCajasData(){
         +'</div>'
         +'<div class="cj-info">'
           +'<div class="cj-tit">'+(c.terminal||'Terminal')+(c.sucursal?' &nbsp;<span style="color:var(--muted);font-size:12px;font-weight:400">'+c.sucursal+'</span>':'')+'</div>'
-          +'<div class="cj-meta" style="margin-top:3px">'
-            +(ab
-              ?'<span style="color:var(--green)">● Abierta</span> · Desde '+fmtDT(c.fecha_apertura)+(durTxt?' · '+durTxt:'')
-              :'Cerrada '+fmtDT(c.fecha_cierre)+(durTxt?' · Duración: '+durTxt:''))
-          +'</div>'
-          +(c.nombre_operador?'<div style="font-size:11px;color:var(--muted);margin-top:2px">Operador: '+c.nombre_operador+'</div>':'')
+          +'<div class="cj-meta" style="margin-top:3px">'+(ab?'<span style="color:var(--green)">\u25CF Abierta</span> \u00b7 Desde '+fmtDT(c.fecha_apertura)+(durTxt?' \u00b7 '+durTxt:''):'Cerrada '+fmtDT(c.fecha_cierre)+(durTxt?' \u00b7 '+durTxt:''))+'</div>'
+          +(c.nombre_operador?'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+c.nombre_operador+'</div>':'')
         +'</div>'
         +'<div style="text-align:right;flex-shrink:0">'
           +'<div style="font-size:18px;font-weight:800;color:var(--green)">'+gs(c.total_vendido||0)+'</div>'
-          +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+(c.total_operaciones||c.cantidad_ventas||0)+' ventas</div>'
+          +'<div style="font-size:11px;color:var(--muted)">'+(c.total_operaciones||c.cantidad_ventas||0)+' ventas</div>'
           +'<span class="tag '+(ab?'tag-g':'tag-gr')+'" style="margin-top:4px">'+(ab?'ABIERTA':'CERRADA')+'</span>'
         +'</div>'
       +'</div>'
       +'<div class="cj-b" id="cjB'+i+'">'
-        // SECCIÓN: Apertura / Cierre
-        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 6px">'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 10px">'
           +'<div style="background:var(--card2);border-radius:8px;padding:12px">'
             +'<div style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Apertura</div>'
             +'<div class="cj-dr"><span style="color:var(--muted)">Fecha/Hora</span><span>'+fmtDT(c.fecha_apertura)+'</span></div>'
@@ -770,29 +731,20 @@ function renderCajasData(){
             +(c.nombre_operador?'<div class="cj-dr"><span style="color:var(--muted)">Operador</span><span>'+c.nombre_operador+'</span></div>':'')
           +'</div>'
           +'<div style="background:var(--card2);border-radius:8px;padding:12px">'
-            +'<div style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">'+(ab?'Estado actual':'Cierre')+'</div>'
-            +(ab
-              ?'<div class="cj-dr"><span style="color:var(--muted)">Tiempo abierta</span><span style="color:var(--green)">'+durTxt+'</span></div>'
-               +'<div class="cj-dr"><span style="color:var(--muted)">Estado</span><span style="color:var(--green);font-weight:700">En curso</span></div>'
-              :'<div class="cj-dr"><span style="color:var(--muted)">Fecha/Hora</span><span>'+fmtDT(c.fecha_cierre)+'</span></div>'
-               +'<div class="cj-dr"><span style="color:var(--muted)">Duración</span><span>'+durTxt+'</span></div>'
-            )
+            +'<div style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">'+(ab?'En curso':'Cierre')+'</div>'
+            +(ab?'<div class="cj-dr"><span style="color:var(--muted)">Tiempo</span><span style="color:var(--green)">'+durTxt+'</span></div><div class="cj-dr"><span style="color:var(--muted)">Estado</span><span style="color:var(--green);font-weight:700">Activa</span></div>':'<div class="cj-dr"><span style="color:var(--muted)">Fecha/Hora</span><span>'+fmtDT(c.fecha_cierre)+'</span></div><div class="cj-dr"><span style="color:var(--muted)">Duraci\u00f3n</span><span>'+durTxt+'</span></div>')
           +'</div>'
         +'</div>'
-        // SECCIÓN: Resumen de ventas
         +'<div style="background:var(--card2);border-radius:8px;padding:12px;margin-bottom:10px">'
-          +'<div style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Resumen de ventas</div>'
-          +'<div class="cj-dr"><span style="color:var(--muted)">Total vendido</span><span style="color:var(--green);font-weight:800;font-size:16px">'+gs(c.total_vendido||0)+'</span></div>'
-          +'<div class="cj-dr"><span style="color:var(--muted)">Cantidad de ventas</span><span style="font-weight:700">'+(c.total_operaciones||c.cantidad_ventas||0)+' ops</span></div>'
-          +((c.total_operaciones||c.cantidad_ventas)&&(c.total_vendido)?'<div class="cj-dr"><span style="color:var(--muted)">Ticket promedio</span><span style="font-weight:600">'+gs(Math.round((c.total_vendido||0)/((c.total_operaciones||c.cantidad_ventas)||1)))+'</span></div>':'')
+          +'<div style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Resumen</div>'
+          +'<div class="cj-dr"><span style="color:var(--muted)">Total vendido</span><span style="color:var(--green);font-weight:800;font-size:15px">'+gs(c.total_vendido||0)+'</span></div>'
+          +'<div class="cj-dr"><span style="color:var(--muted)">Cantidad ventas</span><span style="font-weight:700">'+(c.total_operaciones||c.cantidad_ventas||0)+' ops</span></div>'
+          +((c.total_operaciones||c.cantidad_ventas)&&c.total_vendido?'<div class="cj-dr"><span style="color:var(--muted)">Ticket prom.</span><span>'+gs(Math.round((c.total_vendido||0)/((c.total_operaciones||c.cantidad_ventas)||1)))+'</span></div>':'')
           +(c.total_descuentos?'<div class="cj-dr"><span style="color:var(--muted)">Descuentos</span><span style="color:var(--red)">-'+gs(c.total_descuentos)+'</span></div>':'')
         +'</div>'
-        // SECCIÓN: Métodos de pago
-        +(pagos?'<div style="background:var(--card2);border-radius:8px;padding:12px;margin-bottom:10px"><div style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Métodos de pago</div>'+pagos+'</div>':'')
-        // SECCIÓN: Diferencia de caja (solo cajas cerradas)
+        +(pagos?'<div style="background:var(--card2);border-radius:8px;padding:12px;margin-bottom:10px"><div style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">M\u00e9todos de pago</div>'+pagos+'</div>':'')
         +(difHTML?'<div style="background:var(--card2);border-radius:8px;padding:12px;margin-bottom:10px"><div style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Control de efectivo</div>'+difHTML+'</div>':'')
-        // SECCIÓN: Notas de cierre
-        +(c.notas_cierre?'<div style="background:var(--card2);border-radius:8px;padding:12px;margin-bottom:10px"><div style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">Notas de cierre</div><div style="font-size:13px;color:var(--text2)">'+c.notas_cierre+'</div></div>':'')
+        +(c.notas_cierre?'<div style="background:var(--card2);border-radius:8px;padding:12px;margin-bottom:10px"><div style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">Notas</div><div style="font-size:13px;color:var(--text2)">'+c.notas_cierre+'</div></div>':'')
       +'</div>'
     +'</div>';
   }).join('');
@@ -820,84 +772,530 @@ function filtrP(q){if(!allPrds.length) return;var f=q.toLowerCase();renderPT(!q?
 
 
 // ── INVENTARIOS ───────────────────────────────────────────
+// Tablas usadas: sucursales, depositos, stock, stock_movimientos
+// licencia_id se resuelve via SE (email) → licencias.email_cliente
+var _inv = {
+  licId: null, prds: [], deps: [], suc: [],
+  sel: { depId:null, depNom:'', sucId:null, sucNom:'' },
+  prodActivo: null
+};
+
+// Obtener licencia_id a partir del email de sesión
+async function invGetLicId(){
+  if(_inv.licId) return _inv.licId;
+  var rows = await sg('licencias','email_cliente=ilike.'+encodeURIComponent(SE)+'&select=id&limit=1');
+  if(!rows||!rows.length) throw new Error('No se encontró licencia para '+SE);
+  _inv.licId = rows[0].id;
+  return _inv.licId;
+}
+
 async function renderInventarios(){
   var c=document.getElementById('content');
-  c.innerHTML='<div class="ph"><div><div class="pt">Inventarios</div><div class="ps">Stock y movimientos de productos</div></div>'
-    +'<div class="dbar"><input class="d-inp" id="invSearch" placeholder="Buscar producto..." oninput="filtrInv(this.value)" style="min-width:200px"></div></div>'
-    +'<div class="kg k3">'
-      +'<div class="kc" style="--c:var(--blue)"><div class="kc-l">Total productos</div><div class="kc-v" id="invTotal">—</div></div>'
-      +'<div class="kc" style="--c:var(--orange)"><div class="kc-l">Stock bajo</div><div class="kc-v" id="invBajo">—</div></div>'
-      +'<div class="kc" style="--c:var(--red)"><div class="kc-l">Sin stock</div><div class="kc-v" id="invCero">—</div></div>'
-    +'</div>'
-    +'<div class="card"><div class="card-h"><span class="card-t" id="invCount">—</span></div>'
-    +'<table><thead><tr>'
-      +'<th>Producto</th><th>Categoría</th><th style="text-align:center">Stock actual</th>'
-      +'<th style="text-align:center">Stock mínimo</th><th style="text-align:center">Estado</th>'
-      +'<th style="text-align:right">Precio</th>'
-    +'</tr></thead><tbody id="invBody"><tr><td colspan="6" class="loading"><span class="sp"></span></td></tr></tbody></table></div>';
-
+  c.innerHTML='<div class="loading"><span class="sp"></span>Cargando inventarios...</div>';
   try{
-    var prds=await sg('pos_productos','licencia_email=ilike.'+encodeURIComponent(SE)+'&activo=eq.true&order=nombre.asc&limit=500');
-    window._invPrds=prds;
-    renderInvTable(prds);
+    var licId = await invGetLicId();
+    // Cargar sucursales + depósitos en paralelo
+    var [sucs, deps] = await Promise.all([
+      sg('sucursales','licencia_id=eq.'+licId+'&activa=eq.true&order=nombre.asc'),
+      sg('depositos','licencia_id=eq.'+licId+'&activo=eq.true&order=nombre.asc')
+    ]);
+    _inv.suc = sucs; _inv.deps = deps;
+    // Depósito por defecto: el primero
+    if(!_inv.sel.depId && deps.length){
+      _inv.sel.depId  = deps[0].id;
+      _inv.sel.depNom = deps[0].nombre;
+      _inv.sel.sucId  = deps[0].sucursal_id;
+      var s = sucs.find(function(x){return x.id===deps[0].sucursal_id;});
+      _inv.sel.sucNom = s?s.nombre:'';
+    }
+    renderInvShell();
+    await cargarStockDeposito();
   }catch(e){
-    document.getElementById('invBody').innerHTML='<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">Error al cargar productos: '+e.message+'</td></tr>';
+    document.getElementById('content').innerHTML='<div style="padding:24px;color:var(--red)">Error: '+e.message+'</div>';
   }
 }
 
-function renderInvTable(prds){
-  if(!document.getElementById('invBody')) return;
-  var total=prds.length;
-  var bajo=prds.filter(function(p){var s=p.stock!=null?p.stock:null;var m=p.stock_minimo||p.min_stock||0;return s!=null&&s>0&&s<=m;}).length;
-  var cero=prds.filter(function(p){return p.stock!=null&&p.stock<=0;}).length;
-  if(document.getElementById('invTotal')) document.getElementById('invTotal').textContent=total;
-  if(document.getElementById('invBajo'))  document.getElementById('invBajo').textContent=bajo;
-  if(document.getElementById('invCero'))  document.getElementById('invCero').textContent=cero;
-  if(document.getElementById('invCount')) document.getElementById('invCount').textContent=total+' productos';
+function renderInvShell(){
+  var deps=_inv.deps, sucs=_inv.suc;
+  // Construir selector de depósitos agrupado por sucursal
+  var selOpts='';
+  sucs.forEach(function(s){
+    var dds=deps.filter(function(d){return d.sucursal_id===s.id;});
+    if(!dds.length) return;
+    selOpts+='<optgroup label="'+s.nombre+'">';
+    dds.forEach(function(d){
+      selOpts+='<option value="'+d.id+'" '+(d.id===_inv.sel.depId?'selected':'')+'>'+d.nombre+(d.es_principal?' ★':'')+'</option>';
+    });
+    selOpts+='</optgroup>';
+  });
 
-  if(!prds.length){
-    document.getElementById('invBody').innerHTML='<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">Sin productos en inventario</td></tr>';
+  var c=document.getElementById('content');
+  c.innerHTML=
+    '<div class="ph">'
+      +'<div><div class="pt">Inventarios</div>'
+        +'<div class="ps" id="invDepLabel">Depósito: <strong>'+(_inv.sel.sucNom?_inv.sel.sucNom+' › ':'')+_inv.sel.depNom+'</strong></div>'
+      +'</div>'
+      +'<div class="dbar">'
+        +(selOpts?'<select class="d-inp" id="invDepSel" onchange="cambiarDeposito(this)">'
+          +(deps.length?selOpts:'<option>Sin depósitos</option>')
+          +'</select>':'')
+        +'<input class="d-inp" id="invSearch" placeholder="Buscar producto..." oninput="filtrInv(this.value)" style="min-width:160px">'
+        +'<select class="d-inp" id="invFiltroEst" onchange="filtrInv(document.getElementById(\'invSearch\').value)">'
+          +'<option value="">Todos</option>'
+          +'<option value="ok">Stock OK</option>'
+          +'<option value="bajo">Stock bajo</option>'
+          +'<option value="cero">Sin stock</option>'
+        +'</select>'
+      +'</div>'
+    +'</div>'
+    +'<div class="kg k3">'
+      +'<div class="kc" style="--c:var(--blue)"><div class="kc-l">Productos</div><div class="kc-v" id="invKTotal">—</div></div>'
+      +'<div class="kc" style="--c:var(--orange)"><div class="kc-l">Stock bajo</div><div class="kc-v" id="invKBajo">—</div></div>'
+      +'<div class="kc" style="--c:var(--red)"><div class="kc-l">Sin stock</div><div class="kc-v" id="invKCero">—</div></div>'
+    +'</div>'
+    +'<div class="card">'
+      +'<div class="card-h"><span class="card-t" id="invCount">Cargando...</span>'
+        +'<button onclick="abrirTransferencia()" style="background:var(--o2);border:1px solid var(--orange);border-radius:6px;color:var(--orange);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer">'
+          +'⇄ Transferir stock</button>'
+      +'</div>'
+      +'<div style="overflow-x:auto"><table><thead><tr>'
+        +'<th>Producto</th><th>Categoría</th>'
+        +'<th style="text-align:center">Stock</th>'
+        +'<th style="text-align:center">Mínimo</th>'
+        +'<th style="text-align:center">Costo unit.</th>'
+        +'<th style="text-align:center">Estado</th>'
+        +'<th style="text-align:center"></th>'
+      +'</tr></thead>'
+      +'<tbody id="invBody"><tr><td colspan="7" class="loading"><span class="sp"></span></td></tr></tbody>'
+      +'</table></div>'
+    +'</div>'
+
+    // ── MODAL HISTORIAL ──────────────────────────────────────
+    +'<div id="invModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:1000;overflow-y:auto;padding:16px 10px">'
+      +'<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;max-width:720px;margin:0 auto;overflow:hidden">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)">'
+          +'<div><div style="font-size:17px;font-weight:800" id="invMTit">Historial</div>'
+            +'<div style="font-size:12px;color:var(--muted);margin-top:2px" id="invMSub"></div></div>'
+          +'<button onclick="cerrarInvModal()" style="background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;padding:8px 14px;font-family:Barlow,sans-serif;font-size:13px;font-weight:700">✕ Cerrar</button>'
+        +'</div>'
+        // Filtros fecha
+        +'<div style="display:flex;gap:8px;align-items:center;padding:12px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap">'
+          +'<label style="font-size:12px;color:var(--muted)">Desde</label>'
+          +'<input type="date" id="invFD" class="d-inp">'
+          +'<label style="font-size:12px;color:var(--muted)">Hasta</label>'
+          +'<input type="date" id="invFH" class="d-inp">'
+          +'<button onclick="cargarHistorial()" class="btn-sv" style="padding:8px 14px">Filtrar</button>'
+          +'<button onclick="abrirAjuste()" style="background:var(--b2);border:1px solid var(--blue);border-radius:6px;color:var(--blue);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:8px 14px;cursor:pointer;margin-left:auto">+ Ajuste manual</button>'
+        +'</div>'
+        // KPIs
+        +'<div style="display:flex;gap:24px;padding:14px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap">'
+          +'<div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:4px">Stock actual</div>'
+            +'<div style="font-size:24px;font-weight:800;color:var(--green)" id="invMStock">—</div></div>'
+          +'<div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:4px">Entradas (período)</div>'
+            +'<div style="font-size:24px;font-weight:800;color:var(--blue)" id="invMEnt">—</div></div>'
+          +'<div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:4px">Salidas (período)</div>'
+            +'<div style="font-size:24px;font-weight:800;color:var(--red)" id="invMSal">—</div></div>'
+          +'<div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:4px">Depósito</div>'
+            +'<div style="font-size:13px;font-weight:700;color:var(--text);padding-top:6px" id="invMDep">—</div></div>'
+        +'</div>'
+        // Formulario ajuste
+        +'<div id="invAjusteForm" style="display:none;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--card2)">'
+          +'<div style="font-size:13px;font-weight:800;margin-bottom:12px">Nuevo ajuste de stock</div>'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+            +'<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Tipo</label>'
+              +'<select id="ajTipo" class="cfg-inp" style="width:100%">'
+                +'<option value="entrada">Entrada — aumenta stock</option>'
+                +'<option value="salida">Salida — disminuye stock</option>'
+                +'<option value="ajuste">Ajuste — fija el stock en</option>'
+              +'</select></div>'
+            +'<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Cantidad</label>'
+              +'<input type="number" id="ajCant" class="cfg-inp" style="width:100%" min="0" placeholder="0"></div>'
+          +'</div>'
+          +'<div style="margin-bottom:12px"><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Motivo (obligatorio)</label>'
+            +'<input type="text" id="ajMotivo" class="cfg-inp" style="width:100%" placeholder="Ej: Compra proveedor, merma, corrección..."></div>'
+          +'<div style="display:flex;gap:8px">'
+            +'<button onclick="guardarAjuste()" class="btn-sv">Guardar</button>'
+            +'<button onclick="document.getElementById(\'invAjusteForm\').style.display=\'none\'" class="btn-dn">Cancelar</button>'
+          +'</div>'
+        +'</div>'
+        // Tabla movimientos
+        +'<div style="overflow-x:auto">'
+          +'<table><thead><tr>'
+            +'<th>Fecha y hora</th><th>Tipo</th>'
+            +'<th style="text-align:center">Cant.</th>'
+            +'<th style="text-align:center">Antes</th>'
+            +'<th style="text-align:center">Después</th>'
+            +'<th>Referencia / Motivo</th>'
+            +'<th>Terminal</th>'
+          +'</tr></thead>'
+          +'<tbody id="invHistBody"><tr><td colspan="7" class="loading"><span class="sp"></span></td></tr></tbody>'
+          +'</table>'
+        +'</div>'
+        +'<div style="padding:12px 20px;font-size:11px;color:var(--muted)">Ventas y anulaciones se descuentan/reponen automáticamente. Ajustes manuales requieren motivo.</div>'
+      +'</div>'
+    +'</div>'
+
+    // ── MODAL TRANSFERENCIA ──────────────────────────────────
+    +'<div id="invTransModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:1001;overflow-y:auto;padding:16px 10px">'
+      +'<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;max-width:520px;margin:0 auto;overflow:hidden">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)">'
+          +'<div style="font-size:17px;font-weight:800">Transferir stock entre depósitos</div>'
+          +'<button onclick="cerrarTransModal()" style="background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;padding:8px 14px;font-family:Barlow,sans-serif;font-size:13px;font-weight:700">✕</button>'
+        +'</div>'
+        +'<div style="padding:20px">'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
+            +'<div><label style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:5px">Depósito origen</label>'
+              +'<select id="trOrigen" class="cfg-inp" style="width:100%" onchange="actualizarStockOrigen()"></select></div>'
+            +'<div><label style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:5px">Depósito destino</label>'
+              +'<select id="trDestino" class="cfg-inp" style="width:100%"></select></div>'
+          +'</div>'
+          +'<div style="margin-bottom:12px"><label style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:5px">Producto</label>'
+            +'<select id="trProducto" class="cfg-inp" style="width:100%" onchange="actualizarStockOrigen()"></select></div>'
+          +'<div style="background:var(--card2);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px">'
+            +'Stock disponible en origen: <strong id="trStockOrigen" style="color:var(--green)">—</strong>'
+          +'</div>'
+          +'<div style="margin-bottom:12px"><label style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:5px">Cantidad a transferir</label>'
+            +'<input type="number" id="trCant" class="cfg-inp" style="width:100%" min="1" placeholder="0"></div>'
+          +'<div style="margin-bottom:16px"><label style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:5px">Observación (opcional)</label>'
+            +'<input type="text" id="trObs" class="cfg-inp" style="width:100%" placeholder="Ej: Reposición sucursal norte..."></div>'
+          +'<div style="display:flex;gap:8px">'
+            +'<button onclick="ejecutarTransferencia()" class="btn-sv" style="flex:1">Transferir</button>'
+            +'<button onclick="cerrarTransModal()" class="btn-dn">Cancelar</button>'
+          +'</div>'
+        +'</div>'
+      +'</div>'
+    +'</div>';
+}
+
+async function cambiarDeposito(sel){
+  var depId=parseInt(sel.value);
+  var dep=_inv.deps.find(function(d){return d.id===depId;});
+  if(!dep) return;
+  _inv.sel.depId=dep.id; _inv.sel.depNom=dep.nombre; _inv.sel.sucId=dep.sucursal_id;
+  var s=_inv.suc.find(function(x){return x.id===dep.sucursal_id;});
+  _inv.sel.sucNom=s?s.nombre:'';
+  document.getElementById('invDepLabel').innerHTML='Depósito: <strong>'+(_inv.sel.sucNom?_inv.sel.sucNom+' › ':'')+_inv.sel.depNom+'</strong>';
+  await cargarStockDeposito();
+}
+
+async function cargarStockDeposito(){
+  if(!document.getElementById('invBody')) return;
+  document.getElementById('invBody').innerHTML='<tr><td colspan="7" class="loading"><span class="sp"></span>Cargando...</td></tr>';
+  try{
+    var rows=await sg('stock',
+      'deposito_id=eq.'+_inv.sel.depId+
+      '&licencia_id=eq.'+_inv.licId+
+      '&order=nombre_producto.asc&limit=1000'
+    );
+    _inv.prds=rows;
+    renderInvTabla(rows);
+  }catch(e){
+    document.getElementById('invBody').innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--red)">Error: '+e.message+'</td></tr>';
+  }
+}
+
+function renderInvTabla(lista){
+  if(!document.getElementById('invBody')) return;
+  var filtroEst=document.getElementById('invFiltroEst')?document.getElementById('invFiltroEst').value:'';
+  var mostrar=lista;
+  if(filtroEst==='ok')   mostrar=lista.filter(function(r){return (r.cantidad||0)>(r.cantidad_minima||0);});
+  if(filtroEst==='bajo') mostrar=lista.filter(function(r){var m=r.cantidad_minima||0;return m>0&&(r.cantidad||0)>0&&(r.cantidad||0)<=m;});
+  if(filtroEst==='cero') mostrar=lista.filter(function(r){return (r.cantidad||0)<=0;});
+
+  var bajo=lista.filter(function(r){var m=r.cantidad_minima||0;return m>0&&(r.cantidad||0)>0&&(r.cantidad||0)<=m;}).length;
+  var cero=lista.filter(function(r){return (r.cantidad||0)<=0;}).length;
+  if(document.getElementById('invKTotal')) document.getElementById('invKTotal').textContent=lista.length;
+  if(document.getElementById('invKBajo'))  document.getElementById('invKBajo').textContent=bajo;
+  if(document.getElementById('invKCero'))  document.getElementById('invKCero').textContent=cero;
+  if(document.getElementById('invCount'))  document.getElementById('invCount').textContent=mostrar.length+' productos';
+
+  if(!mostrar.length){
+    document.getElementById('invBody').innerHTML='<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted)">'
+      +(lista.length===0
+        ?'No hay productos cargados en este depósito. Usá "Ajuste manual" para cargar stock inicial.'
+        :'Sin productos con este filtro')
+      +'</td></tr>';
     return;
   }
-  document.getElementById('invBody').innerHTML=prds.map(function(p){
-    var stock=p.stock!=null?p.stock:null;
-    var min=p.stock_minimo||p.min_stock||0;
-    var noCtrl=stock==null;
-    var statusTag,statusColor;
-    if(noCtrl){
-      statusTag='SIN CONTROL'; statusColor='tag-gr';
-    } else if(stock<=0){
-      statusTag='SIN STOCK'; statusColor='tag-r';
-    } else if(min>0&&stock<=min){
-      statusTag='STOCK BAJO'; statusColor='tag-o';
-    } else {
-      statusTag='OK'; statusColor='tag-g';
-    }
+  document.getElementById('invBody').innerHTML=mostrar.map(function(r){
+    var q=r.cantidad||0, m=r.cantidad_minima||0;
+    var stag,scol;
+    if(q<=0){stag='SIN STOCK';scol='tag-r';}
+    else if(m>0&&q<=m){stag='BAJO';scol='tag-o';}
+    else{stag='OK';scol='tag-g';}
     return '<tr>'
-      +'<td><div style="display:flex;align-items:center;gap:8px">'
-        +'<div style="width:28px;height:28px;border-radius:6px;background:'+(p.color||'#546e7a')+';flex-shrink:0"></div>'
-        +'<div><div style="font-weight:600">'+p.nombre+'</div>'
-        +(p.codigo_barras?'<div style="font-size:11px;color:var(--muted)">'+p.codigo_barras+'</div>':'')
-        +'</div>'
-      +'</div></td>'
-      +'<td style="color:var(--muted)">'+(p.categoria||'—')+'</td>'
-      +'<td style="text-align:center;font-weight:700;font-size:15px;color:'+(noCtrl?'var(--muted)':stock<=0?'var(--red)':stock<=min?'var(--orange)':'var(--text)')+'">'+
-        (noCtrl?'—':stock)
+      +'<td><div style="font-weight:600">'+(r.nombre_producto||'Producto '+r.producto_id)+'</div></td>'
+      +'<td style="color:var(--muted);font-size:12px">—</td>'
+      +'<td style="text-align:center;font-size:17px;font-weight:800;color:'+(q<=0?'var(--red)':m>0&&q<=m?'var(--orange)':'var(--text)')+'">'+q+'</td>'
+      +'<td style="text-align:center;color:var(--muted)">'+(m>0?m:'—')+'</td>'
+      +'<td style="text-align:center;color:var(--muted)">'+(r.costo_unitario?gs(r.costo_unitario):'—')+'</td>'
+      +'<td style="text-align:center"><span class="tag '+scol+'">'+stag+'</span></td>'
+      +'<td style="text-align:center">'
+        +'<button onclick="abrirHistorial('+r.producto_id+',\''+String(r.nombre_producto||'').replace(/\'/g,"\\'")+'\')" '
+          +'style="background:var(--b2);border:1px solid var(--blue);border-radius:6px;color:var(--blue);font-family:Barlow,sans-serif;font-size:11px;font-weight:700;padding:6px 11px;cursor:pointer;white-space:nowrap">'
+          +'📋 Historial</button>'
       +'</td>'
-      +'<td style="text-align:center;color:var(--muted)">'+(min>0?min:'—')+'</td>'
-      +'<td style="text-align:center"><span class="tag '+statusColor+'">'+statusTag+'</span></td>'
-      +'<td style="text-align:right;font-weight:700">'+(p.precio_variable?'<span style="color:var(--orange)">Variable</span>':gs(p.precio))+'</td>'
     +'</tr>';
   }).join('');
 }
 
 function filtrInv(q){
-  var prds=window._invPrds||[];
-  if(!prds.length) return;
-  var f=q.toLowerCase();
-  renderInvTable(!q?prds:prds.filter(function(p){
-    return (p.nombre||'').toLowerCase().includes(f)||(p.categoria||'').toLowerCase().includes(f)||(p.codigo_barras||'').toLowerCase().includes(f);
-  }));
+  if(!_inv.prds) return;
+  var f=(q||'').toLowerCase();
+  var est=document.getElementById('invFiltroEst')?document.getElementById('invFiltroEst').value:'';
+  var fil=!f?_inv.prds:_inv.prds.filter(function(r){return (r.nombre_producto||'').toLowerCase().includes(f);});
+  // Re-aplicar filtro estado
+  if(est==='ok')   fil=fil.filter(function(r){return (r.cantidad||0)>(r.cantidad_minima||0);});
+  if(est==='bajo') fil=fil.filter(function(r){var m=r.cantidad_minima||0;return m>0&&(r.cantidad||0)>0&&(r.cantidad||0)<=m;});
+  if(est==='cero') fil=fil.filter(function(r){return (r.cantidad||0)<=0;});
+  renderInvTabla(fil.length||f||est?fil:_inv.prds);
+}
+
+// ── HISTORIAL ─────────────────────────────────────────────
+async function abrirHistorial(prodId, prodNom){
+  _inv.prodActivo={id:prodId, nombre:prodNom};
+  document.getElementById('invMTit').textContent=prodNom;
+  var depNom=(_inv.sel.sucNom?_inv.sel.sucNom+' › ':'')+_inv.sel.depNom;
+  document.getElementById('invMSub').textContent='Depósito: '+depNom;
+  document.getElementById('invMDep').textContent=depNom;
+  document.getElementById('invAjusteForm').style.display='none';
+  // Stock actual desde la tabla stock
+  var sr=_inv.prds.find(function(r){return r.producto_id===prodId||String(r.producto_id)===String(prodId);});
+  document.getElementById('invMStock').textContent=sr?sr.cantidad||0:'?';
+  // Fechas default: últimos 30 días
+  var hoy=new Date(), d30=new Date(hoy); d30.setDate(d30.getDate()-30);
+  document.getElementById('invFD').value=d30.getFullYear()+'-'+pad(d30.getMonth()+1)+'-'+pad(d30.getDate());
+  document.getElementById('invFH').value=hoy.getFullYear()+'-'+pad(hoy.getMonth()+1)+'-'+pad(hoy.getDate());
+  document.getElementById('invModal').style.display='block';
+  document.body.style.overflow='hidden';
+  await cargarHistorial();
+}
+
+function cerrarInvModal(){
+  document.getElementById('invModal').style.display='none';
+  document.body.style.overflow='';
+  _inv.prodActivo=null;
+}
+
+async function cargarHistorial(){
+  if(!_inv.prodActivo) return;
+  var fd=document.getElementById('invFD').value;
+  var fh=document.getElementById('invFH').value;
+  document.getElementById('invHistBody').innerHTML='<tr><td colspan="7" class="loading"><span class="sp"></span>Cargando...</td></tr>';
+  document.getElementById('invMEnt').textContent='—';
+  document.getElementById('invMSal').textContent='—';
+  try{
+    var q='producto_id=eq.'+_inv.prodActivo.id
+      +'&deposito_id=eq.'+_inv.sel.depId
+      +'&licencia_id=eq.'+_inv.licId
+      +(fd?'&fecha=gte.'+fd+'T00:00:00':'')
+      +(fh?'&fecha=lte.'+fh+'T23:59:59':'')
+      +'&order=fecha.asc&limit=1000';
+    var movs=await sg('stock_movimientos',q);
+
+    var totEnt=0,totSal=0;
+    movs.forEach(function(m){if((m.cantidad||0)>0)totEnt+=(m.cantidad||0);else totSal+=Math.abs(m.cantidad||0);});
+    document.getElementById('invMEnt').textContent='+'+totEnt;
+    document.getElementById('invMSal').textContent='-'+totSal;
+
+    if(!movs.length){
+      document.getElementById('invHistBody').innerHTML='<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--muted)">Sin movimientos en el período</td></tr>';
+      return;
+    }
+    var tipos={
+      'venta':      {lbl:'Venta',       col:'var(--red)',    ico:'🛒'},
+      'compra':     {lbl:'Compra',      col:'var(--green)',  ico:'📦'},
+      'entrada':    {lbl:'Entrada',     col:'var(--green)',  ico:'⬆️'},
+      'salida':     {lbl:'Salida',      col:'var(--orange)', ico:'⬇️'},
+      'ajuste':     {lbl:'Ajuste',      col:'var(--blue)',   ico:'🔧'},
+      'anulacion':  {lbl:'Anulación',   col:'var(--blue)',   ico:'↩️'},
+      'transferencia_entrada':{lbl:'Transfer. entrada',col:'var(--green)',ico:'↘️'},
+      'transferencia_salida': {lbl:'Transfer. salida', col:'var(--orange)',ico:'↗️'},
+    };
+    document.getElementById('invHistBody').innerHTML=movs.map(function(m){
+      var tc=tipos[m.tipo]||{lbl:m.tipo||'—',col:'var(--muted)',ico:'•'};
+      var cant=m.cantidad||0;
+      return '<tr>'
+        +'<td style="white-space:nowrap;font-size:12px;color:var(--muted)">'+fmtDT(m.fecha)+'</td>'
+        +'<td><span style="display:inline-flex;align-items:center;gap:5px;font-weight:700;font-size:12px;color:'+tc.col+'">'+tc.ico+' '+tc.lbl+'</span>'
+          +(m.referencia?'<div style="font-size:11px;color:var(--muted)">Ref: '+m.referencia+'</div>':'')
+          +(m.observacion?'<div style="font-size:11px;color:var(--muted);font-style:italic">'+m.observacion+'</div>':'')
+        +'</td>'
+        +'<td style="text-align:center;font-weight:800;font-size:15px;color:'+(cant>0?'var(--green)':'var(--red)')+'">'+(cant>0?'+':'')+cant+'</td>'
+        +'<td style="text-align:center;color:var(--muted)">'+(m.cantidad_antes!=null?m.cantidad_antes:'—')+'</td>'
+        +'<td style="text-align:center;font-weight:700">'+(m.cantidad_despues!=null?m.cantidad_despues:'—')+'</td>'
+        +'<td style="font-size:12px;color:var(--muted);max-width:160px;word-break:break-word">'+(m.observacion||m.referencia||'')+'</td>'
+        +'<td style="font-size:12px;color:var(--muted)">'+(m.terminal||m.usuario||'')+'</td>'
+      +'</tr>';
+    }).join('');
+  }catch(e){
+    document.getElementById('invHistBody').innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--red)">Error: '+e.message+'</td></tr>';
+  }
+}
+
+// ── AJUSTE MANUAL ─────────────────────────────────────────
+function abrirAjuste(){
+  document.getElementById('invAjusteForm').style.display='block';
+  document.getElementById('ajCant').value='';
+  document.getElementById('ajMotivo').value='';
+  document.getElementById('ajCant').focus();
+}
+
+async function guardarAjuste(){
+  if(!_inv.prodActivo) return;
+  var tipo    = document.getElementById('ajTipo').value;
+  var cant    = parseFloat(document.getElementById('ajCant').value)||0;
+  var motivo  = document.getElementById('ajMotivo').value.trim();
+  if(cant<=0){toast('Ingresá una cantidad válida'); return;}
+  if(!motivo){toast('El motivo es obligatorio'); return;}
+
+  var sr=_inv.prds.find(function(r){return String(r.producto_id)===String(_inv.prodActivo.id);});
+  var qAct=sr?sr.cantidad||0:0;
+  var cantMov = tipo==='entrada'?cant : tipo==='salida'?-cant : (cant-qAct);
+  var qNueva  = tipo==='ajuste'?cant : qAct+cantMov;
+
+  var mov={
+    licencia_id:      _inv.licId,
+    deposito_id:      _inv.sel.depId,
+    sucursal_id:      _inv.sel.sucId,
+    producto_id:      _inv.prodActivo.id,
+    nombre_producto:  _inv.prodActivo.nombre,
+    tipo:             tipo,
+    cantidad:         cantMov,
+    cantidad_antes:   qAct,
+    cantidad_despues: qNueva,
+    observacion:      motivo,
+    terminal:         'admin',
+    usuario:          SE,
+    fecha:            new Date().toISOString()
+  };
+  try{
+    // Insertar movimiento
+    await supaPost('stock_movimientos', mov, null);
+    // Actualizar stock en tabla stock (upsert por deposito_id + producto_id)
+    var stockRow={
+      licencia_id:     _inv.licId,
+      deposito_id:     _inv.sel.depId,
+      sucursal_id:     _inv.sel.sucId,
+      producto_id:     _inv.prodActivo.id,
+      nombre_producto: _inv.prodActivo.nombre,
+      cantidad:        qNueva,
+      updated_at:      new Date().toISOString()
+    };
+    if(sr && sr.id){
+      await supaPatch('stock','id=eq.'+sr.id,{cantidad:qNueva,updated_at:new Date().toISOString()});
+    } else {
+      await supaPost('stock', stockRow, null);
+    }
+    // Actualizar local
+    if(sr) sr.cantidad=qNueva;
+    else _inv.prds.push({...stockRow, id:Date.now()});
+    document.getElementById('invMStock').textContent=qNueva;
+    renderInvTabla(_inv.prds);
+    document.getElementById('invAjusteForm').style.display='none';
+    toast('✓ Ajuste guardado — Stock: '+qNueva);
+    await cargarHistorial();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+// ── TRANSFERENCIA ENTRE DEPÓSITOS ─────────────────────────
+function abrirTransferencia(){
+  var deps=_inv.deps;
+  if(deps.length<2){toast('Necesitás al menos 2 depósitos para transferir'); return;}
+  // Poblar selects de depósitos
+  var opsDeps=deps.map(function(d){
+    var s=_inv.suc.find(function(x){return x.id===d.sucursal_id;})||{};
+    return '<option value="'+d.id+'">'+(s.nombre?s.nombre+' › ':'')+d.nombre+'</option>';
+  }).join('');
+  document.getElementById('trOrigen').innerHTML=opsDeps;
+  document.getElementById('trDestino').innerHTML=opsDeps;
+  // Destino: el segundo por defecto
+  if(deps.length>1) document.getElementById('trDestino').selectedIndex=1;
+  // Poblar productos: solo los que tienen stock en algún depósito
+  var prdsUniq={};
+  _inv.prds.forEach(function(r){
+    if(!prdsUniq[r.producto_id]) prdsUniq[r.producto_id]=r.nombre_producto||'Producto '+r.producto_id;
+  });
+  var opsPrds=Object.entries(prdsUniq).map(function(e){return '<option value="'+e[0]+'">'+e[1]+'</option>';}).join('');
+  document.getElementById('trProducto').innerHTML=opsPrds||'<option value="">Sin productos</option>';
+  document.getElementById('trCant').value='';
+  document.getElementById('trObs').value='';
+  actualizarStockOrigen();
+  document.getElementById('invTransModal').style.display='block';
+  document.body.style.overflow='hidden';
+}
+
+function cerrarTransModal(){
+  document.getElementById('invTransModal').style.display='none';
+  document.body.style.overflow='';
+}
+
+async function actualizarStockOrigen(){
+  var origenId=parseInt(document.getElementById('trOrigen').value);
+  var prodId=document.getElementById('trProducto').value;
+  if(!origenId||!prodId){document.getElementById('trStockOrigen').textContent='—';return;}
+  try{
+    var rows=await sg('stock','deposito_id=eq.'+origenId+'&producto_id=eq.'+prodId+'&licencia_id=eq.'+_inv.licId+'&select=cantidad&limit=1');
+    document.getElementById('trStockOrigen').textContent=rows&&rows.length?(rows[0].cantidad||0):'0';
+  }catch(e){document.getElementById('trStockOrigen').textContent='?';}
+}
+
+async function ejecutarTransferencia(){
+  var origenId = parseInt(document.getElementById('trOrigen').value);
+  var destinoId= parseInt(document.getElementById('trDestino').value);
+  var prodId   = parseInt(document.getElementById('trProducto').value);
+  var cant     = parseFloat(document.getElementById('trCant').value)||0;
+  var obs      = document.getElementById('trObs').value.trim();
+
+  if(origenId===destinoId){toast('El origen y destino deben ser diferentes'); return;}
+  if(cant<=0){toast('Ingresá una cantidad válida'); return;}
+
+  // Obtener datos de los depósitos
+  var depOrigen  = _inv.deps.find(function(d){return d.id===origenId;});
+  var depDestino = _inv.deps.find(function(d){return d.id===destinoId;});
+  var prodNom    = document.getElementById('trProducto').options[document.getElementById('trProducto').selectedIndex]?.text||'Producto';
+
+  try{
+    // Leer stock actual en origen
+    var [rowsOrig, rowsDest] = await Promise.all([
+      sg('stock','deposito_id=eq.'+origenId+'&producto_id=eq.'+prodId+'&licencia_id=eq.'+_inv.licId+'&limit=1'),
+      sg('stock','deposito_id=eq.'+destinoId+'&producto_id=eq.'+prodId+'&licencia_id=eq.'+_inv.licId+'&limit=1')
+    ]);
+    var qOrig = rowsOrig&&rowsOrig.length?rowsOrig[0].cantidad||0:0;
+    var qDest = rowsDest&&rowsDest.length?rowsDest[0].cantidad||0:0;
+    if(cant>qOrig){toast('Stock insuficiente en origen (disponible: '+qOrig+')'); return;}
+
+    var qOrigNueva=qOrig-cant, qDestNueva=qDest+cant;
+    var ref='Transfer. de '+depOrigen.nombre+' → '+depDestino.nombre;
+    var ts=new Date().toISOString();
+
+    // Movimiento salida en origen
+    await supaPost('stock_movimientos',{
+      licencia_id:_inv.licId, deposito_id:origenId, sucursal_id:depOrigen.sucursal_id,
+      producto_id:prodId, nombre_producto:prodNom,
+      tipo:'transferencia_salida', cantidad:-cant,
+      cantidad_antes:qOrig, cantidad_despues:qOrigNueva,
+      referencia:ref, observacion:obs, terminal:'admin', usuario:SE, fecha:ts
+    },null);
+    // Movimiento entrada en destino
+    await supaPost('stock_movimientos',{
+      licencia_id:_inv.licId, deposito_id:destinoId, sucursal_id:depDestino.sucursal_id,
+      producto_id:prodId, nombre_producto:prodNom,
+      tipo:'transferencia_entrada', cantidad:cant,
+      cantidad_antes:qDest, cantidad_despues:qDestNueva,
+      referencia:ref, observacion:obs, terminal:'admin', usuario:SE, fecha:ts
+    },null);
+    // Actualizar stock en ambos depósitos
+    if(rowsOrig&&rowsOrig.length) await supaPatch('stock','id=eq.'+rowsOrig[0].id,{cantidad:qOrigNueva,updated_at:ts});
+    else await supaPost('stock',{licencia_id:_inv.licId,deposito_id:origenId,sucursal_id:depOrigen.sucursal_id,producto_id:prodId,nombre_producto:prodNom,cantidad:qOrigNueva},null);
+    if(rowsDest&&rowsDest.length) await supaPatch('stock','id=eq.'+rowsDest[0].id,{cantidad:qDestNueva,updated_at:ts});
+    else await supaPost('stock',{licencia_id:_inv.licId,deposito_id:destinoId,sucursal_id:depDestino.sucursal_id,producto_id:prodId,nombre_producto:prodNom,cantidad:qDestNueva},null);
+
+    toast('✓ Transferencia realizada: '+cant+' unidades');
+    cerrarTransModal();
+    // Refrescar si el depósito activo es origen o destino
+    if(_inv.sel.depId===origenId||_inv.sel.depId===destinoId) await cargarStockDeposito();
+  }catch(e){ toast('Error: '+e.message); }
 }
 
 // ════════════════════════════════════════════════════════
@@ -1339,7 +1737,7 @@ async function saveConf(){
   applyAdminTheme();
   var e=localStorage.getItem('ae'),p=localStorage.getItem('ap'),v=localStorage.getItem('av');
   // Solo auto-login si hay sesión previamente validada (no Demo)
-  if(e&&p&&p!=='Demo'){SE=e.toLowerCase().trim();SP=p;SV=v;showApp();}
+  var li=localStorage.getItem('ali');if(e&&p&&p!=='Demo'){SE=e.toLowerCase().trim();SP=p;SV=v;SLI=li?parseInt(li):null;showApp();}
 })();
 
 
