@@ -483,11 +483,11 @@ async function doLogin(){
       console.log('[Login] licencias columns:', cols);
 
       // Determinar nombre de columna de email
-      var emailCol = cols.find(function(c){return c==='email'||c==='licencia_email'||c==='correo'||c==='user_email';}) || 'licencia_email';
+      var emailCol = cols.find(function(c){return c==='email_cliente'||c==='email'||c==='licencia_email'||c==='correo'||c==='user_email';}) || 'email_cliente';
       // Determinar nombre de columna de clave
       var claveCol = cols.find(function(c){return c==='clave'||c==='codigo'||c==='code'||c==='license_key';}) || 'clave';
-      var planCol  = cols.find(function(c){return c==='plan'||c==='tipo'||c==='type';}) || 'plan';
-      var venceCol = cols.find(function(c){return c==='vence'||c==='vencimiento'||c==='expires_at'||c==='expira';}) || 'vence';
+      var planCol  = cols.find(function(c){return c==='plan_id'||c==='plan'||c==='tipo'||c==='type';}) || 'plan_id';
+      var venceCol = cols.find(function(c){return c==='fecha_vence'||c==='vence'||c==='vencimiento'||c==='expires_at'||c==='expira';}) || 'fecha_vence';
       var activaCol= cols.find(function(c){return c==='activa'||c==='activo'||c==='active';}) || 'activa';
 
       console.log('[Login] Using cols:', emailCol, claveCol, planCol, venceCol);
