@@ -224,6 +224,9 @@ tr:last-child td{border-bottom:none;}
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>Movimientos de Stock</div>
       <div class="sb-i" id="sbi-conteo" onclick="goTo('conteo')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Conteo Físico</div>
+      <div style="font-size:10px;color:#3a3a3a;letter-spacing:1px;text-transform:uppercase;font-weight:700;padding:10px 14px 3px;">Reportes</div>
+      <div class="sb-i" id="sbi-rep-productos" onclick="goTo(&apos;rep-productos&apos;)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h2v5H7zM11 5h2v8h-2zM15 10h2v3h-2z"/></svg>Ventas por Producto</div>
       <div style="font-size:10px;color:#3a3a3a;letter-spacing:1px;text-transform:uppercase;font-weight:700;padding:10px 14px 3px;">Sistema</div>
       <div class="sb-i" id="sbi-admin" onclick="goTo('admin')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>Administración</div>
@@ -568,7 +571,7 @@ function goTo(p){
   curPage=p; closeSB();
   document.querySelectorAll('.sb-i').forEach(function(el){el.classList.toggle('on',el.id==='sbi-'+p);});
   document.querySelectorAll('.bn').forEach(function(el){el.classList.toggle('on',el.id==='bni-'+p);});
-  var titles={dashboard:'Dashboard',ventas:'Ventas',terminales:'Terminales',cajas:'Cajas / Turnos',productos:'Productos',inventarios:'Inventarios',extracto:'Extracto de Producto',compras:'Compras',movstock:'Movimientos de Stock',conteo:'Conteo Físico',admin:'Administración',config:'Configuración'};
+  var titles={dashboard:'Dashboard',ventas:'Ventas',terminales:'Terminales',cajas:'Cajas / Turnos',productos:'Productos',inventarios:'Inventarios',extracto:'Extracto de Producto',compras:'Compras',movstock:'Movimientos de Stock',conteo:'Conteo Físico','rep-productos':'Ventas por Producto',admin:'Administración',config:'Configuración'};
   document.getElementById('topTitle').textContent=titles[p]||p;
   var c=document.getElementById('content');
   c.innerHTML='<div class="loading"><span class="sp"></span>Cargando...</div>';
@@ -586,6 +589,7 @@ function renderPage(p){
   else if(p==='compras') renderCompras();
   else if(p==='movstock') renderMovStock();
   else if(p==='conteo') renderConteo();
+  else if(p==='rep-productos') renderRepProductos();
   else if(p==='admin')  renderAdmin();
   else if(p==='config') renderConfig();
 }
@@ -3410,6 +3414,348 @@ async function cntVerDetalle(conteoId){
   }catch(e){
     document.getElementById('cntDetBody').innerHTML='<div style="color:var(--red)">Error: '+e.message+'</div>';
   }
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// REPORTES — VENTAS POR PRODUCTO
+// ═══════════════════════════════════════════════════════════
+var _rpp = { data: [], prodMap: {}, cats: [] };
+
+async function renderRepProductos(){
+  var c = document.getElementById('content');
+  c.innerHTML = '<div class="loading"><span class="sp"></span>Cargando...</div>';
+
+  // Cargar productos para tener costo y categoria
+  try{
+    var prds = await sg('pos_productos',
+      'licencia_email=ilike.'+encodeURIComponent(SE)+
+      '&activo=eq.true&select=id,nombre,categoria,costo,precio&limit=1000'
+    );
+    _rpp.prodMap = {};
+    var cats = new Set();
+    prds.forEach(function(p){
+      _rpp.prodMap[p.id] = p;
+      if(p.categoria) cats.add(p.categoria);
+    });
+    _rpp.cats = Array.from(cats).sort();
+  }catch(e){ _rpp.prodMap={}; _rpp.cats=[]; }
+
+  // Sucursales
+  var sucOpts = '<option value="">Todas las sucursales</option>';
+  try{
+    var licId = SLI || (await sg('licencias','email_cliente=ilike.'+encodeURIComponent(SE)+'&activa=eq.true&select=id&limit=1'))[0].id;
+    var sucs = await sg('sucursales','licencia_id=eq.'+licId+'&activa=eq.true&order=nombre.asc');
+    sucs.forEach(function(s){ sucOpts += '<option value="'+s.nombre+'">'+s.nombre+'</option>'; });
+  }catch(e){}
+
+  var catOpts = '<option value="">Todas las categorías</option>'
+    + _rpp.cats.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
+
+  var hoy = new Date();
+  var d1 = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  var fdDef = d1.getFullYear()+'-'+pad(d1.getMonth()+1)+'-'+pad(d1.getDate());
+  var fhDef = hoy.getFullYear()+'-'+pad(hoy.getMonth()+1)+'-'+pad(hoy.getDate());
+
+  c.innerHTML =
+    '<div class="ph"><div><div class="pt">Ventas por Producto</div>'
+      +'<div class="ps">Análisis de venta bruta y utilidad por producto</div></div>'
+      +'<button onclick="rppBuscar()" class="btn-sv" style="padding:9px 20px">Generar reporte</button>'
+    +'</div>'
+    // Filtros
+    +'<div class="card" style="margin-bottom:12px">'
+      +'<div style="padding:14px 18px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">'
+        +'<div><label style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Desde</label>'
+          +'<input type="date" id="rppFD" class="cfg-inp" value="'+fdDef+'"></div>'
+        +'<div><label style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Hasta</label>'
+          +'<input type="date" id="rppFH" class="cfg-inp" value="'+fhDef+'"></div>'
+        +'<div style="min-width:160px"><label style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Sucursal</label>'
+          +'<select id="rppSuc" class="cfg-inp" style="width:100%">'+sucOpts+'</select></div>'
+        +'<div style="min-width:160px"><label style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Categoría</label>'
+          +'<select id="rppCat" class="cfg-inp" style="width:100%" onchange="rppFiltrarTabla()">'+catOpts+'</select></div>'
+        +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-self:flex-end">'
+          +'<button onclick="rppSetPeriodo(\'hoy\')"    class="dbtn" id="rppBHoy">Hoy</button>'
+          +'<button onclick="rppSetPeriodo(\'semana\')" class="dbtn" id="rppBSem">Semana</button>'
+          +'<button onclick="rppSetPeriodo(\'mes\')"    class="dbtn on" id="rppBMes">Mes</button>'
+          +'<button onclick="rppSetPeriodo(\'anio\')"   class="dbtn" id="rppBAnio">Año</button>'
+        +'</div>'
+      +'</div>'
+    +'</div>'
+    // KPIs
+    +'<div class="kg k4" id="rppKpis" style="display:none">'
+      +'<div class="kc" style="--c:var(--green)"><div class="kc-l">Venta bruta</div><div class="kc-v" id="rppKVenta">₲0</div><div class="kc-s" id="rppKQty">0 unidades</div></div>'
+      +'<div class="kc" style="--c:var(--red)"><div class="kc-l">Costo total</div><div class="kc-v" id="rppKCosto">₲0</div></div>'
+      +'<div class="kc" style="--c:var(--blue)"><div class="kc-l">Utilidad bruta</div><div class="kc-v" id="rppKUtil">₲0</div></div>'
+      +'<div class="kc" style="--c:var(--orange)"><div class="kc-l">Margen</div><div class="kc-v" id="rppKMargen">0%</div></div>'
+    +'</div>'
+    // Gráfico
+    +'<div class="card" id="rppGrafCard" style="display:none;margin-bottom:12px">'
+      +'<div class="card-h">'
+        +'<span class="card-t" id="rppGrafTit">Top productos por venta</span>'
+        +'<div style="display:flex;gap:6px">'
+          +'<button onclick="rppSetGraf(\'venta\')"   class="dbtn on" id="rppGBV">Venta</button>'
+          +'<button onclick="rppSetGraf(\'utilidad\')" class="dbtn"   id="rppGBU">Utilidad</button>'
+          +'<button onclick="rppSetGraf(\'qty\')"      class="dbtn"   id="rppGBQ">Unidades</button>'
+        +'</div>'
+      +'</div>'
+      +'<div style="padding:16px 18px"><canvas id="rppCanvas" height="100"></canvas></div>'
+    +'</div>'
+    // Tabla
+    +'<div class="card" id="rppTablaCard" style="display:none">'
+      +'<div class="card-h">'
+        +'<span class="card-t" id="rppTabCount">—</span>'
+        +'<select id="rppSort" class="d-inp" onchange="rppFiltrarTabla()" style="font-size:12px">'
+          +'<option value="venta">Ordenar: Mayor venta</option>'
+          +'<option value="utilidad">Ordenar: Mayor utilidad</option>'
+          +'<option value="margen">Ordenar: Mayor margen</option>'
+          +'<option value="qty">Ordenar: Mayor cantidad</option>'
+          +'<option value="nombre">Ordenar: Nombre A-Z</option>'
+        +'</select>'
+      +'</div>'
+      +'<div style="overflow-x:auto"><table><thead><tr>'
+        +'<th>Producto</th><th>Categoría</th>'
+        +'<th style="text-align:center">Unidades</th>'
+        +'<th style="text-align:right">Venta bruta</th>'
+        +'<th style="text-align:right">Costo total</th>'
+        +'<th style="text-align:right">Utilidad</th>'
+        +'<th style="text-align:right">Margen %</th>'
+        +'<th style="text-align:right">Precio prom.</th>'
+      +'</tr></thead>'
+      +'<tbody id="rppBody"></tbody>'
+      +'</table></div>'
+    +'</div>'
+    +'<div id="rppEmpty" style="display:none" class="empty">'
+      +'<div class="empty-i">📊</div><div class="empty-t">Sin ventas</div>'
+      +'<div class="empty-s">No hay ventas en el período seleccionado</div>'
+    +'</div>';
+}
+
+function rppSetPeriodo(p){
+  var hoy=new Date(), d=new Date(hoy);
+  if(p==='hoy'){}
+  else if(p==='semana'){d.setDate(d.getDate()-d.getDay());}
+  else if(p==='mes'){d=new Date(hoy.getFullYear(),hoy.getMonth(),1);}
+  else if(p==='anio'){d=new Date(hoy.getFullYear(),0,1);}
+  var fmt=function(x){return x.getFullYear()+'-'+pad(x.getMonth()+1)+'-'+pad(x.getDate());};
+  document.getElementById('rppFD').value=fmt(d);
+  document.getElementById('rppFH').value=fmt(hoy);
+  ['Hoy','Sem','Mes','Anio'].forEach(function(x){
+    var el=document.getElementById('rppB'+x);
+    if(el) el.classList.toggle('on',(p==='hoy'&&x==='Hoy')||(p==='semana'&&x==='Sem')||(p==='mes'&&x==='Mes')||(p==='anio'&&x==='Anio'));
+  });
+}
+
+var _rppGrafMode='venta';
+function rppSetGraf(mode){
+  _rppGrafMode=mode;
+  ['V','U','Q'].forEach(function(x){
+    var el=document.getElementById('rppGB'+x);
+    if(el) el.classList.toggle('on',(mode==='venta'&&x==='V')||(mode==='utilidad'&&x==='U')||(mode==='qty'&&x==='Q'));
+  });
+  rppDibujarGrafico(_rpp.data);
+}
+
+async function rppBuscar(){
+  var fd=document.getElementById('rppFD').value;
+  var fh=document.getElementById('rppFH').value;
+  var suc=(document.getElementById('rppSuc')||{}).value||'';
+  if(!fd||!fh){ toast('Seleccioná un rango de fechas'); return; }
+
+  ['rppKpis','rppGrafCard','rppTablaCard','rppEmpty'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.style.display='none';
+  });
+  // Mostrar loading en tabla
+  document.getElementById('rppTablaCard').style.display='block';
+  document.getElementById('rppBody').innerHTML='<tr><td colspan="8" class="loading"><span class="sp"></span>Procesando ventas...</td></tr>';
+
+  try{
+    var q='licencia_email=ilike.'+encodeURIComponent(SE)
+      +'&fecha=gte.'+fd+'T00:00:00'
+      +'&fecha=lte.'+fh+'T23:59:59'
+      +(suc?'&sucursal=ilike.'+encodeURIComponent(suc):'')
+      +'&order=fecha.asc&limit=5000'
+      +'&select=items,total,tiene_factura,sucursal';
+
+    var ventas=await sg('pos_ventas',q);
+
+    // Agregar por producto
+    var mapaProds={};
+    var ventasSinAnular=ventas; // pos_ventas no tiene anulada en DB actualmente
+
+    ventasSinAnular.forEach(function(v){
+      var items=[];
+      try{ items=typeof v.items==='string'?JSON.parse(v.items):(v.items||[]); }catch(e){}
+      items.forEach(function(it){
+        var pid=it.id;
+        if(!pid) return;
+        var prod=_rpp.prodMap[pid]||{nombre:it.nombre||'#'+pid,categoria:'Sin categoría',costo:0,precio:it.precio||0};
+        if(!mapaProds[pid]){
+          mapaProds[pid]={
+            id:pid, nombre:prod.nombre||it.nombre||'#'+pid,
+            categoria:prod.categoria||'Sin categoría',
+            costo:parseFloat(prod.costo)||0,
+            qty:0, ventaBruta:0, costoTotal:0
+          };
+        }
+        var qty=parseFloat(it.qty)||1;
+        var precio=parseFloat(it.precio)||0;
+        mapaProds[pid].qty+=qty;
+        mapaProds[pid].ventaBruta+=precio*qty;
+        mapaProds[pid].costoTotal+=(parseFloat(prod.costo)||0)*qty;
+      });
+    });
+
+    // Calcular utilidad y margen
+    var rows=Object.values(mapaProds).map(function(r){
+      r.utilidad=r.ventaBruta-r.costoTotal;
+      r.margen=r.ventaBruta>0?Math.round(r.utilidad/r.ventaBruta*100):0;
+      r.precioProm=r.qty>0?Math.round(r.ventaBruta/r.qty):0;
+      return r;
+    });
+
+    _rpp.data=rows;
+
+    if(!rows.length){
+      document.getElementById('rppTablaCard').style.display='none';
+      document.getElementById('rppEmpty').style.display='block';
+      return;
+    }
+
+    // KPIs globales
+    var totVenta=rows.reduce(function(s,r){return s+r.ventaBruta;},0);
+    var totCosto=rows.reduce(function(s,r){return s+r.costoTotal;},0);
+    var totUtil=totVenta-totCosto;
+    var totQty=rows.reduce(function(s,r){return s+r.qty;},0);
+    var margenGlobal=totVenta>0?Math.round(totUtil/totVenta*100):0;
+
+    document.getElementById('rppKpis').style.display='grid';
+    document.getElementById('rppKVenta').textContent=gs(totVenta);
+    document.getElementById('rppKQty').textContent=totQty+' unidades';
+    document.getElementById('rppKCosto').textContent=gs(totCosto);
+    document.getElementById('rppKUtil').textContent=gs(totUtil);
+    document.getElementById('rppKMargen').textContent=margenGlobal+'%';
+
+    // Gráfico y tabla
+    document.getElementById('rppGrafCard').style.display='block';
+    rppDibujarGrafico(rows);
+    rppFiltrarTabla();
+
+  }catch(e){
+    document.getElementById('rppBody').innerHTML='<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--red)">Error: '+e.message+'</td></tr>';
+  }
+}
+
+function rppFiltrarTabla(){
+  var cat=(document.getElementById('rppCat')||{}).value||'';
+  var sort=(document.getElementById('rppSort')||{}).value||'venta';
+  var rows=cat?_rpp.data.filter(function(r){return r.categoria===cat;}):_rpp.data.slice();
+
+  rows.sort(function(a,b){
+    if(sort==='venta')    return b.ventaBruta-a.ventaBruta;
+    if(sort==='utilidad') return b.utilidad-a.utilidad;
+    if(sort==='margen')   return b.margen-a.margen;
+    if(sort==='qty')      return b.qty-a.qty;
+    if(sort==='nombre')   return (a.nombre||'').localeCompare(b.nombre||'');
+    return 0;
+  });
+
+  if(document.getElementById('rppTabCount'))
+    document.getElementById('rppTabCount').textContent=rows.length+' productos';
+  if(!document.getElementById('rppBody')) return;
+
+  if(!rows.length){
+    document.getElementById('rppBody').innerHTML='<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">Sin productos en esta categoría</td></tr>';
+    return;
+  }
+
+  // Barra de utilidad relativa al máximo
+  var maxUtil=Math.max.apply(null,rows.map(function(r){return r.utilidad;}));
+
+  document.getElementById('rppBody').innerHTML=rows.map(function(r,i){
+    var utilCol=r.utilidad>0?'var(--green)':r.utilidad<0?'var(--red)':'var(--muted)';
+    var margenCol=r.margen>=30?'var(--green)':r.margen>=10?'var(--orange)':'var(--red)';
+    var barW=maxUtil>0?Math.round(Math.max(0,r.utilidad)/maxUtil*60):0;
+    return '<tr>'
+      +'<td><div style="display:flex;align-items:center;gap:8px">'
+        +'<span style="font-size:12px;color:var(--muted);width:20px;text-align:right;flex-shrink:0">'+(i+1)+'</span>'
+        +'<div><div style="font-weight:600">'+r.nombre+'</div>'
+          +'<div style="height:4px;background:var(--green);border-radius:2px;width:'+barW+'px;margin-top:3px;opacity:.6"></div>'
+        +'</div>'
+      +'</div></td>'
+      +'<td style="font-size:12px;color:var(--muted)">'+r.categoria+'</td>'
+      +'<td style="text-align:center;font-weight:700">'+r.qty+'</td>'
+      +'<td style="text-align:right;font-weight:700">'+gs(r.ventaBruta)+'</td>'
+      +'<td style="text-align:right;color:var(--muted)">'+gs(r.costoTotal)+'</td>'
+      +'<td style="text-align:right;font-weight:800;color:'+utilCol+'">'+gs(r.utilidad)+'</td>'
+      +'<td style="text-align:right;font-weight:700;color:'+margenCol+'">'+r.margen+'%</td>'
+      +'<td style="text-align:right;color:var(--muted)">'+gs(r.precioProm)+'</td>'
+    +'</tr>';
+  }).join('');
+
+  // Actualizar gráfico con filtro aplicado
+  rppDibujarGrafico(rows);
+}
+
+function rppDibujarGrafico(rows){
+  var grafCard=document.getElementById('rppGrafCard');
+  if(!grafCard) return;
+  var canvas=document.getElementById('rppCanvas');
+  if(!canvas) return;
+
+  // Top 12 según el modo actual
+  var sorted=rows.slice().sort(function(a,b){
+    if(_rppGrafMode==='venta')    return b.ventaBruta-a.ventaBruta;
+    if(_rppGrafMode==='utilidad') return b.utilidad-a.utilidad;
+    if(_rppGrafMode==='qty')      return b.qty-a.qty;
+    return 0;
+  });
+  var top=sorted.slice(0,12);
+
+  var titulo=_rppGrafMode==='venta'?'Top por venta bruta':_rppGrafMode==='utilidad'?'Top por utilidad':'Top por unidades vendidas';
+  if(document.getElementById('rppGrafTit')) document.getElementById('rppGrafTit').textContent=titulo;
+
+  var W=canvas.offsetWidth||canvas.parentElement.offsetWidth||600;
+  canvas.width=W;
+  var barH=28, PAD={t:10,b:30,l:0,r:80};
+  canvas.height=top.length*barH+PAD.t+PAD.b;
+  var ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,canvas.height);
+
+  var vals=top.map(function(r){
+    return _rppGrafMode==='venta'?r.ventaBruta:_rppGrafMode==='utilidad'?r.utilidad:r.qty;
+  });
+  var maxVal=Math.max.apply(null,vals.map(function(v){return Math.abs(v);}));
+  if(!maxVal) return;
+
+  var availW=W-PAD.l-PAD.r-160; // 160 = label width
+
+  top.forEach(function(r,i){
+    var val=_rppGrafMode==='venta'?r.ventaBruta:_rppGrafMode==='utilidad'?r.utilidad:r.qty;
+    var y=PAD.t+i*barH;
+    var bw=Math.abs(val)/maxVal*availW;
+    var isNeg=val<0;
+
+    // Label
+    ctx.fillStyle='rgba(255,255,255,0.7)';
+    ctx.font='11px Barlow,sans-serif';
+    ctx.textAlign='left';
+    var lbl=(r.nombre||'').substring(0,20);
+    ctx.fillText(lbl, 0, y+barH*0.65);
+
+    // Bar
+    var bx=160;
+    ctx.fillStyle=isNeg?'rgba(239,83,80,0.7)':'rgba(76,175,80,0.75)';
+    ctx.beginPath();
+    ctx.roundRect(bx, y+3, Math.max(bw,2), barH-6, 3);
+    ctx.fill();
+
+    // Value label
+    ctx.fillStyle=isNeg?'#ef5350':'rgba(255,255,255,0.85)';
+    ctx.font='bold 11px Barlow,sans-serif';
+    ctx.textAlign='left';
+    var valStr=_rppGrafMode==='qty'?String(Math.round(val)):gs(val);
+    ctx.fillText(valStr, bx+bw+6, y+barH*0.65);
+  });
 }
 
 // ════════════════════════════════════════════════════════
