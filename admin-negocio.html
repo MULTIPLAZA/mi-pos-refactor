@@ -855,8 +855,10 @@ function renderInvShell(){
     +'</div>'
     +'<div class="card">'
       +'<div class="card-h"><span class="card-t" id="invCount">Cargando...</span>'
-        +'<button onclick="abrirTransferencia()" style="background:var(--o2);border:1px solid var(--orange);border-radius:6px;color:var(--orange);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer">'
-          +'⇄ Transferir stock</button>'
+        +'<div style="display:flex;gap:8px">'
+          +'<button onclick="abrirTransferencia()" style="background:var(--o2);border:1px solid var(--orange);border-radius:6px;color:var(--orange);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer">⇄ Transferir</button>'
+          +'<button onclick="abrirReconciliacion()" style="background:var(--b2);border:1px solid var(--blue);border-radius:6px;color:var(--blue);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer">🔄 Reconciliar</button>'
+        +'</div>'
       +'</div>'
       +'<div style="overflow-x:auto"><table><thead><tr>'
         +'<th>Producto</th><th>Categoría</th>'
@@ -2633,6 +2635,210 @@ async function movEjecutarAnulacion(compId){
     toast('Error: '+e.message);
     if(btn){btn.disabled=false;btn.textContent='Confirmar anulación';}
   }
+}
+
+
+// ── RECONCILIACIÓN DE STOCK ───────────────────────────────────────────────
+async function abrirReconciliacion(){
+  // Crear overlay modal
+  var ov=document.createElement('div');
+  ov.id='reconOv';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:1000;overflow-y:auto;padding:14px 8px';
+  ov.innerHTML=
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;max-width:780px;margin:0 auto;overflow:hidden">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)">'
+        +'<div>'
+          +'<div style="font-size:17px;font-weight:800">🔄 Reconciliación de Stock</div>'
+          +'<div style="font-size:12px;color:var(--muted);margin-top:2px">Compara tabla stock vs comprobantes y corrige diferencias</div>'
+        +'</div>'
+        +'<button onclick="document.getElementById(\'reconOv\').remove()" style="background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;padding:8px 14px;font-family:Barlow,sans-serif;font-size:13px;font-weight:700">✕ Cerrar</button>'
+      +'</div>'
+      +'<div style="padding:16px 20px;border-bottom:1px solid var(--border);background:var(--card2);font-size:13px;color:var(--muted)">'
+        +'<strong style="color:var(--text)">¿Cómo funciona?</strong> Calcula el saldo real sumando todos los comprobantes por producto+depósito, '
+        +'lo compara con la tabla <code>stock</code>, y muestra las diferencias. Podés corregir todo de una vez o producto por producto.'
+      +'</div>'
+      +'<div id="reconBody" style="padding:16px 20px">'
+        +'<div class="loading"><span class="sp"></span>Analizando diferencias...</div>'
+      +'</div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  await reconCargar();
+}
+
+async function reconCargar(){
+  var body=document.getElementById('reconBody');
+  if(!body) return;
+  body.innerHTML='<div class="loading"><span class="sp"></span>Calculando...</div>';
+  var licId=await invGetLicId();
+
+  try{
+    // 1. Leer stock actual de la tabla stock
+    var stockRows=await sg('stock','licencia_id=eq.'+licId+'&select=deposito_id,producto_id,cantidad&limit=5000');
+    var stockMap={}; // key: depId_prodId → cantidad
+    stockRows.forEach(function(r){
+      stockMap[r.deposito_id+'_'+r.producto_id]=parseFloat(r.cantidad)||0;
+    });
+
+    // 2. Calcular saldo real desde comprobantes
+    // Traer todos los items de comprobantes de esta licencia
+    var compIds_r=await sg('stock_comprobantes',
+      'licencia_id=eq.'+licId+'&select=id,deposito_id&limit=10000'
+    );
+    var compDepMap={}; // compId → depId
+    compIds_r.forEach(function(c){compDepMap[c.id]=c.deposito_id;});
+
+    var allCompIds=compIds_r.map(function(c){return c.id;});
+    var saldosComp={}; // key: depId_prodId → suma cantidad
+
+    if(allCompIds.length){
+      // Fetch en batches de 200 para no reventar la URL
+      var batchSize=200;
+      for(var bi=0;bi<allCompIds.length;bi+=batchSize){
+        var batch=allCompIds.slice(bi,bi+batchSize);
+        var items=await sg('stock_comprobante_items',
+          'comprobante_id=in.('+batch.join(',')+')'
+          +'&select=comprobante_id,producto_id,cantidad&limit=10000'
+        );
+        items.forEach(function(i){
+          var depId=compDepMap[i.comprobante_id];
+          if(!depId) return;
+          var key=depId+'_'+i.producto_id;
+          saldosComp[key]=(saldosComp[key]||0)+(parseFloat(i.cantidad)||0);
+        });
+      }
+    }
+
+    // 3. Comparar: buscar diferencias
+    var diffs=[];
+    var todasKeys=new Set(Object.keys(stockMap).concat(Object.keys(saldosComp)));
+    todasKeys.forEach(function(key){
+      var parts=key.split('_');
+      var depId=parseInt(parts[0]), prodId=parseInt(parts[1]);
+      var enStock=stockMap[key]||0;
+      var enComp=saldosComp[key]||0;
+      var diff=enComp-enStock;
+      if(Math.abs(diff)>0.001){ // diferencia real
+        var dep=(_inv.deps.find(function(d){return d.id===depId;})||{});
+        var suc=(_inv.suc.find(function(s){return s.id===dep.sucursal_id;})||{});
+        // Buscar nombre producto
+        var prodNom='Producto #'+prodId;
+        if(_inv.prds&&_inv.prds.length){
+          var pr=_inv.prds.find(function(p){return p.producto_id===prodId||p.id===prodId;});
+          if(pr) prodNom=pr.nombre_producto||pr.nombre||prodNom;
+        }
+        diffs.push({
+          key:key, depId:depId, prodId:prodId,
+          depNom:dep.nombre||('#'+depId), sucNom:suc.nombre||'',
+          prodNom:prodNom,
+          enStock:enStock, enComp:enComp, diff:diff
+        });
+      }
+    });
+
+    if(!diffs.length){
+      body.innerHTML=
+        '<div style="text-align:center;padding:40px">'
+          +'<div style="font-size:40px;margin-bottom:12px">✅</div>'
+          +'<div style="font-size:16px;font-weight:800;color:var(--green)">Sin diferencias</div>'
+          +'<div style="font-size:13px;color:var(--muted);margin-top:6px">La tabla stock coincide exactamente con los comprobantes</div>'
+        +'</div>';
+      return;
+    }
+
+    // Guardar diffs en closure para usar en corrección
+    window._reconDiffs=diffs;
+
+    body.innerHTML=
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">'
+        +'<div>'
+          +'<span style="font-size:15px;font-weight:800;color:var(--red)">'+diffs.length+' diferencia'+(diffs.length===1?'':'s')+' encontrada'+(diffs.length===1?'':'s')+'</span>'
+          +'<span style="font-size:12px;color:var(--muted);margin-left:10px">La columna "Comp." es la fuente de verdad</span>'
+        +'</div>'
+        +'<button onclick="reconCorregirTodo()" style="background:var(--green);border:none;border-radius:8px;color:#fff;font-family:Barlow,sans-serif;font-size:13px;font-weight:800;padding:10px 20px;cursor:pointer">✓ Corregir todo</button>'
+      +'</div>'
+      +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>'
+        +'<th style="padding:9px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:left;background:var(--card2)">Producto</th>'
+        +'<th style="padding:9px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:left;background:var(--card2)">Depósito</th>'
+        +'<th style="padding:9px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center;background:var(--card2)">Tabla stock</th>'
+        +'<th style="padding:9px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center;background:var(--card2)">Comprobantes</th>'
+        +'<th style="padding:9px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center;background:var(--card2)">Diferencia</th>'
+        +'<th style="padding:9px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center;background:var(--card2)">Acción</th>'
+      +'</tr></thead><tbody>'
+      +diffs.map(function(d,i){
+        var difCol=d.diff>0?'var(--green)':'var(--red)';
+        var difSign=d.diff>0?'+':'';
+        return '<tr style="border-bottom:1px solid var(--border)">'
+          +'<td style="padding:10px 12px;font-weight:600">'+d.prodNom+'</td>'
+          +'<td style="padding:10px 12px"><div style="font-weight:600;font-size:13px">'+d.depNom+'</div>'
+            +(d.sucNom?'<div style="font-size:11px;color:var(--muted)">'+d.sucNom+'</div>':'')+'</td>'
+          +'<td style="padding:10px 12px;text-align:center;font-size:15px;font-weight:700">'+d.enStock+'</td>'
+          +'<td style="padding:10px 12px;text-align:center;font-size:15px;font-weight:800;color:var(--green)">'+d.enComp+'</td>'
+          +'<td style="padding:10px 12px;text-align:center;font-size:15px;font-weight:800;color:'+difCol+'">'+difSign+d.diff+'</td>'
+          +'<td style="padding:10px 12px;text-align:center">'
+            +'<button onclick="reconCorregirUno('+i+')" '
+              +'style="background:var(--g2);border:1px solid var(--green);border-radius:6px;color:var(--green);'
+              +'font-family:Barlow,sans-serif;font-size:11px;font-weight:700;padding:6px 12px;cursor:pointer">'
+              +'Corregir</button>'
+          +'</td>'
+        +'</tr>';
+      }).join('')
+      +'</tbody></table></div>'
+      +'<div style="margin-top:14px;padding:12px 16px;background:var(--o2);border:1px solid var(--orange);border-radius:8px;font-size:12px;color:var(--orange)">'
+        +'⚠️ <strong>Corregir</strong> actualiza la tabla <code>stock</code> para que coincida con los comprobantes. '
+        +'Los comprobantes son la fuente de verdad y no se modifican.'
+      +'</div>';
+
+  }catch(e){
+    body.innerHTML='<div style="color:var(--red);padding:16px">Error: '+e.message+'</div>';
+  }
+}
+
+async function reconCorregirUno(idx){
+  var d=window._reconDiffs[idx];
+  if(!d) return;
+  await reconAplicarCorrecciones([d]);
+}
+
+async function reconCorregirTodo(){
+  if(!window._reconDiffs||!window._reconDiffs.length) return;
+  await reconAplicarCorrecciones(window._reconDiffs);
+}
+
+async function reconAplicarCorrecciones(diffs){
+  var licId=await invGetLicId();
+  var btn=event&&event.target;
+  if(btn){btn.disabled=true;btn.textContent='Corrigiendo...';}
+
+  var errores=0;
+  for(var i=0;i<diffs.length;i++){
+    var d=diffs[i];
+    try{
+      // Upsert stock con el valor correcto (el de comprobantes)
+      await supaPost('stock',{
+        deposito_id:d.depId,
+        sucursal_id:(_inv.deps.find(function(x){return x.id===d.depId;})||{}).sucursal_id||null,
+        licencia_id:licId,
+        producto_id:d.prodId,
+        nombre_producto:d.prodNom,
+        cantidad:d.enComp,
+        updated_at:new Date().toISOString()
+      },'deposito_id,producto_id');
+    }catch(e){
+      console.warn('[Recon] Error en',d.key,':',e.message);
+      errores++;
+    }
+  }
+
+  if(errores===0){
+    toast('✓ '+diffs.length+' corrección'+(diffs.length===1?'':'es')+' aplicada'+(diffs.length===1?'':'s'));
+  } else {
+    toast('⚠️ '+errores+' error'+(errores===1?'':'s')+' al corregir — revisá la consola');
+  }
+
+  // Recargar modal y tabla de inventario
+  await reconCargar();
+  // Invalidar cache para que inventario se refresque al volver
+  _inv.prds=[];
 }
 
 // ════════════════════════════════════════════════════════
