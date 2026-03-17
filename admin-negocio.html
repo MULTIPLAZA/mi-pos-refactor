@@ -993,15 +993,32 @@ async function cargarStockDeposito(){
       'licencia_email=ilike.'+encodeURIComponent(SE)+
       '&inventario=eq.true&activo=eq.true&order=nombre.asc&limit=500'
     );
-    // 2. Cargar stock de los depósitos seleccionados
-    var depIds=_inv.sel.depIds&&_inv.sel.depIds.length?_inv.sel.depIds:_inv.deps.map(function(d){return d.id;});
+    // 2. Determinar depósitos a consultar — deduplicados por nombre de sucursal
+    // Si hay filtro de sucursal activo, usar esos depIds; si no, usar UN depósito por sucursal única
+    var depIds;
+    if(_inv.sel.sucNom){
+      // Filtro activo: todos los deps de esa sucursal (nombre exacto)
+      var sucIdsFilt=_inv.suc.filter(function(s){return s.nombre===_inv.sel.sucNom;}).map(function(s){return s.id;});
+      depIds=_inv.deps.filter(function(d){return sucIdsFilt.includes(d.sucursal_id);}).map(function(d){return d.id;});
+    } else {
+      // Sin filtro: tomar solo el depósito con ID más bajo por nombre de sucursal única
+      // para evitar sumar duplicados
+      var sucNomVisto={};
+      depIds=[];
+      // Ordenar deps por id ascendente y tomar el primero por sucursal-nombre
+      var depsSorted=_inv.deps.slice().sort(function(a,b){return a.id-b.id;});
+      depsSorted.forEach(function(d){
+        var s=_inv.suc.find(function(x){return x.id===d.sucursal_id;});
+        var key=(s?s.nombre.toUpperCase():'?')+'__'+d.nombre.toUpperCase();
+        if(!sucNomVisto[key]){ sucNomVisto[key]=true; depIds.push(d.id); }
+      });
+    }
     var stockRows=[];
     if(depIds.length){
-      // Supabase IN filter: deposito_id=in.(1,2,3)
       var inFilter='deposito_id=in.('+depIds.join(',')+')';
       stockRows=await sg('stock',inFilter+'&licencia_id=eq.'+_inv.licId+'&limit=5000');
     }
-    // 3. Construir mapa stock por producto_id (suma todos los depósitos si hay varios)
+    // 3. Construir mapa stock por producto_id
     var stockMap={};
     stockRows.forEach(function(r){
       var pid=r.producto_id;
@@ -1606,24 +1623,39 @@ async function extBuscar(){
   document.getElementById('extTablaCard').style.display='block';
 
   try{
-    // Obtener dep_ids según filtros de sucursal/depósito
-    var sucIds=_ext.sucs.filter(function(s){return !sucNom||s.nombre===sucNom;}).map(function(s){return s.id;});
-    var depIds=depId?[depId]:_ext.deps.filter(function(d){return sucIds.includes(d.sucursal_id);}).map(function(d){return d.id;});
+    // Obtener dep_ids — deduplicando por nombre de sucursal para evitar contar duplicados
+    var depIds;
+    if(depId){
+      depIds=[depId];
+    } else if(sucNom){
+      // Sucursal seleccionada: incluir todos los dep de todas las sucursales con ese nombre
+      var sucIdsFiltE=_ext.sucs.filter(function(s){return s.nombre===sucNom;}).map(function(s){return s.id;});
+      depIds=_ext.deps.filter(function(d){return sucIdsFiltE.includes(d.sucursal_id);}).map(function(d){return d.id;});
+    } else {
+      // Sin filtro: tomar el dep con ID más bajo por cada nombre-de-sucursal + nombre-de-dep único
+      var seenE={};
+      depIds=[];
+      var depsSortedE=_ext.deps.slice().sort(function(a,b){return a.id-b.id;});
+      depsSortedE.forEach(function(d){
+        var s=_ext.sucs.find(function(x){return x.id===d.sucursal_id;});
+        var key=(s?s.nombre.toUpperCase():'?')+'__'+d.nombre.toUpperCase();
+        if(!seenE[key]){ seenE[key]=true; depIds.push(d.id); }
+      });
+    }
 
-    // Saldo anterior al período (todos los movimientos antes de fd)
+    // Saldo anterior al período
     var saldoAnt=0;
-    if(fd&&depIds.length){
+    if(fd){
       var prevItems=await sg('stock_comprobante_items',
         'producto_id=eq.'+prodId+'&select=cantidad,comprobante_id&limit=5000'
       );
       var prevCompIds=prevItems.map(function(i){return i.comprobante_id;});
       if(prevCompIds.length){
-        var prevComps=await sg('stock_comprobantes',
-          'id=in.('+prevCompIds.join(',')+')'
+        var qPrevC='id=in.('+prevCompIds.join(',')+')'
           +'&licencia_id=eq.'+licId
           +(depIds.length?'&deposito_id=in.('+depIds.join(',')+')'  :'')
-          +'&fecha=lt.'+fd+'T00:00:00&select=id&limit=5000'
-        );
+          +'&fecha=lt.'+fd+'T00:00:00&select=id&limit=5000';
+        var prevComps=await sg('stock_comprobantes',qPrevC);
         var prevCompSet=new Set(prevComps.map(function(c){return c.id;}));
         prevItems.forEach(function(i){if(prevCompSet.has(i.comprobante_id))saldoAnt+=(i.cantidad||0);});
       }
@@ -1911,48 +1943,54 @@ async function movCargarMaestros(){
 }
 
 // ── COMPRAS ───────────────────────────────────────────────
-async function renderCompras(){
-  _mov.modo='compra';
-  _mov.items=[];
+async function renderCompras(tab){
+  tab=tab||'lista';
   var c=document.getElementById('content');
   c.innerHTML='<div class="loading"><span class="sp"></span>Cargando...</div>';
-  try{ await movCargarMaestros(); }
-  catch(e){ c.innerHTML='<div style="padding:24px;color:var(--red)">Error: '+e.message+'</div>'; return; }
-  var hoy=new Date().toISOString().split('T')[0];
-  var depOpts=movBuildDepOpts(null,false);
-  c.innerHTML=movBuildShell({
-    titulo:'Nueva Compra',
-    subtit:'Ingreso de mercadería al depósito',
-    hoy:hoy,
-    tipoFixed:'Compra / Ingreso',
-    depEntradaOpts:depOpts,
-    depSalidaOpts:null,
-    mostrarCosto:true
-  });
-  movRenderGrilla();
+  try{ await movCargarMaestros(); } catch(e){ c.innerHTML='<div style="padding:24px;color:var(--red)">Error: '+e.message+'</div>'; return; }
+  var tabs='<div class="admin-tabs">'
+    +'<button class="atab'+(tab==='lista'?' on':'')+'" onclick="renderCompras('lista')">📋 Lista de compras</button>'
+    +'<button class="atab'+(tab==='nuevo'?' on':'')+'" onclick="renderCompras('nuevo')">+ Nueva compra</button>'
+    +'</div>';
+  if(tab==='lista'){
+    c.innerHTML=tabs+'<div id="movListaWrap"></div>';
+    await movCargarLista(['compra'], 'movListaWrap');
+  } else {
+    _mov.modo='compra'; _mov.items=[];
+    var hoy=new Date().toISOString().split('T')[0];
+    c.innerHTML=tabs+movBuildShell({
+      titulo:'Nueva Compra', subtit:'Ingreso de mercadería al depósito',
+      hoy:hoy, tipoFixed:'Compra / Ingreso',
+      depEntradaOpts:movBuildDepOpts(null,false), depSalidaOpts:null, mostrarCosto:true
+    });
+    movRenderGrilla();
+  }
 }
 
 // ── MOVIMIENTOS DE STOCK ──────────────────────────────────
-async function renderMovStock(){
-  _mov.modo='entrada';
-  _mov.items=[];
+async function renderMovStock(tab){
+  tab=tab||'lista';
   var c=document.getElementById('content');
   c.innerHTML='<div class="loading"><span class="sp"></span>Cargando...</div>';
-  try{ await movCargarMaestros(); }
-  catch(e){ c.innerHTML='<div style="padding:24px;color:var(--red)">Error: '+e.message+'</div>'; return; }
-  var hoy=new Date().toISOString().split('T')[0];
-  var depOpts=movBuildDepOpts(null,false);
-  c.innerHTML=movBuildShell({
-    titulo:'Movimiento de Stock',
-    subtit:'Entrada, salida o transferencia entre depósitos',
-    hoy:hoy,
-    tipoFixed:null,       // el usuario elige
-    depEntradaOpts:depOpts,
-    depSalidaOpts:depOpts,
-    mostrarCosto:false
-  });
-  movTipoChange();
-  movRenderGrilla();
+  try{ await movCargarMaestros(); } catch(e){ c.innerHTML='<div style="padding:24px;color:var(--red)">Error: '+e.message+'</div>'; return; }
+  var tabs='<div class="admin-tabs">'
+    +'<button class="atab'+(tab==='lista'?' on':'')+'" onclick="renderMovStock('lista')">📋 Lista de movimientos</button>'
+    +'<button class="atab'+(tab==='nuevo'?' on':'')+'" onclick="renderMovStock('nuevo')">+ Nuevo movimiento</button>'
+    +'</div>';
+  if(tab==='lista'){
+    c.innerHTML=tabs+'<div id="movListaWrap"></div>';
+    await movCargarLista(['entrada','salida','transferencia_salida','transferencia_entrada','ajuste'], 'movListaWrap');
+  } else {
+    _mov.modo='entrada'; _mov.items=[];
+    var hoy=new Date().toISOString().split('T')[0];
+    var depOpts=movBuildDepOpts(null,false);
+    c.innerHTML=tabs+movBuildShell({
+      titulo:'Movimiento de Stock', subtit:'Entrada, salida o transferencia entre depósitos',
+      hoy:hoy, tipoFixed:null,
+      depEntradaOpts:depOpts, depSalidaOpts:depOpts, mostrarCosto:false
+    });
+    movTipoChange(); movRenderGrilla();
+  }
 }
 
 function movBuildDepOpts(selectedId, withAll){
@@ -2202,8 +2240,8 @@ function movSetCosto(i,v){ var it=_mov.items[i];if(it){it.costo=parseFloat(v)||0
 
 function movLimpiar(){
   _mov.items=[];
-  if(_mov.modo==='compra') renderCompras();
-  else renderMovStock();
+  if(_mov.modo==='compra') renderCompras('nuevo');
+  else renderMovStock('nuevo');
 }
 
 // ── GUARDAR ───────────────────────────────────────────────
@@ -2311,12 +2349,336 @@ async function movGuardar(){
     _inv.prds=[]; // forzar recarga en inventarios
     setTimeout(function(){
       if(btn){btn.disabled=false;btn.textContent='💾 GUARDAR';}
-      if(_mov.modo==='compra') renderCompras(); else renderMovStock();
+      if(_mov.modo==='compra') renderCompras('lista'); else renderMovStock('lista');
     },800);
 
   }catch(e){
     toast('Error al guardar: '+e.message);
     if(btn){btn.disabled=false;btn.textContent='💾 GUARDAR';}
+  }
+}
+
+
+// ── LISTA DE COMPROBANTES ─────────────────────────────────
+async function movCargarLista(tipos, wraId){
+  var wrap=document.getElementById(wraId);
+  if(!wrap) return;
+  wrap.innerHTML='<div class="loading"><span class="sp"></span>Cargando...</div>';
+  var licId=await movGetLicId();
+
+  // Fechas default: últimos 90 días
+  var hoy=new Date(), d90=new Date(hoy); d90.setDate(d90.getDate()-90);
+  var fdDef=d90.getFullYear()+'-'+pad(d90.getMonth()+1)+'-'+pad(d90.getDate());
+  var fhDef=hoy.getFullYear()+'-'+pad(hoy.getMonth()+1)+'-'+pad(hoy.getDate());
+
+  var tiposStr=tipos.join(',');
+  var depOpts='<option value="">Todos los depósitos</option>'
+    +_mov.deps.map(function(d){
+      var s=(_mov.sucs.find(function(x){return x.id===d.sucursal_id;})||{}).nombre||'';
+      return '<option value="'+d.id+'">'+d.nombre+(s?' ('+s+')':'')+'</option>';
+    }).join('');
+
+  wrap.innerHTML=
+    '<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px">'
+      +'<div><label style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Desde</label>'
+        +'<input type="date" id="mlFD" class="d-inp" value="'+fdDef+'"></div>'
+      +'<div><label style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Hasta</label>'
+        +'<input type="date" id="mlFH" class="d-inp" value="'+fhDef+'"></div>'
+      +'<div><label style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Depósito</label>'
+        +'<select id="mlDep" class="d-inp">'+depOpts+'</select></div>'
+      +'<button onclick="movFiltrarLista(\''+tiposStr+'\')" class="btn-sv" style="padding:9px 18px">Buscar</button>'
+    +'</div>'
+    +'<div class="card"><div class="card-h"><span class="card-t" id="mlCount">—</span></div>'
+      +'<div style="overflow-x:auto"><table><thead><tr>'
+        +'<th>Fecha</th><th>Tipo</th><th>Comprobante</th>'
+        +'<th>Depósito</th><th style="text-align:center">Productos</th>'
+        +'<th>Observación</th><th style="text-align:center">Estado</th>'
+        +'<th style="text-align:center">Acciones</th>'
+      +'</tr></thead>'
+      +'<tbody id="mlBody"><tr><td colspan="8" class="loading"><span class="sp"></span>Cargando...</td></tr></tbody>'
+      +'</table></div></div>';
+
+  await movFiltrarLista(tiposStr);
+}
+
+async function movFiltrarLista(tiposStr){
+  var licId=await movGetLicId();
+  var fd=(document.getElementById('mlFD')||{}).value||'';
+  var fh=(document.getElementById('mlFH')||{}).value||'';
+  var depId=parseInt((document.getElementById('mlDep')||{}).value||'0')||null;
+  var tbody=document.getElementById('mlBody');
+  if(!tbody) return;
+  tbody.innerHTML='<tr><td colspan="8" class="loading"><span class="sp"></span>Buscando...</td></tr>';
+
+  try{
+    var tipos=tiposStr.split(',');
+    var q='licencia_id=eq.'+licId
+      +'&tipo=in.('+tipos.join(',')+')'
+      +(depId?'&deposito_id=eq.'+depId:'')
+      +(fd?'&fecha=gte.'+fd+'T00:00:00':'')
+      +(fh?'&fecha=lte.'+fh+'T23:59:59':'')
+      +'&order=fecha.desc&limit=300';
+    var comps=await sg('stock_comprobantes',q);
+
+    // Cargar conteo de items por comprobante
+    var compIds=comps.map(function(c){return c.id;});
+    var itemsCount={};
+    if(compIds.length){
+      var items=await sg('stock_comprobante_items',
+        'comprobante_id=in.('+compIds.join(',')+')'
+        +'&select=comprobante_id,producto_id&limit=5000'
+      );
+      items.forEach(function(i){
+        itemsCount[i.comprobante_id]=(itemsCount[i.comprobante_id]||0)+1;
+      });
+    }
+
+    if(document.getElementById('mlCount'))
+      document.getElementById('mlCount').textContent=comps.length+' comprobantes';
+
+    if(!comps.length){
+      tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--muted)">Sin comprobantes en el período</td></tr>';
+      return;
+    }
+
+    var tcfg={
+      'compra':               {lbl:'Compra',           col:'var(--green)',  bg:'var(--g2)'},
+      'entrada':              {lbl:'Entrada',           col:'var(--green)',  bg:'var(--g2)'},
+      'salida':               {lbl:'Salida',            col:'var(--orange)', bg:'var(--o2)'},
+      'ajuste':               {lbl:'Ajuste',            col:'var(--blue)',   bg:'var(--b2)'},
+      'transferencia_salida': {lbl:'Transf. Salida',    col:'var(--orange)', bg:'var(--o2)'},
+      'transferencia_entrada':{lbl:'Transf. Entrada',   col:'var(--green)',  bg:'var(--g2)'},
+      'anulacion':            {lbl:'Anulación',         col:'var(--red)',    bg:'var(--r2)'},
+    };
+
+    tbody.innerHTML=comps.map(function(c){
+      var tc=tcfg[c.tipo]||{lbl:c.tipo,col:'var(--muted)',bg:'#222'};
+      var dep=(_mov.deps.find(function(d){return d.id===c.deposito_id;})||{}).nombre||('#'+c.deposito_id);
+      var anulado=c.observacion&&c.observacion.includes('[ANULADO]');
+      var esAnulacion=c.tipo==='anulacion'||(c.referencia&&c.referencia.startsWith('ANU-'));
+      var canAnular=!anulado&&!esAnulacion;
+      return '<tr style="opacity:'+(anulado?'0.5':'1')+'">'
+        +'<td style="font-size:12px;white-space:nowrap">'+fmtDT(c.fecha)+'</td>'
+        +'<td><span style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;background:'+tc.bg+';color:'+tc.col+'">'+tc.lbl+'</span></td>'
+        +'<td style="font-weight:600;font-size:13px">'+(c.referencia||'—')+'</td>'
+        +'<td style="font-size:12px;color:var(--muted)">'+dep+'</td>'
+        +'<td style="text-align:center;font-weight:700">'+(itemsCount[c.id]||0)+'</td>'
+        +'<td style="font-size:12px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(c.observacion||'')+'</td>'
+        +'<td style="text-align:center">'
+          +(anulado
+            ?'<span class="tag tag-r">ANULADO</span>'
+            :(esAnulacion?'<span class="tag tag-gr">ANULACIÓN</span>':'<span class="tag tag-g">ACTIVO</span>'))
+        +'</td>'
+        +'<td style="text-align:center;white-space:nowrap;display:flex;gap:5px;justify-content:center">'
+          +'<button onclick="movVerDetalle('+c.id+')" style="background:var(--b2);border:1px solid var(--blue);border-radius:6px;color:var(--blue);font-family:Barlow,sans-serif;font-size:11px;font-weight:700;padding:5px 9px;cursor:pointer">Ver</button>'
+          +(canAnular?'<button onclick="movConfirmarAnulacion('+c.id+',\''+c.referencia+'\')" style="background:var(--r2);border:1px solid var(--red);border-radius:6px;color:var(--red);font-family:Barlow,sans-serif;font-size:11px;font-weight:700;padding:5px 9px;cursor:pointer">Anular</button>':'')
+        +'</td>'
+      +'</tr>';
+    }).join('');
+  }catch(e){
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--red)">Error: '+e.message+'</td></tr>';
+  }
+}
+
+// ── VER DETALLE COMPROBANTE ────────────────────────────────
+async function movVerDetalle(compId){
+  // Crear modal overlay
+  var ov=document.createElement('div');
+  ov.id='movDetOv';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:20px 10px;overflow-y:auto';
+  ov.innerHTML='<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;width:100%;max-width:620px;overflow:hidden">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)">'
+      +'<div style="font-size:16px;font-weight:800">Detalle del comprobante</div>'
+      +'<button onclick="document.getElementById(\'movDetOv\').remove()" style="background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;padding:7px 13px;font-family:Barlow,sans-serif;font-size:13px;font-weight:700">✕ Cerrar</button>'
+    +'</div>'
+    +'<div id="movDetBody" style="padding:20px"><div class="loading"><span class="sp"></span>Cargando...</div></div>'
+    +'</div>';
+  document.body.appendChild(ov);
+
+  try{
+    var comps=await sg('stock_comprobantes','id=eq.'+compId+'&select=*');
+    var items=await sg('stock_comprobante_items','comprobante_id=eq.'+compId+'&order=nombre_producto.asc');
+    if(!comps.length){document.getElementById('movDetBody').innerHTML='<div style="color:var(--red)">No encontrado</div>';return;}
+    var c=comps[0];
+    var dep=(_mov.deps.find(function(d){return d.id===c.deposito_id;})||{}).nombre||('#'+c.deposito_id);
+    var suc=(_mov.sucs.find(function(s){return s.id===c.sucursal_id;})||{}).nombre||'';
+    var tcfg={
+      'compra':'Compra','entrada':'Entrada','salida':'Salida','ajuste':'Ajuste',
+      'transferencia_salida':'Transferencia (Salida)','transferencia_entrada':'Transferencia (Entrada)',
+      'anulacion':'Anulación'
+    };
+    var totEnt=0,totSal=0;
+    items.forEach(function(i){if((i.cantidad||0)>0)totEnt+=i.cantidad;else totSal+=Math.abs(i.cantidad);});
+
+    document.getElementById('movDetBody').innerHTML=
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
+        +'<div style="background:var(--card2);border-radius:8px;padding:12px">'
+          +'<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-weight:700;margin-bottom:8px">Encabezado</div>'
+          +'<div class="cj-dr"><span style="color:var(--muted)">Fecha</span><span>'+fmtDT(c.fecha)+'</span></div>'
+          +'<div class="cj-dr"><span style="color:var(--muted)">Tipo</span><span style="font-weight:700">'+(tcfg[c.tipo]||c.tipo)+'</span></div>'
+          +'<div class="cj-dr"><span style="color:var(--muted)">Comprobante</span><span style="font-weight:600">'+(c.referencia||'—')+'</span></div>'
+        +'</div>'
+        +'<div style="background:var(--card2);border-radius:8px;padding:12px">'
+          +'<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-weight:700;margin-bottom:8px">Depósito / Sucursal</div>'
+          +'<div class="cj-dr"><span style="color:var(--muted)">Depósito</span><span style="font-weight:600">'+dep+'</span></div>'
+          +(suc?'<div class="cj-dr"><span style="color:var(--muted)">Sucursal</span><span>'+suc+'</span></div>':'')
+          +'<div class="cj-dr"><span style="color:var(--muted)">Terminal</span><span>'+(c.terminal||'—')+'</span></div>'
+          +'<div class="cj-dr"><span style="color:var(--muted)">Usuario</span><span>'+(c.usuario||'—')+'</span></div>'
+        +'</div>'
+      +'</div>'
+      +(c.observacion?'<div style="background:var(--card2);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--text2)">'+c.observacion+'</div>':'')
+      +'<div style="display:flex;gap:16px;margin-bottom:12px">'
+        +'<span style="font-size:12px;color:var(--muted)">'+items.length+' productos</span>'
+        +(totEnt?'<span style="font-size:12px;font-weight:700;color:var(--green)">+'+totEnt+' uds entrada</span>':'')
+        +(totSal?'<span style="font-size:12px;font-weight:700;color:var(--red)">-'+totSal+' uds salida</span>':'')
+      +'</div>'
+      +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>'
+        +'<th style="padding:8px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:left;background:var(--card2)">Producto</th>'
+        +'<th style="padding:8px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center;background:var(--card2)">Antes</th>'
+        +'<th style="padding:8px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center;background:var(--card2)">Movimiento</th>'
+        +'<th style="padding:8px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center;background:var(--card2)">Después</th>'
+        +'<th style="padding:8px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:right;background:var(--card2)">Costo unit.</th>'
+      +'</tr></thead><tbody>'
+      +items.map(function(i){
+        var cant=i.cantidad||0;
+        return '<tr style="border-bottom:1px solid var(--border)">'
+          +'<td style="padding:9px 12px;font-size:13px;font-weight:600">'+i.nombre_producto+'</td>'
+          +'<td style="padding:9px 12px;text-align:center;color:var(--muted)">'+(i.cantidad_antes!=null?i.cantidad_antes:'—')+'</td>'
+          +'<td style="padding:9px 12px;text-align:center;font-weight:800;font-size:14px;color:'+(cant>0?'var(--green)':'var(--red)')+'">'+(cant>0?'+':'')+cant+'</td>'
+          +'<td style="padding:9px 12px;text-align:center;font-weight:700">'+(i.cantidad_despues!=null?i.cantidad_despues:'—')+'</td>'
+          +'<td style="padding:9px 12px;text-align:right;color:var(--muted)">'+(i.costo_unitario?gs(i.costo_unitario):'—')+'</td>'
+        +'</tr>';
+      }).join('')
+      +'</tbody></table></div>';
+  }catch(e){
+    document.getElementById('movDetBody').innerHTML='<div style="color:var(--red)">Error: '+e.message+'</div>';
+  }
+}
+
+// ── ANULAR COMPROBANTE ────────────────────────────────────
+function movConfirmarAnulacion(compId, referencia){
+  var ov=document.createElement('div');
+  ov.id='movAnulOv';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:1001;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML='<div style="background:var(--card);border:1px solid var(--red);border-radius:14px;max-width:420px;width:100%;padding:28px 24px;text-align:center">'
+    +'<div style="font-size:32px;margin-bottom:12px">⚠️</div>'
+    +'<div style="font-size:17px;font-weight:800;margin-bottom:8px">¿Anular comprobante?</div>'
+    +'<div style="font-size:13px;color:var(--muted);margin-bottom:6px">Comprobante: <strong>'+(referencia||('#'+compId))+'</strong></div>'
+    +'<div style="font-size:13px;color:var(--muted);margin-bottom:20px">Se creará un comprobante inverso que revierte todos los movimientos de stock. Esta acción queda registrada.</div>'
+    +'<div style="margin-bottom:12px"><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-align:left">Motivo de anulación (obligatorio)</label>'
+      +'<input type="text" id="movAnulMotivo" class="cfg-inp" style="width:100%" placeholder="Ej: Error de carga, proveedor devuelto..."></div>'
+    +'<div style="display:flex;gap:10px">'
+      +'<button onclick="document.getElementById(\'movAnulOv\').remove()" class="btn-dn" style="flex:1;padding:12px">Cancelar</button>'
+      +'<button onclick="movEjecutarAnulacion('+compId+')" class="btn-sv" style="flex:1;padding:12px;background:var(--red);border-color:var(--red)">Confirmar anulación</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  document.getElementById('movAnulMotivo').focus();
+}
+
+async function movEjecutarAnulacion(compId){
+  var motivo=(document.getElementById('movAnulMotivo')||{}).value||'';
+  if(!motivo.trim()){toast('El motivo de anulación es obligatorio');return;}
+  var btn=document.querySelector('[onclick="movEjecutarAnulacion('+compId+')"]');
+  if(btn){btn.disabled=true;btn.textContent='Procesando...';}
+
+  try{
+    var licId=await movGetLicId();
+    // Leer comprobante original
+    var comps=await sg('stock_comprobantes','id=eq.'+compId+'&select=*');
+    var items=await sg('stock_comprobante_items','comprobante_id=eq.'+compId+'&select=*');
+    if(!comps.length) throw new Error('Comprobante no encontrado');
+    var orig=comps[0];
+
+    // Verificar no anulado ya
+    if(orig.observacion&&orig.observacion.includes('[ANULADO]')) throw new Error('Este comprobante ya fue anulado');
+
+    var now=new Date().toISOString();
+    var dep=(_mov.deps.find(function(d){return d.id===orig.deposito_id;})||{});
+
+    // Leer stock actual
+    var prodIds=items.map(function(i){return i.producto_id;});
+    var stockR=await sg('stock',
+      'deposito_id=eq.'+orig.deposito_id
+      +'&producto_id=in.('+prodIds.join(',')+')'
+      +'&licencia_id=eq.'+licId
+      +'&select=producto_id,cantidad'
+    );
+    var stockMap={};
+    stockR.forEach(function(s){stockMap[s.producto_id]=s.cantidad||0;});
+
+    // Crear comprobante de anulación (cantidades invertidas)
+    var compAnulR=await supaPost('stock_comprobantes',{
+      licencia_id:licId,
+      deposito_id:orig.deposito_id,
+      sucursal_id:orig.sucursal_id,
+      tipo:'anulacion',
+      referencia:'ANU-'+(orig.referencia||orig.id),
+      observacion:'Anulación de: '+(orig.referencia||('#'+orig.id))+' | '+motivo,
+      terminal:'admin', usuario:SE, fecha:now
+    },null);
+    var newCompId=Array.isArray(compAnulR)?compAnulR[0].id:compAnulR.id;
+
+    // Items invertidos
+    var itemsInv=items.map(function(i){
+      var cantInv=-(i.cantidad||0);
+      var antes=stockMap[i.producto_id]||0;
+      var desp=antes+cantInv;
+      return {
+        comprobante_id:newCompId,
+        producto_id:i.producto_id,
+        nombre_producto:i.nombre_producto,
+        cantidad:cantInv,
+        cantidad_antes:antes,
+        cantidad_despues:desp,
+        costo_unitario:i.costo_unitario||0
+      };
+    });
+    await supaPost('stock_comprobante_items',itemsInv,null);
+
+    // Actualizar stock — invertir cada item
+    for(var k=0;k<items.length;k++){
+      var it=items[k];
+      var antes2=stockMap[it.producto_id]||0;
+      var cantInv2=-(it.cantidad||0);
+      fetch(SUPA_URL+'/rest/v1/stock?on_conflict=deposito_id,producto_id',{
+        method:'POST',
+        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+          'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+        body:JSON.stringify({
+          deposito_id:orig.deposito_id, sucursal_id:orig.sucursal_id,
+          licencia_id:licId, producto_id:it.producto_id,
+          nombre_producto:it.nombre_producto,
+          cantidad:antes2+cantInv2, updated_at:now
+        })
+      }).catch(function(e){console.warn('[Stock anul]',e.message);});
+    }
+
+    // Marcar comprobante original como anulado
+    await supaPatch('stock_comprobantes','id=eq.'+compId,{
+      observacion:(orig.observacion?orig.observacion+' ':'')+'[ANULADO] '+now+' | '+motivo
+    });
+
+    // Invalidar cache
+    _inv.prds=[];
+
+    var ovAnul=document.getElementById('movAnulOv');
+    if(ovAnul) ovAnul.remove();
+    toast('✓ Comprobante anulado — stock revertido');
+
+    // Recargar lista
+    var mlBody=document.getElementById('mlBody');
+    if(mlBody){
+      var tiposStr=mlBody.closest('[id="movListaWrap"]')?'compra':
+        'entrada,salida,transferencia_salida,transferencia_entrada,ajuste';
+      // determine mode from current page
+      if(curPage==='compras') await movFiltrarLista('compra');
+      else await movFiltrarLista('entrada,salida,transferencia_salida,transferencia_entrada,ajuste');
+    }
+
+  }catch(e){
+    toast('Error: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='Confirmar anulación';}
   }
 }
 
