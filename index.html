@@ -33,11 +33,92 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  /* ══ AMPERSAND BRAND THEME ═════════════════════════════ */
   :root {
-    --bg:#2e2e2e; --bg-dark:#222; --bg-header:#1e1e1e; --bg-card:#3a3a3a;
-    --green:#4caf50; --green-btn:#43a047; --green-dark:#2e7d32;
-    --text:#fff; --muted:#999; --label:#aaa; --border:#444; --border2:#555;
+    --brand-burgundy: #800020;
+    --brand-cream:    #f5f0dc;
+    --brand-gold:     #c8960c;
   }
+
+  /* Dark mode — default */
+  :root, [data-theme="dark"] {
+    --bg:        #1e1e1e;
+    --bg-dark:   #161616;
+    --bg-header: #800020;
+    --bg-card:   #2a2a2a;
+    --green:     #c8960c;
+    --green-btn: #b8860b;
+    --green-dark:#8b6508;
+    --text:      #f5f0dc;
+    --muted:     #a89880;
+    --label:     #c8b090;
+    --border:    #3a2020;
+    --border2:   #4a2a2a;
+    --hdr-text:  #f5f0dc;
+  }
+
+  /* Light mode */
+  [data-theme="light"] {
+    --bg:        #f8f4ec;
+    --bg-dark:   #ede8dd;
+    --bg-header: #800020;
+    --bg-card:   #ffffff;
+    --green:     #b8860b;
+    --green-btn: #a07808;
+    --green-dark:#7a5c06;
+    --text:      #1a0a0a;
+    --muted:     #7a6050;
+    --label:     #6a5040;
+    --border:    #d4c4b0;
+    --border2:   #c0b09c;
+    --hdr-text:  #f5f0dc;
+  }
+
+  /* Light mode overrides */
+  [data-theme="light"] body,
+  [data-theme="light"] .screen { background: var(--bg); }
+  [data-theme="light"] .filter-bar { background:var(--bg-dark); border-bottom:1px solid var(--border); }
+  [data-theme="light"] .fdrop span { color:var(--text); }
+  [data-theme="light"] .fdrop svg  { stroke:var(--label); }
+  [data-theme="light"] .search-bar { background:var(--bg-dark); border-bottom:1px solid var(--border); }
+  [data-theme="light"] .sinput { background:#fff; border-color:var(--border2); color:var(--text); }
+  [data-theme="light"] .sinput::placeholder { color:var(--muted); }
+  [data-theme="light"] .cat-sheet     { background:var(--bg-card); }
+  [data-theme="light"] .cat-sheet-hdr { background:var(--bg-card); border-bottom:1px solid var(--border); }
+  [data-theme="light"] .cat-sheet-ttl { color:var(--muted); }
+  [data-theme="light"] .cat-item      { color:var(--text); border-bottom:1px solid var(--border); }
+  [data-theme="light"] .cat-item.sel  { background:rgba(184,134,11,.08); color:var(--green); }
+  [data-theme="light"] .cat-sheet-cls { background:var(--bg-dark); color:var(--muted); }
+  [data-theme="light"] .drawer        { background:var(--bg-card); }
+  [data-theme="light"] .drawer-item   { color:var(--text); }
+  [data-theme="light"] .drawer-item:hover { background:var(--bg-dark); }
+  [data-theme="light"] input, [data-theme="light"] textarea, [data-theme="light"] select {
+    background:var(--bg-card); border-color:var(--border2); color:var(--text);
+  }
+  [data-theme="light"] .card, [data-theme="light"] .modal-box { background:var(--bg-card); }
+  [data-theme="light"] .npb { background:var(--bg-dark); color:var(--text); border-color:var(--border); }
+  [data-theme="light"] .tkt-item, [data-theme="light"] .det-line {
+    background:var(--bg-card); border-color:var(--border); color:var(--text);
+  }
+  [data-theme="light"] .det-footer, [data-theme="light"] .cobrar-bar,
+  [data-theme="light"] .tkt-total { background:var(--bg-dark); }
+  [data-theme="light"] .cfg-section { background:var(--bg-card); border-color:var(--border); }
+  [data-theme="light"] .cfg-label { color:var(--text); }
+  [data-theme="light"] .tbadge { background:var(--hdr-text); color:var(--bg-header); }
+  [data-theme="light"] #scClosed { background:var(--bg); color:var(--text); }
+  [data-theme="light"] .shift-card { background:var(--bg-card); border:1px solid var(--border); }
+
+  /* Theme toggle button */
+  .theme-toggle {
+    width:34px; height:34px; border-radius:50%;
+    background:rgba(255,255,255,.15); border:none;
+    cursor:pointer; display:flex; align-items:center;
+    justify-content:center; font-size:16px; flex-shrink:0;
+    transition:background .15s ease;
+    color: var(--hdr-text);
+  }
+  .theme-toggle:hover  { background:rgba(255,255,255,.25); }
+  .theme-toggle:active { background:rgba(255,255,255,.35); }
   html { background:var(--bg); }
   body {
     font-family:'Barlow',sans-serif; color:var(--text);
@@ -974,6 +1055,12 @@
   /* ── CATEGORY OVERLAY ── */
   .cat-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:100; align-items:flex-end; justify-content:center; }
   .cat-overlay.open { display:flex; }
+  #catOv {
+    display:none; position:fixed; inset:0; z-index:300;
+    background:rgba(0,0,0,0); align-items:flex-end; justify-content:center;
+    transition:background .22s ease;
+  }
+  #catOv.open { display:flex; background:rgba(0,0,0,.55); }
   .cat-sheet {
     background:#1e1e1e;
     width:100%; max-width:600px;
@@ -2441,6 +2528,8 @@
     <div class="hright">
       <button class="hbtn"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></button>
       <button class="hbtn"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
+    
+      <button class="hbtn theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
     </div>
   </header>
   <div class="action-bar">
@@ -2725,13 +2814,10 @@
   <div class="cat-sheet">
     <div class="cat-sheet-hdr">
       <span class="cat-sheet-ttl">Categorías</span>
-      <button class="cat-sheet-cls" onclick="document.getElementById('catOv').classList.remove('open')">✕</button>
     </div>
     <div id="catSheetContent"></div>
   </div>
 </div>
-
-<div class="toast" id="toast"></div>
 
 <script>
 const PRODS = [
@@ -7306,52 +7392,44 @@ const DEMO_KEYS = {
 const USAR_DEMO = (SUPA_URL === 'https://XXXXXXXXXXXXXXXX.supabase.co');
 
 function licGetDeviceId(){
-  // Priority: localStorage → sessionStorage → generate NEW unique ID
+  // Try all storage layers - most persistent first
   let id = localStorage.getItem(SK.deviceId)
          || sessionStorage.getItem(SK.deviceId);
   if(!id){
-    // Generate cryptographically random ID — never based on fingerprint alone
-    // so two identical devices ALWAYS get different IDs
-    const rand = typeof crypto !== 'undefined' && crypto.randomUUID
+    // Generate stable ID based on browser fingerprint + random
+    const rand = (typeof crypto!=='undefined' && crypto.randomUUID)
       ? crypto.randomUUID()
-      : Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2);
-    id = 'dev_' + rand.replace(/-/g,'').slice(0, 20);
+      : (Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2));
+    id = 'dev_' + rand.replace(/-/g,'').slice(0,20);
   }
-  // Persist in all layers (but NEVER overwrite with someone else's ID)
+  // Persist in all layers
   localStorage.setItem(SK.deviceId, id);
   sessionStorage.setItem(SK.deviceId, id);
-  if(typeof db !== 'undefined' && db){
+  // Also save in IndexedDB via dbSaveConfig if available
+  if(typeof db !== 'undefined' && db) {
     try { db.config.put({key:'device_id', value:id}); } catch(e){}
   }
   return id;
 }
 
 async function licGetDeviceIdAsync(){
-  // 1. Try fastest layers first
+  // Try localStorage/sessionStorage first (fast)
   let id = localStorage.getItem(SK.deviceId) || sessionStorage.getItem(SK.deviceId);
   if(id) return id;
-
-  // 2. Try IndexedDB — survives localStorage.clear()
+  // Try IndexedDB (survives localStorage clear)
   try {
     if(typeof db !== 'undefined' && db){
       const row = await db.config.get('device_id');
-      if(row && row.value){
-        id = row.value;
-        // Restore to localStorage/sessionStorage
-        localStorage.setItem(SK.deviceId, id);
-        sessionStorage.setItem(SK.deviceId, id);
-        return id;
-      }
+      if(row && row.value){ id = row.value; }
     }
   } catch(e){}
-
-  // 3. No ID found anywhere — generate a NEW unique one for THIS device
-  const rand = typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2);
-  id = 'dev_' + rand.replace(/-/g,'').slice(0, 20);
-
-  // Persist everywhere
+  if(!id){
+    // Generate new ID
+    const rand = (typeof crypto!=='undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : (Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2));
+    id = 'dev_' + rand.replace(/-/g,'').slice(0,20);
+  }
   localStorage.setItem(SK.deviceId, id);
   sessionStorage.setItem(SK.deviceId, id);
   if(typeof db !== 'undefined' && db){
@@ -7474,17 +7552,12 @@ async function licInit(){
   }
   const neg=localStorage.getItem(SK.negocio);
   if(neg&&typeof configData!=='undefined') configData.negocio=neg;
-  // Si faltan datos de terminal, intentar recuperar de Supabase
-  // SOLO si el dispositivo ya fue registrado antes (tiene config propia)
-  if(!localStorage.getItem('pos_terminal') || !localStorage.getItem('pos_sucursal')){
+  if(!localStorage.getItem('pos_terminal')||!localStorage.getItem('pos_sucursal')){
     try{
-      await licGetDeviceIdAsync(); // asegurar que tenemos el ID correcto
-      const cfg = await recuperarConfigTerminalSupabase(); // solo devuelve config de ESTE device
-      if(cfg){
-        aplicarConfigTerminal(cfg);
-        console.log('[licInit] Terminal recuperada:', cfg.terminal, '/', cfg.sucursal);
-      }
-    }catch(e){ console.warn('[licInit] No se pudo recuperar config:', e.message); }
+      await licGetDeviceIdAsync();
+      const cfg=await recuperarConfigTerminalSupabase();
+      if(cfg){ aplicarConfigTerminal(cfg); console.log('[licInit] Terminal recuperada:', cfg.terminal); }
+    }catch(e){}
   }
   return true;
 }
@@ -7514,23 +7587,20 @@ async function doActivar(){
   document.getElementById('activadoNegocio').value='';
   // Mostrar spinner mientras buscamos config previa
   const btnEntrar = document.getElementById('scActivado');
-  // Intentar recuperar config de ESTE dispositivo específico
   try{
-    const deviceId = await licGetDeviceIdAsync();
-    const cfg = await recuperarConfigTerminalSupabase(); // ya usa el deviceId correcto
+    // Asegurar que tenemos el deviceId correcto (incluyendo IndexedDB)
+    await licGetDeviceIdAsync();
+    const cfg = await recuperarConfigTerminalSupabase();
     if(cfg && cfg.terminal && cfg.sucursal){
-      // ✅ Este dispositivo ya fue configurado antes — entrar directo
+      // ✅ Dispositivo ya registrado — restaurar config y entrar directo
       aplicarConfigTerminal(cfg);
-      console.log('[Activar] Terminal restaurada:', cfg.terminal, '/', cfg.sucursal);
+      await guardarConfigTerminalSupabase(cfg); // actualizar con nuevo deviceId si cambió
       document.getElementById('scActivado').style.display='none';
       await iniciarApp();
       return;
     }
   }catch(e){ console.warn('[Activar] No se pudo recuperar config:', e.message); }
-  // Este dispositivo no tiene config → mostrar formulario de setup
-  // Pre-llenar nombre del negocio si lo tenemos
-  const negGuardado = localStorage.getItem(SK.negocio);
-  if(negGuardado) document.getElementById('activadoNegocio').value = negGuardado;
+  // No hay config previa → mostrar formulario de setup
   document.getElementById('scActivado').style.display='flex';
 }
 
@@ -7724,38 +7794,21 @@ function animAddToCart(tileEl, color){
 
 async function guardarConfigTerminalSupabase(cfg){
   if(USAR_DEMO) return;
-  const email = localStorage.getItem(SK.email); if(!email) return;
-  const deviceId = await licGetDeviceIdAsync(); // siempre usar el ID de ESTE dispositivo
+  const email=localStorage.getItem(SK.email); if(!email) return;
   try{
-    await fetch(SUPA_URL+'/rest/v1/pos_config',{
-      method:'POST',
+    await fetch(SUPA_URL+'/rest/v1/pos_config',{method:'POST',
       headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-      body:JSON.stringify({
-        clave: 'terminal_config_'+deviceId,
-        valor: JSON.stringify({
-          negocio:  cfg.negocio,
-          terminal: cfg.terminal,
-          sucursal: cfg.sucursal,
-          deposito: cfg.deposito,
-          deviceId: deviceId,  // guardamos el deviceId para validar al recuperar
-          savedAt:  new Date().toISOString()
-        }),
-        licencia_email: email
-      })
-    });
-    console.log('[Terminal] Config guardada — device:', deviceId.slice(0,12));
-  }catch(e){console.warn('[Terminal] Error guardando:', e.message);}
+      body:JSON.stringify({clave:'terminal_config_'+licGetDeviceId(),
+        valor:JSON.stringify({negocio:cfg.negocio,terminal:cfg.terminal,sucursal:cfg.sucursal,deposito:cfg.deposito,deviceId:licGetDeviceId()}),
+        licencia_email:email})});
+    console.log('[Terminal] Config guardada en Supabase');
+  }catch(e){console.warn('[Terminal]',e.message);}
 }
 
 async function recuperarConfigTerminalSupabase(){
-  // IMPORTANTE: solo recupera config del device_id de ESTE dispositivo.
-  // NO usa fallback al último registro — eso causaría que un nuevo dispositivo
-  // adopte la configuración de otro.
   if(USAR_DEMO) return null;
-  const email = localStorage.getItem(SK.email);
-  if(!email) return null;
+  const email = localStorage.getItem(SK.email); if(!email) return null;
   const deviceId = await licGetDeviceIdAsync();
-  if(!deviceId) return null;
   try{
     const r = await fetch(
       SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)
@@ -7765,34 +7818,73 @@ async function recuperarConfigTerminalSupabase(){
     const data = await r.json();
     if(data && data[0]){
       const cfg = JSON.parse(data[0].valor);
-      // Verificar que el deviceId guardado coincide con este dispositivo
-      // Si no coincide, ignorar (puede pasar si se copió la DB)
       if(cfg.deviceId && cfg.deviceId !== deviceId){
-        console.warn('[Terminal] deviceId mismatch — ignoring config from other device');
+        console.warn('[Terminal] deviceId mismatch — ignorando config de otro dispositivo');
         return null;
       }
       return cfg;
     }
     return null;
-  }catch(e){
-    console.warn('[Terminal] Error recuperando config:', e.message);
-    return null;
-  }
+  }catch(e){ return null; }
 }
-
 function aplicarConfigTerminal(cfg){
   if(!cfg) return false;
-  // Aplica negocio, terminal, sucursal, depósito — pero NUNCA el deviceId
-  // El deviceId pertenece a este dispositivo y no debe copiarse de otro
-  if(cfg.negocio)  { localStorage.setItem(SK.negocio,cfg.negocio);   if(typeof configData!=='undefined') configData.negocio=cfg.negocio; }
-  if(cfg.terminal) { localStorage.setItem('pos_terminal',cfg.terminal); if(typeof configData!=='undefined') configData.terminal=cfg.terminal; }
-  if(cfg.sucursal) { localStorage.setItem('pos_sucursal',cfg.sucursal); if(typeof configData!=='undefined') configData.sucursal=cfg.sucursal; }
-  if(cfg.deposito) { localStorage.setItem('pos_deposito',cfg.deposito); if(typeof configData!=='undefined') configData.deposito=cfg.deposito; }
-  // ⚠️ NUNCA copiar cfg.deviceId — cada dispositivo tiene su propio ID único
+  if(cfg.negocio) {localStorage.setItem(SK.negocio,cfg.negocio);if(typeof configData!=='undefined')configData.negocio=cfg.negocio;}
+  if(cfg.terminal){localStorage.setItem('pos_terminal',cfg.terminal);if(typeof configData!=='undefined')configData.terminal=cfg.terminal;}
+  if(cfg.sucursal){localStorage.setItem('pos_sucursal',cfg.sucursal);if(typeof configData!=='undefined')configData.sucursal=cfg.sucursal;}
+  if(cfg.deposito){localStorage.setItem('pos_deposito',cfg.deposito);if(typeof configData!=='undefined')configData.deposito=cfg.deposito;}
+  if(cfg.deviceId){localStorage.setItem(SK.deviceId,cfg.deviceId);sessionStorage.setItem(SK.deviceId,cfg.deviceId);}
   return true;
 }
 
+// ── THEME ────────────────────────────────────────────────────────────────
+function toggleTheme(){
+  const curr = document.documentElement.getAttribute('data-theme') || 'dark';
+  const next = curr === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('pos_theme', next);
+  const btn = document.getElementById('themeToggleBtn');
+  if(btn) btn.textContent = next === 'dark' ? '🌙' : '☀️';
+}
+function applyTheme(){
+  const saved = localStorage.getItem('pos_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  const btn = document.getElementById('themeToggleBtn');
+  if(btn) btn.textContent = saved === 'dark' ? '🌙' : '☀️';
+}
+
 (async function(){
+  applyTheme();
+  try {
+    await initDB();
+    await dbLoadCategorias();
+    await dbLoadProductos();
+  } catch(e){
+    console.log('[DB] Error al iniciar:', e.message);
+  }
+
+  const ok = await licInit();
+  if(ok) await iniciarApp();
+})();
+
+// ── THEME ────────────────────────────────────────────────────────────────
+function toggleTheme(){
+  const curr = document.documentElement.getAttribute('data-theme') || 'dark';
+  const next = curr === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('pos_theme', next);
+  const btn = document.getElementById('themeToggleBtn');
+  if(btn) btn.textContent = next === 'dark' ? '🌙' : '☀️';
+}
+function applyTheme(){
+  const saved = localStorage.getItem('pos_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  const btn = document.getElementById('themeToggleBtn');
+  if(btn) btn.textContent = saved === 'dark' ? '🌙' : '☀️';
+}
+
+(async function(){
+  applyTheme();
   try {
     await initDB();
     await dbLoadCategorias();
@@ -7808,14 +7900,10 @@ function aplicarConfigTerminal(cfg){
 
 <script>
 if('serviceWorker' in navigator){
-  window.addEventListener('load', function(){
+  window.addEventListener('load',function(){
     navigator.serviceWorker.register('/sw.js')
-      .then(function(reg){
-        console.log('[SW] Registrado:', reg.scope);
-      })
-      .catch(function(err){
-        console.warn('[SW] Error:', err);
-      });
+      .then(function(r){console.log('[SW] OK:',r.scope);})
+      .catch(function(e){console.warn('[SW] Error:',e);});
   });
 }
 </script>
