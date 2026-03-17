@@ -776,7 +776,7 @@ function filtrP(q){if(!allPrds.length) return;var f=q.toLowerCase();renderPT(!q?
 // licencia_id se resuelve via SE (email) → licencias.email_cliente
 var _inv = {
   licId: null, prds: [], deps: [], suc: [],
-  sel: { depId:null, depNom:'', sucId:null, sucNom:'' },
+  sel: { depId:null, depIds:[], depNom:'', sucId:null, sucNom:'' },
   prodActivo: null
 };
 
@@ -800,14 +800,10 @@ async function renderInventarios(){
       sg('depositos','licencia_id=eq.'+licId+'&activo=eq.true&order=nombre.asc')
     ]);
     _inv.suc = sucs; _inv.deps = deps;
-    // Depósito por defecto: el primero
-    if(!_inv.sel.depId && deps.length){
-      _inv.sel.depId  = deps[0].id;
-      _inv.sel.depNom = deps[0].nombre;
-      _inv.sel.sucId  = deps[0].sucursal_id;
-      var s = sucs.find(function(x){return x.id===deps[0].sucursal_id;});
-      _inv.sel.sucNom = s?s.nombre:'';
-    }
+    // Inicializar con "todas las sucursales"
+    _inv.sel.sucNom = '';
+    _inv.sel.depIds = deps.map(function(d){return d.id;});
+    _inv.sel.depId  = deps.length?deps[0].id:null;
     renderInvShell();
     await cargarStockDeposito();
   }catch(e){
@@ -817,23 +813,24 @@ async function renderInventarios(){
 
 function renderInvShell(){
   var deps=_inv.deps, sucs=_inv.suc;
-  // Construir selector de depósitos agrupado por sucursal
-  var selOpts='';
+  // Deduplicar sucursales por nombre (puede haber duplicados en DB)
+  var sucsUnicas=[], nombresVistos={};
   sucs.forEach(function(s){
-    var dds=deps.filter(function(d){return d.sucursal_id===s.id;});
-    if(!dds.length) return;
-    selOpts+='<optgroup label="'+s.nombre+'">';
-    dds.forEach(function(d){
-      selOpts+='<option value="'+d.id+'" '+(d.id===_inv.sel.depId?'selected':'')+'>'+d.nombre+(d.es_principal?' ★':'')+'</option>';
-    });
-    selOpts+='</optgroup>';
+    var nom=(s.nombre||'').trim().toUpperCase();
+    if(!nombresVistos[nom]){ nombresVistos[nom]=true; sucsUnicas.push(s); }
+  });
+  // Selector: una opción por sucursal única, valor = nombre (para agrupar todos sus depósitos)
+  var selOpts='<option value="">Todas las sucursales</option>';
+  sucsUnicas.forEach(function(s){
+    var sel=(_inv.sel.sucNom&&_inv.sel.sucNom.trim().toUpperCase()===s.nombre.trim().toUpperCase())?'selected':'';
+    selOpts+='<option value="'+s.nombre+'" '+sel+'>'+s.nombre+'</option>';
   });
 
   var c=document.getElementById('content');
   c.innerHTML=
     '<div class="ph">'
       +'<div><div class="pt">Inventarios</div>'
-        +'<div class="ps" id="invDepLabel">Depósito: <strong>'+(_inv.sel.sucNom?_inv.sel.sucNom+' › ':'')+_inv.sel.depNom+'</strong></div>'
+        +'<div class="ps" id="invDepLabel">Sucursal: <strong>'+(_inv.sel.sucNom||'Todas')+'</strong></div>'
       +'</div>'
       +'<div class="dbar">'
         +(selOpts?'<select class="d-inp" id="invDepSel" onchange="cambiarDeposito(this)">'
@@ -968,13 +965,15 @@ function renderInvShell(){
 }
 
 async function cambiarDeposito(sel){
-  var depId=parseInt(sel.value);
-  var dep=_inv.deps.find(function(d){return d.id===depId;});
-  if(!dep) return;
-  _inv.sel.depId=dep.id; _inv.sel.depNom=dep.nombre; _inv.sel.sucId=dep.sucursal_id;
-  var s=_inv.suc.find(function(x){return x.id===dep.sucursal_id;});
-  _inv.sel.sucNom=s?s.nombre:'';
-  document.getElementById('invDepLabel').innerHTML='Depósito: <strong>'+(_inv.sel.sucNom?_inv.sel.sucNom+' › ':'')+_inv.sel.depNom+'</strong>';
+  var sucNom=sel.value; // ahora es nombre de sucursal
+  _inv.sel.sucNom=sucNom;
+  // Obtener todos los depósito_ids de sucursales con este nombre (cubre duplicados)
+  var sucIds=_inv.suc.filter(function(s){return !sucNom||s.nombre===sucNom;}).map(function(s){return s.id;});
+  _inv.sel.depIds=_inv.deps.filter(function(d){return sucIds.includes(d.sucursal_id);}).map(function(d){return d.id;});
+  // Para compatibilidad, mantener depId como el primero
+  _inv.sel.depId=_inv.sel.depIds[0]||null;
+  var lbl=sucNom||'Todas las sucursales';
+  document.getElementById('invDepLabel').innerHTML='Sucursal: <strong>'+lbl+'</strong>';
   await cargarStockDeposito();
 }
 
@@ -982,11 +981,38 @@ async function cargarStockDeposito(){
   if(!document.getElementById('invBody')) return;
   document.getElementById('invBody').innerHTML='<tr><td colspan="7" class="loading"><span class="sp"></span>Cargando...</td></tr>';
   try{
-    var rows=await sg('stock',
-      'deposito_id=eq.'+_inv.sel.depId+
-      '&licencia_id=eq.'+_inv.licId+
-      '&order=nombre_producto.asc&limit=1000'
+    // 1. Cargar productos con inventario=true
+    var prdsDB=await sg('pos_productos',
+      'licencia_email=ilike.'+encodeURIComponent(SE)+
+      '&inventario=eq.true&activo=eq.true&order=nombre.asc&limit=500'
     );
+    // 2. Cargar stock de los depósitos seleccionados
+    var depIds=_inv.sel.depIds&&_inv.sel.depIds.length?_inv.sel.depIds:_inv.deps.map(function(d){return d.id;});
+    var stockRows=[];
+    if(depIds.length){
+      // Supabase IN filter: deposito_id=in.(1,2,3)
+      var inFilter='deposito_id=in.('+depIds.join(',')+')';
+      stockRows=await sg('stock',inFilter+'&licencia_id=eq.'+_inv.licId+'&limit=5000');
+    }
+    // 3. Construir mapa stock por producto_id (suma todos los depósitos si hay varios)
+    var stockMap={};
+    stockRows.forEach(function(r){
+      var pid=r.producto_id;
+      if(!stockMap[pid]) stockMap[pid]={cantidad:0,cantidad_minima:r.cantidad_minima||0,costo:r.costo_unitario||0,dep_ids:[]};
+      stockMap[pid].cantidad+=(r.cantidad||0);
+      stockMap[pid].dep_ids.push(r.deposito_id);
+      if(r.cantidad_minima>stockMap[pid].cantidad_minima) stockMap[pid].cantidad_minima=r.cantidad_minima;
+    });
+    // 4. Combinar: para cada producto con inventario, tomar su stock (0 si no existe aún)
+    var rows=prdsDB.map(function(p){
+      var sk=stockMap[p.id]||{cantidad:0,cantidad_minima:0,costo:0};
+      return {
+        producto_id:p.id, nombre_producto:p.nombre, categoria:p.categoria||'',
+        color:p.color||'#546e7a', codigo:p.codigo||'', precio:p.precio||0,
+        precio_variable:p.precio_variable||false,
+        cantidad:sk.cantidad, cantidad_minima:sk.cantidad_minima, costo_unitario:sk.costo
+      };
+    });
     _inv.prds=rows;
     renderInvTabla(rows);
   }catch(e){
