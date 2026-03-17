@@ -474,32 +474,18 @@ async function doLogin(){
   if(btn){btn.disabled=true;btn.textContent='Verificando...';}
 
   try{
-    // Primero detectar columnas reales de licencias consultando sin filtro
-    var sample = await sg('licencias','limit=1');
     var lic = null;
 
-    if(sample && sample.length > 0){
-      var cols = Object.keys(sample[0]);
-      console.log('[Login] licencias columns:', cols);
+    // Buscar directamente con los nombres reales de columnas de la tabla licencias
+    var rows = await sg('licencias',
+      'email_cliente=ilike.'+encodeURIComponent(email)+
+      '&clave=eq.'+encodeURIComponent(clave)+
+      '&activa=eq.true'+
+      '&select=*'
+    );
 
-      // Determinar nombre de columna de email
-      var emailCol = cols.find(function(c){return c==='email_cliente'||c==='email'||c==='licencia_email'||c==='correo'||c==='user_email';}) || 'email_cliente';
-      // Determinar nombre de columna de clave
-      var claveCol = cols.find(function(c){return c==='clave'||c==='codigo'||c==='code'||c==='license_key';}) || 'clave';
-      var planCol  = cols.find(function(c){return c==='plan_id'||c==='plan'||c==='tipo'||c==='type';}) || 'plan_id';
-      var venceCol = cols.find(function(c){return c==='fecha_vence'||c==='vence'||c==='vencimiento'||c==='expires_at'||c==='expira';}) || 'fecha_vence';
-      var activaCol= cols.find(function(c){return c==='activa'||c==='activo'||c==='active';}) || 'activa';
-
-      console.log('[Login] Using cols:', emailCol, claveCol, planCol, venceCol);
-
-      // Buscar por email + clave
-      var q = emailCol+'=ilike.'+encodeURIComponent(email)+'&'+claveCol+'=eq.'+encodeURIComponent(clave);
-      if(cols.includes(activaCol)) q += '&'+activaCol+'=eq.true';
-      var rows = await sg('licencias', q+'&select=*');
-
-      if(rows && rows.length > 0){
-        lic = { plan: rows[0][planCol]||'Pro', vence: rows[0][venceCol]||'—' };
-      }
+    if(rows && rows.length > 0){
+      lic = { plan: rows[0]['plan_id']||'Pro', vence: rows[0]['fecha_vence']||'—' };
     }
 
     // Si no encontramos nada, intentar con la RPC como fallback
