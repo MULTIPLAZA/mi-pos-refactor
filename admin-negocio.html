@@ -222,6 +222,8 @@ tr:last-child td{border-bottom:none;}
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>Compras</div>
       <div class="sb-i" id="sbi-movstock" onclick="goTo('movstock')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>Movimientos de Stock</div>
+      <div class="sb-i" id="sbi-conteo" onclick="goTo('conteo')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Conteo Físico</div>
       <div style="font-size:10px;color:#3a3a3a;letter-spacing:1px;text-transform:uppercase;font-weight:700;padding:10px 14px 3px;">Sistema</div>
       <div class="sb-i" id="sbi-admin" onclick="goTo('admin')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>Administración</div>
@@ -566,7 +568,7 @@ function goTo(p){
   curPage=p; closeSB();
   document.querySelectorAll('.sb-i').forEach(function(el){el.classList.toggle('on',el.id==='sbi-'+p);});
   document.querySelectorAll('.bn').forEach(function(el){el.classList.toggle('on',el.id==='bni-'+p);});
-  var titles={dashboard:'Dashboard',ventas:'Ventas',terminales:'Terminales',cajas:'Cajas / Turnos',productos:'Productos',inventarios:'Inventarios',extracto:'Extracto de Producto',compras:'Compras',movstock:'Movimientos de Stock',admin:'Administración',config:'Configuración'};
+  var titles={dashboard:'Dashboard',ventas:'Ventas',terminales:'Terminales',cajas:'Cajas / Turnos',productos:'Productos',inventarios:'Inventarios',extracto:'Extracto de Producto',compras:'Compras',movstock:'Movimientos de Stock',conteo:'Conteo Físico',admin:'Administración',config:'Configuración'};
   document.getElementById('topTitle').textContent=titles[p]||p;
   var c=document.getElementById('content');
   c.innerHTML='<div class="loading"><span class="sp"></span>Cargando...</div>';
@@ -583,6 +585,7 @@ function renderPage(p){
   else if(p==='extracto') renderExtracto();
   else if(p==='compras') renderCompras();
   else if(p==='movstock') renderMovStock();
+  else if(p==='conteo') renderConteo();
   else if(p==='admin')  renderAdmin();
   else if(p==='config') renderConfig();
 }
@@ -2847,6 +2850,566 @@ async function reconAplicarCorrecciones(diffs){
   await reconCargar();
   // Invalidar cache para que inventario se refresque al volver
   _inv.prds=[];
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// CONTEO FÍSICO DE INVENTARIO
+// ═══════════════════════════════════════════════════════════
+var _cnt = {
+  licId: null, deps: [], sucs: [],
+  conteoActual: null,   // {id, numero, deposito_id, estado, items:[]}
+  itemsOrig: []         // snapshot del stock al abrir el conteo
+};
+
+async function cntGetLicId(){
+  if(_cnt.licId) return _cnt.licId;
+  if(SLI){ _cnt.licId=SLI; return SLI; }
+  var r=await sg('licencias','email_cliente=ilike.'+encodeURIComponent(SE)+'&activa=eq.true&select=id&limit=1');
+  if(r&&r.length){ _cnt.licId=r[0].id; return r[0].id; }
+  throw new Error('No se encontró licencia');
+}
+
+async function cntCargarMaestros(){
+  if(_cnt.deps.length) return;
+  var licId=await cntGetLicId();
+  var res=await Promise.all([
+    sg('sucursales','licencia_id=eq.'+licId+'&activa=eq.true&order=nombre.asc'),
+    sg('depositos', 'licencia_id=eq.'+licId+'&activo=eq.true&order=nombre.asc')
+  ]);
+  _cnt.sucs=res[0]; _cnt.deps=res[1];
+}
+
+async function renderConteo(tab){
+  tab=tab||'lista';
+  var c=document.getElementById('content');
+  c.innerHTML='<div class="loading"><span class="sp"></span>Cargando...</div>';
+  try{ await cntCargarMaestros(); }
+  catch(e){ c.innerHTML='<div style="padding:24px;color:var(--red)">Error: '+e.message+'</div>'; return; }
+
+  var tabs='<div class="admin-tabs">'
+    +'<button class="atab'+(tab==='lista'?' on':'')+'" onclick="renderConteo(&apos;lista&apos;)">📋 Historial de conteos</button>'
+    +'<button class="atab'+(tab==='nuevo'?' on':'')+'" onclick="renderConteo(&apos;nuevo&apos;)">+ Nuevo conteo</button>'
+    +(tab==='activo'?'<button class="atab on">📝 Conteo en curso</button>':'')
+    +'</div>';
+
+  if(tab==='lista'){
+    c.innerHTML=tabs+'<div id="cntListaWrap"><div class="loading"><span class="sp"></span></div></div>';
+    await cntCargarLista();
+  } else if(tab==='activo' && _cnt.conteoActual){
+    c.innerHTML=tabs;
+    cntRenderFormulario();
+  } else {
+    // Nuevo conteo
+    _cnt.conteoActual=null;
+    var hoy=new Date().toISOString().split('T')[0];
+    var depOpts='<option value="">— Seleccionar depósito —</option>';
+    _cnt.deps.forEach(function(d){
+      var s=(_cnt.sucs.find(function(x){return x.id===d.sucursal_id;})||{}).nombre||'';
+      depOpts+='<option value="'+d.id+'">'+d.nombre+(s?' ('+s+')':'')+'</option>';
+    });
+    c.innerHTML=tabs
+      +'<div class="card" style="max-width:500px">'
+        +'<div class="card-h"><span class="card-t">Iniciar nuevo conteo</span></div>'
+        +'<div style="padding:20px;display:flex;flex-direction:column;gap:14px">'
+          +'<div><label style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:5px">Depósito a contar</label>'
+            +'<select id="cntDep" class="cfg-inp" style="width:100%">'+depOpts+'</select></div>'
+          +'<div><label style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:5px">Fecha del conteo</label>'
+            +'<input type="date" id="cntFecha" class="cfg-inp" style="width:100%" value="'+hoy+'"></div>'
+          +'<div><label style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:5px">Observación (opcional)</label>'
+            +'<input type="text" id="cntObs" class="cfg-inp" style="width:100%" placeholder="Ej: Conteo mensual, cierre de mes..."></div>'
+          +'<button onclick="cntIniciar()" class="btn-sv" style="padding:13px;font-size:14px">Iniciar conteo →</button>'
+        +'</div>'
+      +'</div>';
+  }
+}
+
+async function cntIniciar(){
+  var depId=parseInt(document.getElementById('cntDep').value)||null;
+  var fecha=document.getElementById('cntFecha').value;
+  var obs=document.getElementById('cntObs').value.trim();
+  if(!depId){ toast('Seleccioná un depósito'); return; }
+  var licId=await cntGetLicId();
+  var dep=_cnt.deps.find(function(d){return d.id===depId;})||{};
+  var suc=_cnt.sucs.find(function(s){return s.id===dep.sucursal_id;})||{};
+
+  var btn=document.querySelector('[onclick="cntIniciar()"]');
+  if(btn){ btn.disabled=true; btn.textContent='Cargando productos...'; }
+
+  try{
+    // Generar número de conteo
+    var prevs=await sg('stock_conteos','licencia_id=eq.'+licId+'&select=numero&order=created_at.desc&limit=1');
+    var lastNum=0;
+    if(prevs&&prevs.length){
+      var m=(prevs[0].numero||'').match(/(\d+)$/);
+      if(m) lastNum=parseInt(m[1]);
+    }
+    var numero='CONTEO-'+String(lastNum+1).padStart(3,'0');
+
+    // Cargar productos con inventario=true y su stock en este depósito
+    var prds=await sg('pos_productos',
+      'licencia_email=ilike.'+encodeURIComponent(SE)+
+      '&inventario=eq.true&activo=eq.true&order=nombre.asc&select=id,nombre,codigo,color,categoria&limit=500'
+    );
+    var stockRows=await sg('stock',
+      'deposito_id=eq.'+depId+'&licencia_id=eq.'+licId+'&select=producto_id,cantidad&limit=1000'
+    );
+    var stockMap={};
+    stockRows.forEach(function(r){ stockMap[r.producto_id]=parseFloat(r.cantidad)||0; });
+
+    // Crear conteo en DB
+    var conteoR=await supaPost('stock_conteos',{
+      licencia_id:licId, deposito_id:depId, sucursal_id:dep.sucursal_id||null,
+      numero:numero, estado:'borrador', observacion:obs||null,
+      usuario:SE, fecha:fecha
+    },null);
+    var conteoId=Array.isArray(conteoR)?conteoR[0].id:conteoR.id;
+
+    // Crear ítems
+    var items=prds.map(function(p){
+      return {
+        conteo_id:conteoId, producto_id:p.id,
+        nombre_producto:p.nombre, stock_sistema:stockMap[p.id]||0,
+        stock_fisico:null, diferencia:null, ajustado:false,
+        // campos UI (no van a DB)
+        _color:p.color||'#546e7a', _codigo:p.codigo||''
+      };
+    });
+    var itemsForDB=items.map(function(i){
+      return {conteo_id:i.conteo_id, producto_id:i.producto_id,
+        nombre_producto:i.nombre_producto, stock_sistema:i.stock_sistema,
+        stock_fisico:null, diferencia:null, ajustado:false};
+    });
+    if(itemsForDB.length){
+      await supaPost('stock_conteo_items',itemsForDB,null);
+    }
+
+    // Recargar items con IDs desde DB
+    var dbItems=await sg('stock_conteo_items','conteo_id=eq.'+conteoId+'&order=nombre_producto.asc');
+    // Mezclar con info UI
+    var itemsMerged=dbItems.map(function(i){
+      var p=prds.find(function(x){return x.id===i.producto_id;})||{};
+      return Object.assign({},i,{_color:p.color||'#546e7a',_codigo:p.codigo||''});
+    });
+
+    _cnt.conteoActual={
+      id:conteoId, numero:numero, deposito_id:depId,
+      depNom:dep.nombre||'', sucNom:suc.nombre||'',
+      fecha:fecha, obs:obs, estado:'borrador',
+      items:itemsMerged, licId:licId
+    };
+
+    toast('Conteo '+numero+' iniciado — '+prds.length+' productos');
+    renderConteo('activo');
+  }catch(e){
+    toast('Error: '+e.message);
+    if(btn){ btn.disabled=false; btn.textContent='Iniciar conteo →'; }
+  }
+}
+
+function cntRenderFormulario(){
+  var ct=_cnt.conteoActual;
+  if(!ct) return;
+  var c=document.getElementById('content');
+  var tabs='<div class="admin-tabs">'
+    +'<button class="atab" onclick="renderConteo(&apos;lista&apos;)">📋 Historial</button>'
+    +'<button class="atab" onclick="renderConteo(&apos;nuevo&apos;)">+ Nuevo</button>'
+    +'<button class="atab on">📝 En curso</button>'
+    +'</div>';
+
+  // Calcular stats
+  var contados=ct.items.filter(function(i){return i.stock_fisico!==null;}).length;
+  var total=ct.items.length;
+  var conDif=ct.items.filter(function(i){return i.stock_fisico!==null&&i.diferencia!==0;}).length;
+
+  c.innerHTML=tabs
+    // Header info
+    +'<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">'
+      +'<div>'
+        +'<div style="font-size:20px;font-weight:800">'+ct.numero+'</div>'
+        +'<div style="font-size:13px;color:var(--muted);margin-top:2px">'+ct.depNom+(ct.sucNom?' · '+ct.sucNom:'')+'  &nbsp;·&nbsp;  '+fmt(ct.fecha)+'</div>'
+        +(ct.obs?'<div style="font-size:12px;color:var(--muted);margin-top:2px;font-style:italic">'+ct.obs+'</div>':'')
+      +'</div>'
+      +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+        +'<div style="text-align:center;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 16px">'
+          +'<div style="font-size:18px;font-weight:800;color:var(--green)">'+contados+'/'+total+'</div>'
+          +'<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Contados</div>'
+        +'</div>'
+        +'<div style="text-align:center;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 16px">'
+          +'<div style="font-size:18px;font-weight:800;color:'+(conDif>0?'var(--red)':'var(--muted)')+'">'+conDif+'</div>'
+          +'<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Con diferencia</div>'
+        +'</div>'
+        +'<button onclick="cntConfirmar()" class="btn-sv" style="padding:10px 20px;font-size:13px" '+(contados===0?'disabled title="Contá al menos un producto"':'')+'>'
+          +'✓ Confirmar y ajustar</button>'
+      +'</div>'
+    +'</div>'
+    // Barra de progreso
+    +'<div style="background:var(--card2);border-radius:6px;height:6px;margin-bottom:16px;overflow:hidden">'
+      +'<div style="background:var(--green);height:100%;width:'+Math.round(contados/Math.max(total,1)*100)+'%;transition:width .3s"></div>'
+    +'</div>'
+    // Tabla
+    +'<div class="card">'
+      +'<div class="card-h">'
+        +'<span class="card-t">'+total+' productos a contar</span>'
+        +'<div style="display:flex;gap:8px">'
+          +'<input class="d-inp" id="cntBusq" placeholder="Buscar..." oninput="cntFiltrar(this.value)" style="min-width:150px">'
+          +'<select class="d-inp" id="cntFiltroEst" onchange="cntFiltrar(document.getElementById(&apos;cntBusq&apos;).value)">'
+            +'<option value="">Todos</option>'
+            +'<option value="contado">Contados</option>'
+            +'<option value="pendiente">Pendientes</option>'
+            +'<option value="diferencia">Con diferencia</option>'
+          +'</select>'
+        +'</div>'
+      +'</div>'
+      +'<div style="overflow-x:auto"><table><thead><tr>'
+        +'<th>Producto</th>'
+        +'<th style="text-align:center">Sistema</th>'
+        +'<th style="text-align:center">Conteo físico</th>'
+        +'<th style="text-align:center">Diferencia</th>'
+      +'</tr></thead>'
+      +'<tbody id="cntItems"></tbody>'
+      +'</table></div>'
+    +'</div>';
+
+  cntFiltrar('');
+}
+
+function cntFiltrar(q){
+  var ct=_cnt.conteoActual;
+  if(!ct||!document.getElementById('cntItems')) return;
+  var f=(q||'').toLowerCase();
+  var est=(document.getElementById('cntFiltroEst')||{}).value||'';
+  var lista=ct.items.filter(function(i){
+    var matchQ=!f||(i.nombre_producto||'').toLowerCase().includes(f)||(i._codigo||'').toLowerCase().includes(f);
+    var matchE=!est
+      ||(est==='contado'&&i.stock_fisico!==null)
+      ||(est==='pendiente'&&i.stock_fisico===null)
+      ||(est==='diferencia'&&i.stock_fisico!==null&&i.diferencia!==0);
+    return matchQ&&matchE;
+  });
+  document.getElementById('cntItems').innerHTML=lista.map(function(item){
+    var contado=item.stock_fisico!==null;
+    var dif=item.diferencia||0;
+    var difCol=dif>0?'var(--green)':dif<0?'var(--red)':'var(--muted)';
+    var idx=ct.items.indexOf(item);
+    return '<tr style="background:'+(contado&&dif!==0?'rgba(239,83,80,.04)':'')+'">'
+      +'<td><div style="display:flex;align-items:center;gap:8px">'
+        +'<div style="width:26px;height:26px;border-radius:6px;background:'+item._color+';flex-shrink:0"></div>'
+        +'<div><div style="font-weight:600">'+item.nombre_producto+'</div>'
+          +(item._codigo?'<div style="font-size:11px;color:var(--muted)">'+item._codigo+'</div>':'')
+        +'</div></div></td>'
+      +'<td style="text-align:center;font-size:16px;font-weight:700">'+item.stock_sistema+'</td>'
+      +'<td style="text-align:center">'
+        +'<input type="number" id="cntF'+idx+'" value="'+(contado?item.stock_fisico:'')+'" '
+          +'placeholder="—" min="0" step="1" '
+          +'onchange="cntSetFisico('+idx+',this.value)" '
+          +'style="width:80px;text-align:center;background:var(--input-bg);border:1.5px solid '+(contado?'var(--green)':'var(--input-border)')+';border-radius:6px;color:var(--text);font-family:Barlow,sans-serif;font-size:15px;font-weight:700;padding:6px">'
+      +'</td>'
+      +'<td style="text-align:center;font-size:16px;font-weight:800;color:'+(contado?difCol:'var(--muted)')+'">'
+        +(contado?(dif>0?'+':'')+dif:'—')
+      +'</td>'
+    +'</tr>';
+  }).join('');
+}
+
+async function cntSetFisico(idx, val){
+  var ct=_cnt.conteoActual;
+  var item=ct.items[idx];
+  if(!item) return;
+  var v=val===''?null:parseFloat(val);
+  if(v!==null&&isNaN(v)) return;
+  item.stock_fisico=v;
+  item.diferencia=v!==null?v-item.stock_sistema:null;
+
+  // Guardar en DB (debounced)
+  clearTimeout(item._saveTimer);
+  item._saveTimer=setTimeout(async function(){
+    try{
+      await supaPatch('stock_conteo_items','id=eq.'+item.id,{
+        stock_fisico:v, diferencia:item.diferencia
+      });
+    }catch(e){ console.warn('[Conteo] save item error:',e.message); }
+  },600);
+
+  // Re-render solo los stats y la fila (no todo)
+  cntFiltrar((document.getElementById('cntBusq')||{}).value||'');
+  // Actualizar header stats
+  var contados=ct.items.filter(function(i){return i.stock_fisico!==null;}).length;
+  var conDif=ct.items.filter(function(i){return i.stock_fisico!==null&&i.diferencia!==0;}).length;
+  // Actualizar barra de progreso
+  var barra=document.querySelector('[style*="transition:width"]');
+  if(barra) barra.style.width=Math.round(contados/Math.max(ct.items.length,1)*100)+'%';
+}
+
+async function cntConfirmar(){
+  var ct=_cnt.conteoActual;
+  if(!ct) return;
+  var contados=ct.items.filter(function(i){return i.stock_fisico!==null;});
+  if(!contados.length){ toast('Contá al menos un producto'); return; }
+
+  var conDif=contados.filter(function(i){return i.diferencia!==0;}).length;
+  var msg='¿Confirmar el conteo '+ct.numero+'?\n\n'
+    +'• '+contados.length+' productos contados\n'
+    +'• '+conDif+' con diferencias\n\n'
+    +'Los ajustes se aplicarán automáticamente al stock.';
+  if(!confirm(msg)) return;
+
+  var btn=document.querySelector('[onclick="cntConfirmar()"]');
+  if(btn){ btn.disabled=true; btn.textContent='Procesando...'; }
+
+  try{
+    var licId=ct.licId||await cntGetLicId();
+    var dep=_cnt.deps.find(function(d){return d.id===ct.deposito_id;})||{};
+    var now=new Date().toISOString();
+
+    // Solo ajustar los que tienen diferencia ≠ 0
+    var conAjuste=contados.filter(function(i){return i.diferencia!==0;});
+
+    if(conAjuste.length){
+      // Crear comprobante de ajuste tipo 'conteo'
+      var compR=await supaPost('stock_comprobantes',{
+        licencia_id:licId, deposito_id:ct.deposito_id, sucursal_id:dep.sucursal_id||null,
+        tipo:'conteo', referencia:ct.numero,
+        observacion:'Conteo físico — ajuste de inventario'+(ct.obs?' | '+ct.obs:''),
+        usuario:SE, terminal:'admin', fecha:now
+      },null);
+      var compId=Array.isArray(compR)?compR[0].id:compR.id;
+
+      // Items del comprobante (solo los que tienen diferencia)
+      var compItems=conAjuste.map(function(i){
+        return {
+          comprobante_id:compId, producto_id:i.producto_id,
+          nombre_producto:i.nombre_producto,
+          cantidad:i.diferencia,          // puede ser + o -
+          cantidad_antes:i.stock_sistema,
+          cantidad_despues:i.stock_fisico,
+          costo_unitario:0
+        };
+      });
+      await supaPost('stock_comprobante_items',compItems,null);
+
+      // Actualizar stock en tabla stock
+      for(var k=0;k<conAjuste.length;k++){
+        var it=conAjuste[k];
+        fetch(SUPA_URL+'/rest/v1/stock?on_conflict=deposito_id,producto_id',{
+          method:'POST',
+          headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
+            'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+          body:JSON.stringify({
+            deposito_id:ct.deposito_id, sucursal_id:dep.sucursal_id||null,
+            licencia_id:licId, producto_id:it.producto_id,
+            nombre_producto:it.nombre_producto,
+            cantidad:it.stock_fisico, updated_at:now
+          })
+        }).catch(function(e){ console.warn('[Conteo] stock upsert:',e.message); });
+
+        // Marcar ítem como ajustado
+        await supaPatch('stock_conteo_items','id=eq.'+it.id,{ajustado:true});
+      }
+    }
+
+    // Cerrar el conteo
+    await supaPatch('stock_conteos','id=eq.'+ct.id,{
+      estado:'confirmado', fecha_confirm:now
+    });
+
+    _cnt.conteoActual=null;
+    _inv.prds=[]; // invalidar cache inventario
+
+    toast('✓ Conteo confirmado — '+conAjuste.length+' ajuste'+(conAjuste.length===1?'':'s')+' aplicado'+(conAjuste.length===1?'':'s'));
+    renderConteo('lista');
+  }catch(e){
+    toast('Error: '+e.message);
+    if(btn){ btn.disabled=false; btn.textContent='✓ Confirmar y ajustar'; }
+  }
+}
+
+// ── HISTORIAL DE CONTEOS ──────────────────────────────────
+async function cntCargarLista(){
+  var wrap=document.getElementById('cntListaWrap');
+  if(!wrap) return;
+  var licId=await cntGetLicId();
+
+  wrap.innerHTML=
+    '<div class="card">'
+      +'<div class="card-h"><span class="card-t" id="cntListCount">Cargando...</span></div>'
+      +'<div style="overflow-x:auto"><table><thead><tr>'
+        +'<th>N° Conteo</th><th>Fecha</th><th>Depósito</th>'
+        +'<th style="text-align:center">Productos</th>'
+        +'<th style="text-align:center">Con diferencia</th>'
+        +'<th style="text-align:center">Estado</th>'
+        +'<th style="text-align:center">Acciones</th>'
+      +'</tr></thead>'
+      +'<tbody id="cntListBody"><tr><td colspan="7" class="loading"><span class="sp"></span></td></tr></tbody>'
+      +'</table></div>'
+    +'</div>';
+
+  try{
+    var conteos=await sg('stock_conteos',
+      'licencia_id=eq.'+licId+'&order=created_at.desc&limit=100'
+    );
+    if(document.getElementById('cntListCount'))
+      document.getElementById('cntListCount').textContent=conteos.length+' conteos';
+
+    if(!conteos.length){
+      document.getElementById('cntListBody').innerHTML='<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--muted)">Sin conteos registrados. Creá el primero.</td></tr>';
+      return;
+    }
+
+    // Cargar stats de items para cada conteo
+    var cIds=conteos.map(function(c){return c.id;});
+    var allItems=await sg('stock_conteo_items',
+      'conteo_id=in.('+cIds.join(',')+')'
+      +'&select=conteo_id,stock_fisico,diferencia&limit=5000'
+    );
+    var statsMap={};
+    allItems.forEach(function(i){
+      if(!statsMap[i.conteo_id]) statsMap[i.conteo_id]={total:0,contados:0,conDif:0};
+      statsMap[i.conteo_id].total++;
+      if(i.stock_fisico!==null){ statsMap[i.conteo_id].contados++; }
+      if(i.diferencia!==null&&i.diferencia!==0) statsMap[i.conteo_id].conDif++;
+    });
+
+    var estCfg={
+      'borrador': {lbl:'BORRADOR', cls:'tag-o'},
+      'confirmado':{lbl:'CONFIRMADO',cls:'tag-g'},
+      'anulado':  {lbl:'ANULADO',  cls:'tag-r'}
+    };
+
+    document.getElementById('cntListBody').innerHTML=conteos.map(function(ct){
+      var st=statsMap[ct.id]||{total:0,contados:0,conDif:0};
+      var dep=(_cnt.deps.find(function(d){return d.id===ct.deposito_id;})||{}).nombre||('#'+ct.deposito_id);
+      var suc=(_cnt.sucs.find(function(s){return s.id===ct.sucursal_id;})||{}).nombre||'';
+      var ec=estCfg[ct.estado]||{lbl:ct.estado,cls:'tag-gr'};
+      var esBorrador=ct.estado==='borrador';
+      return '<tr>'
+        +'<td style="font-weight:700">'+ct.numero+'</td>'
+        +'<td style="font-size:12px;color:var(--muted)">'+fmt(ct.fecha)+'</td>'
+        +'<td><div style="font-weight:600">'+dep+'</div>'
+          +(suc?'<div style="font-size:11px;color:var(--muted)">'+suc+'</div>':'')+'</td>'
+        +'<td style="text-align:center">'
+          +'<span style="font-size:13px;font-weight:700">'+st.contados+'</span>'
+          +'<span style="font-size:11px;color:var(--muted)">/'+st.total+'</span>'
+        +'</td>'
+        +'<td style="text-align:center;font-weight:800;color:'+(st.conDif>0?'var(--red)':'var(--muted)')+'">'+st.conDif+'</td>'
+        +'<td style="text-align:center"><span class="tag '+ec.cls+'">'+ec.lbl+'</span></td>'
+        +'<td style="text-align:center;white-space:nowrap;display:flex;gap:5px;justify-content:center">'
+          +(esBorrador
+            ?'<button onclick="cntReanudar('+ct.id+')" style="background:var(--o2);border:1px solid var(--orange);border-radius:6px;color:var(--orange);font-family:Barlow,sans-serif;font-size:11px;font-weight:700;padding:5px 9px;cursor:pointer">Continuar</button>'
+            :'')
+          +'<button onclick="cntVerDetalle('+ct.id+')" style="background:var(--b2);border:1px solid var(--blue);border-radius:6px;color:var(--blue);font-family:Barlow,sans-serif;font-size:11px;font-weight:700;padding:5px 9px;cursor:pointer">Ver</button>'
+        +'</td>'
+      +'</tr>';
+    }).join('');
+  }catch(e){
+    document.getElementById('cntListBody').innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--red)">Error: '+e.message+'</td></tr>';
+  }
+}
+
+async function cntReanudar(conteoId){
+  try{
+    var licId=await cntGetLicId();
+    var comps=await sg('stock_conteos','id=eq.'+conteoId+'&select=*');
+    var items=await sg('stock_conteo_items','conteo_id=eq.'+conteoId+'&order=nombre_producto.asc');
+    if(!comps.length) return toast('Conteo no encontrado');
+    var ct=comps[0];
+    var dep=_cnt.deps.find(function(d){return d.id===ct.deposito_id;})||{};
+    var suc=_cnt.sucs.find(function(s){return s.id===ct.sucursal_id;})||{};
+    // Recargar stocks actuales del sistema
+    var prodIds=items.map(function(i){return i.producto_id;});
+    var stockRows=await sg('stock',
+      'deposito_id=eq.'+ct.deposito_id+'&licencia_id=eq.'+licId
+      +'&producto_id=in.('+prodIds.join(',')+')'
+      +'&select=producto_id,cantidad&limit=1000'
+    );
+    var stockMap={};
+    stockRows.forEach(function(r){ stockMap[r.producto_id]=parseFloat(r.cantidad)||0; });
+    // Enriquecer items
+    var prds=await sg('pos_productos',
+      'id=in.('+prodIds.join(',')+')'+'&select=id,color,codigo&limit=500'
+    );
+    var prdMap={};
+    prds.forEach(function(p){ prdMap[p.id]=p; });
+    var itemsMerged=items.map(function(i){
+      var p=prdMap[i.producto_id]||{};
+      return Object.assign({},i,{
+        stock_sistema:stockMap[i.producto_id]||i.stock_sistema,
+        stock_fisico:i.stock_fisico,
+        diferencia:i.diferencia,
+        _color:p.color||'#546e7a', _codigo:p.codigo||''
+      });
+    });
+    _cnt.conteoActual={
+      id:conteoId, numero:ct.numero, deposito_id:ct.deposito_id,
+      depNom:dep.nombre||'', sucNom:suc.nombre||'',
+      fecha:ct.fecha, obs:ct.observacion, estado:ct.estado,
+      items:itemsMerged, licId:licId
+    };
+    renderConteo('activo');
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+async function cntVerDetalle(conteoId){
+  var ov=document.createElement('div');
+  ov.id='cntDetOv';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:1000;overflow-y:auto;padding:14px 8px';
+  ov.innerHTML='<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;max-width:700px;margin:0 auto;overflow:hidden">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)">'
+      +'<div style="font-size:16px;font-weight:800">Detalle del conteo</div>'
+      +'<button onclick="document.getElementById(&apos;cntDetOv&apos;).remove()" style="background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;padding:7px 13px;font-family:Barlow,sans-serif;font-size:13px;font-weight:700">✕ Cerrar</button>'
+    +'</div>'
+    +'<div id="cntDetBody" style="padding:20px"><div class="loading"><span class="sp"></span></div></div>'
+    +'</div>';
+  document.body.appendChild(ov);
+
+  try{
+    var comps=await sg('stock_conteos','id=eq.'+conteoId+'&select=*');
+    var items=await sg('stock_conteo_items','conteo_id=eq.'+conteoId+'&order=nombre_producto.asc');
+    var ct=comps[0];
+    var dep=(_cnt.deps.find(function(d){return d.id===ct.deposito_id;})||{}).nombre||'';
+    var contados=items.filter(function(i){return i.stock_fisico!==null;});
+    var conDif=items.filter(function(i){return i.diferencia!==null&&i.diferencia!==0;});
+
+    document.getElementById('cntDetBody').innerHTML=
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
+        +'<div style="background:var(--card2);border-radius:8px;padding:12px">'
+          +'<div class="cj-dr"><span style="color:var(--muted)">N° Conteo</span><span style="font-weight:700">'+ct.numero+'</span></div>'
+          +'<div class="cj-dr"><span style="color:var(--muted)">Fecha</span><span>'+fmt(ct.fecha)+'</span></div>'
+          +'<div class="cj-dr"><span style="color:var(--muted)">Depósito</span><span>'+dep+'</span></div>'
+          +'<div class="cj-dr"><span style="color:var(--muted)">Usuario</span><span>'+(ct.usuario||'—')+'</span></div>'
+        +'</div>'
+        +'<div style="background:var(--card2);border-radius:8px;padding:12px">'
+          +'<div class="cj-dr"><span style="color:var(--muted)">Estado</span><span style="font-weight:700">'+(ct.estado||'').toUpperCase()+'</span></div>'
+          +'<div class="cj-dr"><span style="color:var(--muted)">Productos</span><span>'+contados.length+'/'+items.length+' contados</span></div>'
+          +'<div class="cj-dr"><span style="color:var(--muted)">Con diferencia</span><span style="color:'+(conDif.length>0?'var(--red)':'var(--green)')+'">'+conDif.length+'</span></div>'
+          +(ct.observacion?'<div class="cj-dr"><span style="color:var(--muted)">Obs.</span><span style="font-size:12px">'+ct.observacion+'</span></div>':'')
+        +'</div>'
+      +'</div>'
+      // Solo mostrar productos con diferencia o todos
+      +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>'
+        +'<th style="padding:8px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:left;background:var(--card2)">Producto</th>'
+        +'<th style="padding:8px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center;background:var(--card2)">Sistema</th>'
+        +'<th style="padding:8px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center;background:var(--card2)">Físico</th>'
+        +'<th style="padding:8px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center;background:var(--card2)">Diferencia</th>'
+        +'<th style="padding:8px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center;background:var(--card2)">Ajustado</th>'
+      +'</tr></thead><tbody>'
+      +items.map(function(i){
+        var dif=i.diferencia;
+        var difCol=dif>0?'var(--green)':dif<0?'var(--red)':'var(--muted)';
+        return '<tr style="border-bottom:1px solid var(--border);background:'+(dif&&dif!==0?'rgba(239,83,80,.03)':'')+'">'
+          +'<td style="padding:9px 12px;font-size:13px;font-weight:600">'+i.nombre_producto+'</td>'
+          +'<td style="padding:9px 12px;text-align:center;font-weight:700">'+i.stock_sistema+'</td>'
+          +'<td style="padding:9px 12px;text-align:center;font-weight:700">'+(i.stock_fisico!==null?i.stock_fisico:'—')+'</td>'
+          +'<td style="padding:9px 12px;text-align:center;font-weight:800;color:'+(i.stock_fisico!==null?difCol:'var(--muted)')+'">'
+            +(i.stock_fisico!==null?(dif>0?'+':'')+dif:'—')
+          +'</td>'
+          +'<td style="padding:9px 12px;text-align:center">'+(i.ajustado?'<span class="tag tag-g">✓</span>':'<span class="tag tag-gr">—</span>')+'</td>'
+        +'</tr>';
+      }).join('')
+      +'</tbody></table></div>';
+  }catch(e){
+    document.getElementById('cntDetBody').innerHTML='<div style="color:var(--red)">Error: '+e.message+'</div>';
+  }
 }
 
 // ════════════════════════════════════════════════════════
