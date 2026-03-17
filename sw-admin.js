@@ -1,5 +1,5 @@
-const CACHE = 'ampersand-pos-v4';
-const ASSETS = ['/', '/index.html', '/manifest.json', '/icon.png', '/icon-192.png', '/icon-512.png'];
+const CACHE = 'ampersand-admin-v1';
+const ASSETS = ['/admin-negocio.html', '/manifest-admin.json', '/icon.png', '/icon-192.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -22,12 +22,10 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET') return;
-  // Dejar pasar: Supabase, CDNs externos
   if (url.hostname.includes('supabase.co')) return;
   if (url.hostname.includes('jsdelivr.net')) return;
   if (url.hostname.includes('googleapis.com')) return;
   if (url.hostname.includes('cdnjs.cloudflare.com')) return;
-  // Solo cachear recursos propios
   if (!url.hostname.includes('workers.dev') &&
       !url.hostname.includes('pages.dev') &&
       !url.hostname.includes('localhost')) return;
@@ -43,7 +41,7 @@ self.addEventListener('fetch', e => {
       })
       .catch(() =>
         caches.match(e.request)
-          .then(cached => cached || caches.match('/'))
+          .then(cached => cached || caches.match('/admin-negocio.html'))
       )
   );
 });

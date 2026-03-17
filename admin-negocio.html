@@ -2,8 +2,16 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel del Negocio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Ampersand Admin</title>
+<meta name="description" content="Panel del negocio — Ampersand POS">
+<meta name="theme-color" content="#4caf50">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Admin">
+<link rel="manifest" href="/manifest-admin.json">
+<link rel="apple-touch-icon" href="/icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -3299,5 +3307,14 @@ async function saveConf(){
     </div>
   </div>
 </div>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('/sw-admin.js')
+      .then(function(reg){ console.log('[SW Admin] Registrado:', reg.scope); })
+      .catch(function(err){ console.warn('[SW Admin] Error:', err); });
+  });
+}
+</script>
 </body>
 </html>

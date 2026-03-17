@@ -1,12 +1,12 @@
 {
-  "name": "Ampersand POS",
-  "short_name": "POS",
-  "description": "Punto de venta — Ampersand POS",
-  "start_url": "/",
+  "name": "Ampersand Admin",
+  "short_name": "Admin",
+  "description": "Panel del negocio — Ampersand POS",
+  "start_url": "/admin-negocio.html",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#1a1a1a",
+  "orientation": "any",
+  "background_color": "#0f0f0f",
   "theme_color": "#4caf50",
   "icons": [
     { "src": "/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
