@@ -5515,11 +5515,110 @@ function supaInsertVenta(data){
   .then(r => {
     if(!r.ok) return r.text().then(t => { throw new Error(t); });
     console.log('[Venta] Guardada en Supabase OK');
+    // Descontar stock en background
+    stockDescontarVenta(data.items, data.comprobante || ('VENTA-'+Date.now()));
   })
   .catch(e => {
     console.warn('[Venta] Error Supabase, encolando:', e.message);
     if(db) dbQueueSync('ventas','insert', venta);
   });
+}
+
+// ── DESCUENTO DE STOCK POR VENTA ─────────────────────────────────────────
+async function stockDescontarVenta(items, comprobante){
+  const depId    = parseInt(localStorage.getItem('pos_deposito_id'))||null;
+  const sucId    = parseInt(localStorage.getItem('pos_sucursal_id'))||null;
+  const email    = localStorage.getItem(SK.email);
+  if(!depId || !email) return; // terminal sin depósito configurado
+
+  // Filtrar solo items con inventario=true
+  const prods = PRODS || [];
+  const itemsInv = (items||[]).filter(function(it){
+    if(it.esDelivery || it.esDescuento) return false;
+    const p = prods.find(function(p){ return p.id===it.id; });
+    return p && p.inventario;
+  });
+  if(!itemsInv.length) return;
+
+  try{
+    // Leer licencia_id
+    const licId = parseInt(localStorage.getItem('ali')) || null;
+    if(!licId) return;
+
+    // Leer stock actual
+    const prodIds = itemsInv.map(function(i){ return i.id; }).join(',');
+    const stockR = await fetch(
+      SUPA_URL+'/rest/v1/stock?deposito_id=eq.'+depId+'&producto_id=in.('+prodIds+')&select=producto_id,cantidad',
+      { headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'} }
+    );
+    const stockData = await stockR.json();
+    const stockMap = {};
+    (stockData||[]).forEach(function(s){ stockMap[s.producto_id] = parseFloat(s.cantidad)||0; });
+
+    // Crear comprobante de venta
+    const compR = await fetch(SUPA_URL+'/rest/v1/stock_comprobantes', {
+      method: 'POST',
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=representation'},
+      body: JSON.stringify({
+        licencia_id: licId,
+        deposito_id: depId,
+        sucursal_id: sucId,
+        tipo: 'venta',
+        referencia: comprobante || ('VENTA-'+Date.now()),
+        observacion: 'Venta registrada desde POS',
+        terminal: localStorage.getItem('pos_terminal')||'Terminal',
+        usuario: email,
+        fecha: new Date().toISOString()
+      })
+    });
+    const compData = await compR.json();
+    const compId = Array.isArray(compData) ? compData[0].id : compData.id;
+
+    // Items del comprobante + upsert stock
+    const compItems = itemsInv.map(function(it){
+      const qty   = parseFloat(it.qty)||1;
+      const antes = stockMap[it.id]||0;
+      const desp  = antes - qty;
+      return {
+        comprobante_id: compId,
+        producto_id:    it.id,
+        nombre_producto: it.name||it.nombre||'',
+        cantidad:       -qty,
+        cantidad_antes: antes,
+        cantidad_despues: desp,
+        costo_unitario: 0
+      };
+    });
+
+    await fetch(SUPA_URL+'/rest/v1/stock_comprobante_items', {
+      method: 'POST',
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify(compItems)
+    });
+
+    // Upsert stock (actualizar cantidades)
+    for(const it of itemsInv){
+      const qty   = parseFloat(it.qty)||1;
+      const antes = stockMap[it.id]||0;
+      const desp  = antes - qty;
+      fetch(SUPA_URL+'/rest/v1/stock?on_conflict=deposito_id,producto_id', {
+        method: 'POST',
+        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+        body: JSON.stringify({
+          deposito_id: depId,
+          sucursal_id: sucId,
+          licencia_id: licId,
+          producto_id: it.id,
+          nombre_producto: it.name||it.nombre||'',
+          cantidad: desp,
+          updated_at: new Date().toISOString()
+        })
+      }).catch(function(e){ console.warn('[Stock] upsert error:', e.message); });
+    }
+    console.log('[Stock] Descontado — '+itemsInv.length+' productos | depósito:', depId);
+  }catch(e){
+    console.warn('[Stock] Error descontando:', e.message);
+  }
 }
 
 // Sincronizar ventas pendientes de la cola
