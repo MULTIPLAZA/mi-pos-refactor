@@ -3915,8 +3915,8 @@ function confirmarPago(){
   const comprobante = document.getElementById('compDisplay')?.textContent || '';
   const efectivoEntregado = document.getElementById('efecVal')?.textContent || '';
   const vuelto = document.getElementById('vueltoAmt')?.textContent || '';
-  // Capturar nro ANTES de limpiar — si es ticket nuevo usar ticketCounter actual
-  const nroTicket = currentTicketNro !== null ? currentTicketNro : ticketCounter;
+  // Capturar nro ANTES de limpiar — si es ticket nuevo usar ticketCounter y avanzarlo
+  const nroTicket = currentTicketNro !== null ? currentTicketNro : ticketCounter++;
 
   // ── Validaciones de factura ──────────────────────────────
   if(facturaActiva){
@@ -7256,21 +7256,33 @@ function crearArticuloDesdeCategoria(){
 var cierreTicketHTML = '';
 var cierreTextoPlano = '';
 
-function buildCierreTicket(){
+function buildCierreTicket(size){
+  size = size || getPaperSize('ticket') || '58';
+  var cols = size==='80' ? 48 : 32;
   var saldoEsperado = calcSaldoEsperado();
   var totalContado = Object.values(cierreMetodos).reduce(function(s,d){return s+d.contado;},0);
   var diff = totalContado > 0 ? totalContado - saldoEsperado : null;
   var ahora = new Date();
-  var pad = function(n){ return String(n).padStart(2,'0'); };
-  var fmt = function(d){ return d ? pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+' '+pad(d.getHours())+':'+pad(d.getMinutes()) : '-'; };
+  var pad2 = function(n){ return String(n).padStart(2,'0'); };
+  var fmtDT = function(d){ return d ? pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+'/'+d.getFullYear()+' '+pad2(d.getHours())+':'+pad2(d.getMinutes())+':'+pad2(d.getSeconds()) : '-'; };
+  var gn2 = function(n){ return Math.round(n||0).toLocaleString('es-PY'); };
 
-  var totalVentas = turnoData.ventas.reduce(function(s,v){return s+v.total;},0);
+  var negocio  = configData.negocio   || localStorage.getItem('an') || 'MI NEGOCIO';
+  var ruc      = configData.ruc       || localStorage.getItem('ar') || '';
+  var dir      = configData.direccion || localStorage.getItem('ad') || '';
+  var terminal = configData.terminal  || localStorage.getItem('pos_terminal') || 'CAJA1';
+  var usuario  = 'admin';
+  var compNro  = turnoData.comprobante || '001-001-001';
+
+  var totalVentas  = turnoData.ventas.reduce(function(s,v){return s+v.total;},0);
   var totalEgresos = turnoData.egresos.filter(function(e){return !e.anulada;}).reduce(function(s,e){return s+e.monto;},0);
-  var cantVentas = turnoData.ventas.length;
-  var ticketProm = cantVentas > 0 ? Math.round(totalVentas/cantVentas) : 0;
-  var ventasFacturadas = turnoData.ventas.filter(function(v){return v.factura;}).length;
-  var montoFacturado = turnoData.ventas.filter(function(v){return v.factura;}).reduce(function(s,v){return s+v.total;},0);
+  var totalIngresos = (turnoData.ingresos||[]).reduce(function(s,i){return s+i.monto;},0);
+  var cantVentas   = turnoData.ventas.length;
+  var saldoCaja    = turnoData.efectivoInicial + totalVentas + totalIngresos - totalEgresos;
+  var rendicion    = 0; // monto rendido/retirado
+  var diferencia   = rendicion - saldoCaja;
 
+  // Formas de pago
   var metodos = {};
   turnoData.ventas.forEach(function(v){
     var m=(v.metodo||'EFECTIVO').toUpperCase();
@@ -7278,99 +7290,161 @@ function buildCierreTicket(){
     metodos[m].total+=v.total; metodos[m].ops++;
   });
 
-  var SEP = '<hr style="border:none;border-top:1px dashed #999;margin:8px 0;">';
+  // Helper: línea separadora
+  var SEP_CHAR = '-'.repeat(cols);
+  var sep = function(){ return '<p style="margin:0;letter-spacing:0;">'+SEP_CHAR+'</p>'; };
 
-  var metodosRows = '';
-  Object.entries(metodos).forEach(function(e){
-    metodosRows += '<div style="display:flex;justify-content:space-between;margin:3px 0;"><span>'+e[0]+' ('+e[1].ops+' op.)</span><span>'+gs(e[1].total)+'</span></div>';
+  // Helper: fila izq/der alineada
+  var row = function(l, r, bold){
+    l=String(l); r=String(r);
+    var sp=Math.max(1,cols-l.length-r.length);
+    var line=l+' '.repeat(sp)+r;
+    return bold
+      ? '<p style="margin:0;font-weight:bold;">'+line+'</p>'
+      : '<p style="margin:0;">'+line+'</p>';
+  };
+  var rowLabel = function(label){
+    return '<p style="margin:4px 0 2px;font-weight:bold;letter-spacing:1px;">'+label+'</p>';
+  };
+  var center = function(text, bold){
+    var s=String(text); var sp=Math.max(0,Math.floor((cols-s.length)/2));
+    var line=' '.repeat(sp)+s;
+    return bold
+      ? '<p style="margin:0;font-weight:bold;text-align:center;">'+line+'</p>'
+      : '<p style="margin:0;text-align:center;">'+line+'</p>';
+  };
+
+  var css = 'body{font-family:"Courier New",Courier,monospace;font-size:'+(size==='80'?'11':'9')+'pt;'
+    +'width:'+(size==='80'?'80':'58')+'mm;margin:0;padding:2mm 0;background:#fff;color:#000;}'
+    +'p{margin:0;padding:0;line-height:1.3;white-space:pre;}';
+
+  var lines = '';
+  // Cabecera
+  lines += center(negocio, true);
+  if(ruc)  lines += center('RUC: '+ruc);
+  if(dir)  lines += center(dir);
+  lines += sep();
+  lines += center('CIERRE DE CAJA', true);
+  lines += sep();
+  lines += row('Comprobante:', compNro);
+  lines += row('Apertura:', fmtDT(turnoData.fechaApertura));
+  lines += row('Usuario:', usuario);
+  lines += row('Local:', terminal);
+  lines += row('Cierre:', fmtDT(ahora));
+  lines += sep();
+  // RESUMEN
+  lines += rowLabel('RESUMEN');
+  lines += sep();
+  lines += row('Importe Inicial', gn2(turnoData.efectivoInicial));
+  lines += row('Total Entrada', gn2(totalVentas));
+  lines += row('', gn2(totalVentas));
+  lines += row('Total Salida', gn2(totalEgresos));
+  lines += row('Saldo En Caja', gn2(saldoCaja), true);
+  lines += row('Rendicion', gn2(rendicion));
+  lines += row('Diferencia', (diferencia>0?'+':'')+gn2(diferencia));
+  lines += sep();
+  // FORMAS DE PAGO
+  lines += rowLabel('FORMAS DE PAGO');
+  lines += sep();
+  Object.entries(metodos).sort(function(a,b){return b[1].total-a[1].total;}).forEach(function(e){
+    var label = e[0];
+    var ops   = e[1].ops;
+    var monto = gn2(e[1].total);
+    // label + ops (alineado) + monto
+    var mid   = String(ops);
+    var sp    = Math.max(1, cols - label.length - mid.length - monto.length - 2);
+    lines += '<p style="margin:0;white-space:pre;">'+label+' '.repeat(sp)+mid+'  '+monto+'</p>';
   });
-
-  var egresosSection = '';
-  if(totalEgresos > 0){
-    var eRows = '';
-    turnoData.egresos.forEach(function(e){
-      eRows += '<div style="display:flex;justify-content:space-between;margin:3px 0;"><span>'+e.desc+'</span><span style="color:red;">-'+gs(e.monto)+'</span></div>';
+  lines += row('TOTAL:', gn2(totalVentas), true);
+  lines += sep();
+  // MOVIMIENTOS DE CAJA
+  lines += rowLabel('MOVIMIENTOS DE CAJA');
+  lines += sep();
+  var totalEntMovs = (turnoData.ingresos||[]).reduce(function(s,i){return s+i.monto;},0);
+  lines += row('Total Entrada:', gn2(totalEntMovs));
+  lines += row('Total Salida :', gn2(totalEgresos));
+  if(turnoData.egresos && turnoData.egresos.length){
+    turnoData.egresos.filter(function(e){return !e.anulada;}).forEach(function(e){
+      lines += row('  '+e.desc.substring(0,cols-14), gn2(e.monto));
     });
-    egresosSection = '<div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin:6px 0 3px;font-weight:700;">Egresos de Caja</div>'+eRows+
-      '<div style="display:flex;justify-content:space-between;margin:3px 0;font-weight:700;"><span>Total egresos:</span><span style="color:red;">-'+gs(totalEgresos)+'</span></div>'+SEP;
   }
-
-  var conteoSection = '';
+  lines += sep();
+  // Conteo si existe
   if(totalContado > 0){
-    var cRows = '';
+    lines += rowLabel('CONTEO DE VALORES');
+    lines += sep();
     Object.entries(cierreMetodos).forEach(function(e){
       var m=e[0], d=e[1];
-      if(d.contado > 0){
+      if(d.contado>0){
         var dif=d.contado-d.esperado;
-        var difStr=dif===0?'OK':dif>0?'+'+gs(dif):'-'+gs(Math.abs(dif));
-        var difC=dif===0?'green':dif>0?'orange':'red';
-        cRows += '<div style="display:flex;justify-content:space-between;margin:3px 0;"><span>'+m+'</span><span>'+gs(d.contado)+'</span></div>'+
-          '<div style="display:flex;justify-content:space-between;font-size:10px;padding:0 0 3px 10px;"><span style="color:#777;">Esperado: '+gs(d.esperado)+'</span><span style="color:'+difC+';font-weight:700;">'+difStr+'</span></div>';
+        var difStr=dif===0?' OK':dif>0?' +'+gn2(dif):' -'+gn2(Math.abs(dif));
+        lines += row(m.substring(0,cols-gn2(d.contado).length-1), gn2(d.contado));
+        lines += '<p style="margin:0;padding-left:8px;font-size:9pt;">Esp: '+gn2(d.esperado)+'  '+difStr+'</p>';
       }
     });
-    conteoSection = '<div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin:6px 0 3px;font-weight:700;">Conteo de Valores</div>'+cRows+
-      '<div style="display:flex;justify-content:space-between;margin:3px 0;font-weight:700;"><span>Total contado:</span><span>'+gs(totalContado)+'</span></div>'+
-      '<div style="display:flex;justify-content:space-between;margin:3px 0;font-weight:700;"><span>Saldo esperado:</span><span>'+gs(saldoEsperado)+'</span></div>'+SEP;
+    if(diff!==null){
+      var dLabel = diff===0 ? 'CUADRE EXACTO' : diff>0 ? 'SOBRANTE: +'+gn2(diff) : 'FALTANTE: -'+gn2(Math.abs(diff));
+      lines += '<p style="margin:4px 0;font-weight:bold;text-align:center;">'+dLabel+'</p>';
+    }
+    lines += sep();
   }
+  // Firma
+  lines += '<p style="margin:0;white-space:pre;">OBS:</p>';
+  lines += sep();
+  lines += '<p style="margin:20px 0 0;">&nbsp;</p>';
+  lines += '<p style="margin:0;border-top:1px solid #000;">&nbsp;</p>';
+  lines += center('Firma - Aclaracion - CI');
+  lines += '<p style="margin:8px 0 0;">&nbsp;</p>';
+  lines += center(usuario+' '+fmtDT(ahora));
+  lines += sep();
+  lines += '<p style="margin:0 0 16px;">&nbsp;</p>';
 
-  var diffSection = '';
-  if(diff !== null){
-    var dLabel, dColor;
-    if(diff===0){ dLabel='CUADRE EXACTO'; dColor='green'; }
-    else if(diff>0){ dLabel='SOBRANTE: +'+gs(diff); dColor='orange'; }
-    else { dLabel='FALTANTE: -'+gs(Math.abs(diff)); dColor='red'; }
-    diffSection = '<div style="text-align:center;font-size:13px;font-weight:700;color:'+dColor+';padding:6px;border:2px solid '+dColor+';margin:4px 0;">'+dLabel+'</div>'+SEP;
-  }
-
-  var factSection = '';
-  if(ventasFacturadas > 0){
-    factSection = '<div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin:6px 0 3px;font-weight:700;">Facturacion</div>'+
-      '<div style="display:flex;justify-content:space-between;margin:3px 0;"><span>Ventas facturadas ('+ventasFacturadas+'):</span><span>'+gs(montoFacturado)+'</span></div>'+SEP;
-  }
-
-  var firmas =
-    '<div style="margin-top:16px;border-bottom:1px solid #000;height:24px;"></div>'+
-    '<div style="text-align:center;font-size:11px;color:#555;margin-top:2px;">Firma del cajero</div>'+
-    '<div style="margin-top:14px;border-bottom:1px solid #000;height:24px;"></div>'+
-    '<div style="text-align:center;font-size:11px;color:#555;margin-top:2px;">Firma del supervisor</div>';
-
-  cierreTicketHTML =
-    '<div style="text-align:center;font-size:15px;font-weight:700;">MI NEGOCIO</div>'+
-    '<div style="text-align:center;font-size:11px;color:#555;">ASUNCION</div>'+
-    '<div style="text-align:center;font-size:12px;font-weight:700;letter-spacing:1px;margin-top:4px;">RENDICION DE CAJA</div>'+
-    SEP+
-    '<div style="display:flex;justify-content:space-between;margin:3px 0;"><span>Apertura:</span><span>'+fmt(turnoData.fechaApertura)+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between;margin:3px 0;"><span>Cierre:</span><span>'+fmt(ahora)+'</span></div>'+
-    SEP+
-    '<div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin:6px 0 3px;font-weight:700;">Resumen de Ventas</div>'+
-    '<div style="display:flex;justify-content:space-between;margin:3px 0;"><span>Ef. inicial:</span><span>'+gs(turnoData.efectivoInicial)+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between;margin:3px 0;font-weight:700;"><span>Total ventas ('+cantVentas+'):</span><span style="color:green;">'+gs(totalVentas)+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between;margin:3px 0;font-size:11px;color:#555;"><span>Ticket promedio:</span><span>'+gs(ticketProm)+'</span></div>'+
-    SEP+
-    '<div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin:6px 0 3px;font-weight:700;">Formas de Pago</div>'+
-    metodosRows+SEP+
-    egresosSection+conteoSection+diffSection+factSection+firmas+
-    '<div style="text-align:center;font-size:11px;color:#888;margin-top:12px;">'+fmt(ahora)+'</div>';
+  cierreTicketHTML = '<html><head><style>'+css+'</style></head><body>'+lines+'</body></html>';
 
   // Texto plano para WhatsApp
-  var wa = '*RENDICION DE CAJA - MI NEGOCIO*\n';
-  wa += 'Apertura: '+fmt(turnoData.fechaApertura)+'\nCierre: '+fmt(ahora)+'\n\n';
-  wa += '*VENTAS*\nTotal ('+cantVentas+'): '+gs(totalVentas)+'\nEf. inicial: '+gs(turnoData.efectivoInicial)+'\n\n';
-  wa += '*FORMAS DE PAGO*\n';
-  Object.entries(metodos).forEach(function(e){ wa += e[0]+' ('+e[1].ops+' op): '+gs(e[1].total)+'\n'; });
-  if(totalEgresos>0){ wa += '\n*EGRESOS*\nTotal: -'+gs(totalEgresos)+'\n'; }
-  if(totalContado>0){ wa += '\n*CONTEO*\nTotal contado: '+gs(totalContado)+'\nSaldo esperado: '+gs(saldoEsperado)+'\n'; }
+  var wa = '*CIERRE DE CAJA - '+negocio+'*\n';
+  wa += 'Apertura: '+fmtDT(turnoData.fechaApertura)+'\nCierre: '+fmtDT(ahora)+'\n';
+  wa += '\n*RESUMEN*\n';
+  wa += 'Ef. Inicial: '+gn2(turnoData.efectivoInicial)+'\n';
+  wa += 'Total Entrada: '+gn2(totalVentas)+'\n';
+  wa += 'Total Salida: '+gn2(totalEgresos)+'\n';
+  wa += 'Saldo en Caja: '+gn2(saldoCaja)+'\n';
+  wa += 'Diferencia: '+gn2(diferencia)+'\n';
+  wa += '\n*FORMAS DE PAGO*\n';
+  Object.entries(metodos).forEach(function(e){ wa += e[0]+' ('+e[1].ops+'): '+gn2(e[1].total)+'\n'; });
+  wa += 'TOTAL: '+gn2(totalVentas)+'\n';
+  if(totalContado>0){ wa += '\n*CONTEO*\nTotal contado: '+gn2(totalContado)+'\nSaldo esperado: '+gn2(saldoEsperado)+'\n'; }
   if(diff!==null){
     if(diff===0) wa += '\nCUADRE EXACTO';
-    else if(diff>0) wa += '\nSOBRANTE: +'+gs(diff);
-    else wa += '\nFALTANTE: -'+gs(Math.abs(diff));
+    else if(diff>0) wa += '\nSOBRANTE: +'+gn2(diff);
+    else wa += '\nFALTANTE: -'+gn2(Math.abs(diff));
   }
   cierreTextoPlano = wa;
 }
 
 function confirmarCierre(){
-  buildCierreTicket();
-  document.getElementById('previewPapel').innerHTML = cierreTicketHTML;
+  var size = getPaperSize('ticket') || '58';
+  buildCierreTicket(size);
+  // Preview en iframe para fidelidad
+  var papel = document.getElementById('previewPapel');
+  var pxW = size==='80' ? 320 : 220;
+  papel.style.width = pxW+'px';
+  papel.style.padding = '0';
+  papel.style.background = 'transparent';
+  papel.style.boxShadow = 'none';
+  var iframeCierre = document.getElementById('cierreIframe');
+  if(iframeCierre) iframeCierre.remove();
+  iframeCierre = document.createElement('iframe');
+  iframeCierre.id = 'cierreIframe';
+  iframeCierre.style.cssText = 'width:'+pxW+'px;border:none;background:#fff;display:block;';
+  papel.innerHTML = '';
+  papel.appendChild(iframeCierre);
+  var doc = iframeCierre.contentWindow.document;
+  doc.open(); doc.write(cierreTicketHTML); doc.close();
+  // Ajustar altura al contenido
+  setTimeout(function(){
+    try{ iframeCierre.style.height = (iframeCierre.contentWindow.document.body.scrollHeight+20)+'px'; }catch(e){}
+  }, 200);
   turnoBorrar();
   turnoData = { fechaApertura: null, efectivoInicial: 0, ventas: [], egresos: [], ingresos: [] };
   cierreMetodos = {};
@@ -7378,13 +7452,32 @@ function confirmarCierre(){
 }
 
 function imprimirCierre(){
-  var css = 'body{font-family:"Courier New",monospace;font-size:12px;padding:16px;max-width:320px;margin:0 auto;}@media print{body{padding:0;}}';
-  var w = window.open('','_blank','width=420,height=800');
-  w.document.open();
-  w.document.write('<!DOCTYPE html><html><head><title>Rendicion</title><style>'+css+'<\/style><\/head><body>'+cierreTicketHTML+'<\/body><\/html>');
-  w.document.close();
-  w.focus();
-  setTimeout(function(){ w.print(); w.close(); }, 500);
+  var size = getPaperSize('ticket') || '58';
+  buildCierreTicket(size); // Regenerar con el tamaño correcto
+  var isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true;
+  if(isPWA){
+    var iframe = document.getElementById('printFrame');
+    if(!iframe){
+      iframe = document.createElement('iframe');
+      iframe.id = 'printFrame';
+      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;';
+      document.body.appendChild(iframe);
+    }
+    var doc = iframe.contentWindow.document;
+    doc.open(); doc.write(cierreTicketHTML); doc.close();
+    setTimeout(function(){
+      try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }
+      catch(e){ window.print(); }
+    }, 600);
+  } else {
+    var w = window.open('','_blank','width=420,height=800');
+    if(!w){ alert('Permitir ventanas emergentes para imprimir'); return; }
+    w.document.open();
+    w.document.write(cierreTicketHTML);
+    w.document.close();
+    w.focus();
+    setTimeout(function(){ w.print(); w.close(); }, 500);
+  }
 }
 
 function compartirWhatsApp(){
