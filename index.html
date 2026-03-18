@@ -2649,12 +2649,6 @@
     <button class="mob-tipo-btn"     id="mobTipoBtnLlevar"   onclick="setTipoPedido('llevar')">Para llevar</button>
     <button class="mob-tipo-btn"     id="mobTipoBtnDelivery" onclick="setTipoPedido('delivery')">Delivery</button>
   </div>
-  <!-- Barra monto delivery móvil -->
-  <div class="tab-delivery-bar" id="mobDeliveryBar" style="display:none">
-    <span class="tab-delivery-label">Monto envío</span>
-    <button class="tab-delivery-btn" style="flex:1" onclick="openNpDelivery()">+ Ingresar monto</button>
-  </div>
-
   <!-- SPLIT WRAPPER (flex en tablet, contents en móvil) -->
   <div class="tablet-split">
 
@@ -3488,15 +3482,7 @@ function setTipoPedido(tipo){
       if(inp){ inp.value=''; inp.focus(); }
     }
   }
-  // Móvil
-  var mobBar = document.getElementById('mobDeliveryBar');
-  if(mobBar){
-    mobBar.style.display = tipo==='delivery' ? 'flex' : 'none';
-    if(tipo==='delivery'){
-      var mobInp = document.getElementById('mobDeliveryMonto');
-      if(mobInp){ mobInp.value=''; mobInp.focus(); }
-    }
-  }
+
   // Si cambia de delivery, quitar ítem delivery del cart
   if(tipo !== 'delivery') quitarItemDelivery();
 }
@@ -5212,6 +5198,15 @@ function npOK(){
       if(tDisp) tDisp.textContent = gs(tot);
     }
     updCierreDiff();
+    document.getElementById('npOverlay').classList.remove('open');
+    return;
+  } else if(npCtx==='delivery'){
+    const monto = parseInt(npVal)||0;
+    if(monto > 0){
+      const tabInp = document.getElementById('tabDeliveryMonto');
+      if(tabInp) tabInp.value = monto;
+      agregarMontoDelivery();
+    }
     document.getElementById('npOverlay').classList.remove('open');
     return;
   } else if(npCtx==='comprobante'){
