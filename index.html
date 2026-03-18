@@ -4757,12 +4757,29 @@ function abrirVentanaImpresion(html, size){
   const mmW = size==='58' ? '58mm' : '80mm';
   const pxW = size==='58' ? 230 : 310;
 
+  // Inject print instructions into HTML
+  const instruccion = `
+    <div id="printInfo" style="font-family:Arial,sans-serif;font-size:11px;color:#666;
+      background:#fff3cd;border:1px solid #ffc107;padding:8px 10px;margin-bottom:8px;
+      border-radius:4px;">
+      <b>⚠️ Configurar impresión:</b><br>
+      1. Más opciones → <b>Tamaño del papel: ${mmW}</b><br>
+      2. Márgenes: <b>Ninguno / Sin márgenes</b><br>
+      3. Desactivar "Encabezados y pies de página"
+    </div>`;
+
+  const htmlFinal = html.replace('<body>', '<body>'+instruccion);
+
   const win = window.open('','_blank',
     'width='+pxW+',height=700,menubar=no,toolbar=no,location=no');
-  win.document.write(html);
+  win.document.write(htmlFinal);
   win.document.close();
   win.focus();
-  setTimeout(()=>{ win.print(); win.close(); }, 400);
+  // Hide instructions when printing
+  const style = win.document.createElement('style');
+  style.textContent = '@media print { #printInfo { display:none !important; } }';
+  win.document.head.appendChild(style);
+  setTimeout(()=>{ win.print(); win.close(); }, 500);
 }
 
 // Formatear número guaraní sin símbolo (para ticket)
@@ -5068,8 +5085,13 @@ function imprimirRecibo(){
   const html = esFactura
     ? generarHTMLFactura(ultimoReciboData, size)
     : generarHTMLTicket(ultimoReciboData, size);
-  // Usar impresora configurada (BT o PC)
-  imprimirTicketConf(html, 'ticket');
+  // Si hay impresora BT configurada, usar ESC/POS; si no, ventana de impresión
+  const p = printers['ticket'];
+  if(p && p.type==='bt' && p.device){
+    imprimirBluetooth(p.device, html, size);
+  } else {
+    abrirVentanaImpresion(html, size);
+  }
 }
 
 // ── IMPRIMIR COMANDA ──────────────────────────────────────
