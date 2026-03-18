@@ -1465,13 +1465,10 @@
     flex-shrink: 0;
   }
   .tab-ticket-nro {
-    font-size: 11px; font-weight: 600; color: var(--muted);
-    letter-spacing: .4px; text-transform: uppercase;
+    font-size: 13px; font-weight: 800; color: var(--text);
+    letter-spacing: .5px;
   }
-  .tab-ticket-nro span {
-    font-size: 18px; font-weight: 800; color: var(--green);
-    display: block; line-height: 1.1; margin-top: 1px;
-  }
+  .tab-ticket-nro span { color: var(--green); }
   .tab-tipo-btns { display: flex; gap: 4px; }
   .tab-tipo-btn {
     background: var(--bg-card); border: 1.5px solid var(--border2);
@@ -2645,10 +2642,11 @@
 
   <!-- Barra tipo pedido móvil -->
   <div class="mob-tipo-bar">
-    <button class="mob-tipo-btn sel" id="mobTipoBtnLocal"    onclick="setTipoPedido('local')">Local</button>
-    <button class="mob-tipo-btn"     id="mobTipoBtnLlevar"   onclick="setTipoPedido('llevar')">Para llevar</button>
-    <button class="mob-tipo-btn"     id="mobTipoBtnDelivery" onclick="setTipoPedido('delivery')">Delivery</button>
+    <button class="mob-tipo-btn sel" id="mobTipoBtnLocal"    onclick="setTipoPedido('local')">🍽 Local</button>
+    <button class="mob-tipo-btn"     id="mobTipoBtnLlevar"   onclick="setTipoPedido('llevar')">📦 Para llevar</button>
+    <button class="mob-tipo-btn"     id="mobTipoBtnDelivery" onclick="setTipoPedido('delivery')">🛵 Delivery</button>
   </div>
+
   <!-- SPLIT WRAPPER (flex en tablet, contents en móvil) -->
   <div class="tablet-split">
 
@@ -2678,19 +2676,20 @@
     <div class="tablet-right" id="tabletRight">
       <!-- Header: Nro ticket + tipo pedido -->
       <div class="tab-ticket-header">
-        <div class="tab-ticket-nro">Nro. Ticket: <span id="tabTicketNro">#—</span></div>
+        <div class="tab-ticket-nro">🎫 Ticket <span id="tabTicketNro">#—</span></div>
         <div class="tab-tipo-btns">
-          <button class="tab-tipo-btn sel" id="tipoBtnLocal" onclick="setTipoPedido('local')">Local</button>
-          <button class="tab-tipo-btn" id="tipoBtnLlevar" onclick="setTipoPedido('llevar')">Llevar</button>
-          <button class="tab-tipo-btn" id="tipoBtnDelivery" onclick="setTipoPedido('delivery')">Delivery</button>
+          <button class="tab-tipo-btn sel" id="tipoBtnLocal" onclick="setTipoPedido('local')">🍽 Local</button>
+          <button class="tab-tipo-btn" id="tipoBtnLlevar" onclick="setTipoPedido('llevar')">📦 Llevar</button>
+          <button class="tab-tipo-btn" id="tipoBtnDelivery" onclick="setTipoPedido('delivery')">🛵 Delivery</button>
         </div>
       </div>
       <!-- Panel monto delivery -->
       <div class="tab-delivery-bar" id="tabDeliveryBar">
-        <span class="tab-delivery-label">Monto envío</span>
+        <span class="tab-delivery-label">🛵 Envío</span>
         <input type="number" class="tab-delivery-input" id="tabDeliveryMonto"
-          placeholder="0" style="display:none">
-        <button class="tab-delivery-btn" onclick="openNpDelivery()">+ Ingresar monto</button>
+          placeholder="Monto..." min="0" step="1000"
+          onkeydown="if(event.key==='Enter') agregarMontoDelivery()">
+        <button class="tab-delivery-btn" onclick="agregarMontoDelivery()">+ Agregar</button>
       </div>
       <div class="tab-action-bar">
         <button class="tab-btn-left" onclick="onBtnGuardar()">
@@ -3473,7 +3472,7 @@ function setTipoPedido(tipo){
     var btn = document.getElementById('mobTipoBtn'+t.charAt(0).toUpperCase()+t.slice(1));
     if(btn) btn.classList.toggle('sel', t===tipo);
   });
-  // Mostrar/ocultar panel de monto delivery — PC/Tablet
+  // Mostrar/ocultar panel de monto delivery
   var bar = document.getElementById('tabDeliveryBar');
   if(bar){
     bar.classList.toggle('visible', tipo==='delivery');
@@ -3482,7 +3481,6 @@ function setTipoPedido(tipo){
       if(inp){ inp.value=''; inp.focus(); }
     }
   }
-
   // Si cambia de delivery, quitar ítem delivery del cart
   if(tipo !== 'delivery') quitarItemDelivery();
 }
@@ -3491,18 +3489,6 @@ function quitarItemDelivery(){
   var idx = cart.findIndex(function(i){ return i.esDelivery; });
   if(idx >= 0){ cart.splice(idx,1); updUI(); updBtnGuardar(); }
 }
-
-function openNpDelivery(){
-  var existing = cart.find(function(i){ return i.esDelivery; });
-  npCtx = 'delivery';
-  npVal = existing ? String(existing.price) : '';
-  document.getElementById('npLbl').textContent = 'Monto del envío (Delivery)';
-  document.getElementById('npDisp').textContent = existing ? gs(existing.price) : '₲0';
-  document.getElementById('billetesRow').classList.remove('show');
-  document.getElementById('npOverlay').classList.add('open');
-}
-
-
 
 function agregarMontoDelivery(){
   var inp = document.getElementById('tabDeliveryMonto');
@@ -3516,7 +3502,7 @@ function agregarMontoDelivery(){
   cart.push({
     lineId: Date.now()*1000 + 999,
     id: 'delivery_item',
-    name: 'Envío delivery',
+    name: '🛵 Envío delivery',
     price: monto,
     qty: 1,
     obs: '',
@@ -4779,7 +4765,7 @@ function abrirVentanaImpresion(html, size){
   const style = win.document.createElement('style');
   style.textContent = '@media print { #printInfo { display:none !important; } }';
   win.document.head.appendChild(style);
-  setTimeout(()=>{ win.print(); win.close(); }, 500);
+  setTimeout(()=>{ win.print(); }, 500);
 }
 
 // Formatear número guaraní sin símbolo (para ticket)
@@ -5010,7 +4996,7 @@ function generarHTMLComanda(data, size){
   lineas += '<p class="c l">'+hora+'</p>';
   lineas += '<p class="c s">TICKET: #'+String(data.nroTicket||0).padStart(4,'0')+'</p>';
   if(data.tipoPedido && data.tipoPedido!=='local'){
-    const tipos={'llevar':'PARA LLEVAR','delivery':'DELIVERY'};
+    const tipos={'llevar':'📦 PARA LLEVAR','delivery':'🛵 DELIVERY'};
     lineas += '<p class="c b" style="font-size:14px;border:1px solid #000;padding:2px 0;margin:2px 0">'+( tipos[data.tipoPedido]||data.tipoPedido.toUpperCase())+'</p>';
   }
   lineas += '<p class="c s">CLIENTE: '+(data.factura?.nombre||'SIN NOMBRE')+'</p>';
@@ -5085,13 +5071,7 @@ function imprimirRecibo(){
   const html = esFactura
     ? generarHTMLFactura(ultimoReciboData, size)
     : generarHTMLTicket(ultimoReciboData, size);
-  // Si hay impresora BT configurada, usar ESC/POS; si no, ventana de impresión
-  const p = printers['ticket'];
-  if(p && p.type==='bt' && p.device){
-    imprimirBluetooth(p.device, html, size);
-  } else {
-    abrirVentanaImpresion(html, size);
-  }
+  abrirVentanaImpresion(html, size);
 }
 
 // ── IMPRIMIR COMANDA ──────────────────────────────────────
@@ -5140,14 +5120,6 @@ function openNP(ctx){
   document.getElementById('npOverlay').classList.add('open');
 }
 function npOutside(e){ if(e.target===document.getElementById('npOverlay'))document.getElementById('npOverlay').classList.remove('open'); }
-document.addEventListener('keydown', function(e){
-  var ov = document.getElementById('npOverlay');
-  if(!ov || !ov.classList.contains('open')) return;
-  if(e.key>='0' && e.key<='9'){ e.preventDefault(); npP(e.key); }
-  else if(e.key==='Backspace'){ e.preventDefault(); npD(); }
-  else if(e.key==='Enter'){ e.preventDefault(); npOK(); }
-  else if(e.key==='Escape'){ e.preventDefault(); ov.classList.remove('open'); }
-});
 function npP(d){
   if(npCtx==='comprobante'||npCtx==='divComp'){
     npVal+=d; if(npVal.length>15)npVal=npVal.slice(0,15);
@@ -5204,15 +5176,6 @@ function npOK(){
       if(tDisp) tDisp.textContent = gs(tot);
     }
     updCierreDiff();
-    document.getElementById('npOverlay').classList.remove('open');
-    return;
-  } else if(npCtx==='delivery'){
-    const monto = parseInt(npVal)||0;
-    if(monto > 0){
-      const tabInp = document.getElementById('tabDeliveryMonto');
-      if(tabInp) tabInp.value = monto;
-      agregarMontoDelivery();
-    }
     document.getElementById('npOverlay').classList.remove('open');
     return;
   } else if(npCtx==='comprobante'){
@@ -7354,7 +7317,7 @@ function imprimirCierre(){
   w.document.write('<!DOCTYPE html><html><head><title>Rendicion</title><style>'+css+'<\/style><\/head><body>'+cierreTicketHTML+'<\/body><\/html>');
   w.document.close();
   w.focus();
-  setTimeout(function(){ w.print(); w.close(); }, 500);
+  setTimeout(function(){ w.print(); }, 500);
 }
 
 function compartirWhatsApp(){
@@ -7448,14 +7411,6 @@ function updPrinterUI(tipo){
   }
 }
 
-// UUIDs de servicios conocidos de impresoras térmicas BT
-const BT_SERVICES = [
-  '000018f0-0000-1000-8000-00805f9b34fb', // ESC/POS genérico
-  'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Xprinter / Zjiang
-  '49535343-fe7d-4ae5-8fa9-9fafd205e455', // Microprinter / innprinter
-  '0000ff00-0000-1000-8000-00805f9b34fb', // Alternativo genérico
-];
-
 async function conectarBluetooth(tipo){
   if(!navigator.bluetooth){
     toast('Web Bluetooth no disponible en este dispositivo/browser');
@@ -7463,20 +7418,18 @@ async function conectarBluetooth(tipo){
   }
   try {
     toast('Buscando impresoras...');
-    let device;
-    try {
-      // Intento 1: filtrar por servicio ESC/POS conocido
-      device = await navigator.bluetooth.requestDevice({
-        filters: BT_SERVICES.map(s => ({ services: [s] })),
-        optionalServices: BT_SERVICES
-      });
-    } catch(e1) {
-      // Intento 2: mostrar todos los dispositivos BT
-      device = await navigator.bluetooth.requestDevice({
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [
+        { services: ['000018f0-0000-1000-8000-00805f9b34fb'] }, // ESC/POS común
+      ],
+      optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+    }).catch(async () => {
+      // Fallback: mostrar todas las impresoras
+      return await navigator.bluetooth.requestDevice({
         acceptAllDevices: true,
-        optionalServices: BT_SERVICES
+        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
       });
-    }
+    });
     printers[tipo].device = device;
     printers[tipo].name   = device.name || 'Impresora BT';
     printers[tipo].type   = 'bt';
@@ -7660,73 +7613,33 @@ async function imprimirBluetooth(device, htmlContent, size){
 
   bytes.push(...CMD.feed,...CMD.cut);
 
-  // Enviar en chunks conservadores para mayor compatibilidad
-  const CHUNK=200;
+  // Enviar en chunks de 512 bytes (límite BLE)
+  const CHUNK=512;
   try{
-    // Reconectar si se desconectó
-    let server;
-    if(device.gatt.connected){
-      server=device.gatt;
-    } else {
-      server=await device.gatt.connect();
-    }
-
-    // Intentar servicios conocidos de impresoras BT
-    let char=null;
+    const server=await device.gatt.connect();
+    // Intentar con varios servicios conocidos de impresoras BT
+    let service, char;
     const SERVICES=[
       {svc:'000018f0-0000-1000-8000-00805f9b34fb', chr:'00002af1-0000-1000-8000-00805f9b34fb'},
       {svc:'e7810a71-73ae-499d-8c15-faa9aef0c3f2', chr:'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f'},
       {svc:'49535343-fe7d-4ae5-8fa9-9fafd205e455', chr:'49535343-8841-43f4-a8d4-ecbe34729bb3'},
     ];
-    let lastErr='';
     for(const s of SERVICES){
       try{
-        const svc=await server.getPrimaryService(s.svc);
-        char=await svc.getCharacteristic(s.chr);
-        console.log('[BT] Servicio:', s.svc);
+        service=await server.getPrimaryService(s.svc);
+        char=await service.getCharacteristic(s.chr);
         break;
-      }catch(e){ lastErr=e.message; }
+      }catch(e){ continue; }
     }
-
-    // Fallback: escanear todos los servicios disponibles
-    if(!char){
-      try{
-        const svcs=await server.getPrimaryServices();
-        console.log('[BT] Servicios:', svcs.map(s=>s.uuid));
-        for(const svc of svcs){
-          const chars=await svc.getCharacteristics();
-          for(const c of chars){
-            if(c.properties.write||c.properties.writeWithoutResponse){
-              char=c;
-              console.log('[BT] Char:', c.uuid);
-              break;
-            }
-          }
-          if(char) break;
-        }
-      }catch(e2){ console.warn('[BT] Scan error:', e2.message); }
-    }
-
-    if(!char) throw new Error('Impresora no soportada. '+lastErr);
+    if(!char) throw new Error('No se encontró el servicio de impresión');
 
     const data=new Uint8Array(bytes);
     for(let i=0;i<data.length;i+=CHUNK){
-      const chunk=data.slice(i,i+CHUNK);
-      try{
-        if(char.properties.writeWithoutResponse){
-          await char.writeValueWithoutResponse(chunk);
-        } else {
-          await char.writeValue(chunk);
-        }
-      }catch(e){
-        try{ await char.writeValue(chunk); }
-        catch(e2){ throw new Error('Error enviando datos: '+e2.message); }
-      }
-      await new Promise(r=>setTimeout(r,30));
+      await char.writeValueWithoutResponse(data.slice(i,i+CHUNK));
+      await new Promise(r=>setTimeout(r,20)); // pequeña pausa entre chunks
     }
     toast('✓ Impreso por Bluetooth');
   }catch(e){
-    console.error('[BT]', e.message);
     toast('Error BT: '+e.message);
     imprimirTicketConf(htmlContent,'ticket');
   }
