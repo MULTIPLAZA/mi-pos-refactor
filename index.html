@@ -5068,7 +5068,8 @@ function imprimirRecibo(){
   const html = esFactura
     ? generarHTMLFactura(ultimoReciboData, size)
     : generarHTMLTicket(ultimoReciboData, size);
-  abrirVentanaImpresion(html, size);
+  // Usar impresora configurada (BT o PC)
+  imprimirTicketConf(html, 'ticket');
 }
 
 // ── IMPRIMIR COMANDA ──────────────────────────────────────
