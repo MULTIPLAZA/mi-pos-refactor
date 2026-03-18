@@ -4757,29 +4757,12 @@ function abrirVentanaImpresion(html, size){
   const mmW = size==='58' ? '58mm' : '80mm';
   const pxW = size==='58' ? 230 : 310;
 
-  // Inject print instructions into HTML
-  const instruccion = `
-    <div id="printInfo" style="font-family:Arial,sans-serif;font-size:11px;color:#666;
-      background:#fff3cd;border:1px solid #ffc107;padding:8px 10px;margin-bottom:8px;
-      border-radius:4px;">
-      <b>⚠️ Configurar impresión:</b><br>
-      1. Más opciones → <b>Tamaño del papel: ${mmW}</b><br>
-      2. Márgenes: <b>Ninguno / Sin márgenes</b><br>
-      3. Desactivar "Encabezados y pies de página"
-    </div>`;
-
-  const htmlFinal = html.replace('<body>', '<body>'+instruccion);
-
   const win = window.open('','_blank',
     'width='+pxW+',height=700,menubar=no,toolbar=no,location=no');
-  win.document.write(htmlFinal);
+  win.document.write(html);
   win.document.close();
   win.focus();
-  // Hide instructions when printing
-  const style = win.document.createElement('style');
-  style.textContent = '@media print { #printInfo { display:none !important; } }';
-  win.document.head.appendChild(style);
-  setTimeout(()=>{ win.print(); }, 500);
+  setTimeout(()=>{ win.print(); win.close(); }, 400);
 }
 
 // Formatear número guaraní sin símbolo (para ticket)
@@ -7348,7 +7331,7 @@ function imprimirCierre(){
   w.document.write('<!DOCTYPE html><html><head><title>Rendicion</title><style>'+css+'<\/style><\/head><body>'+cierreTicketHTML+'<\/body><\/html>');
   w.document.close();
   w.focus();
-  setTimeout(function(){ w.print(); }, 500);
+  setTimeout(function(){ w.print(); w.close(); }, 500);
 }
 
 function compartirWhatsApp(){
