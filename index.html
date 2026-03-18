@@ -7627,33 +7627,73 @@ async function imprimirBluetooth(device, htmlContent, size){
 
   bytes.push(...CMD.feed,...CMD.cut);
 
-  // Enviar en chunks de 512 bytes (límite BLE)
-  const CHUNK=512;
+  // Enviar en chunks conservadores para mayor compatibilidad
+  const CHUNK=200;
   try{
-    const server=await device.gatt.connect();
-    // Intentar con varios servicios conocidos de impresoras BT
-    let service, char;
+    // Reconectar si se desconectó
+    let server;
+    if(device.gatt.connected){
+      server=device.gatt;
+    } else {
+      server=await device.gatt.connect();
+    }
+
+    // Intentar servicios conocidos de impresoras BT
+    let char=null;
     const SERVICES=[
       {svc:'000018f0-0000-1000-8000-00805f9b34fb', chr:'00002af1-0000-1000-8000-00805f9b34fb'},
       {svc:'e7810a71-73ae-499d-8c15-faa9aef0c3f2', chr:'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f'},
       {svc:'49535343-fe7d-4ae5-8fa9-9fafd205e455', chr:'49535343-8841-43f4-a8d4-ecbe34729bb3'},
     ];
+    let lastErr='';
     for(const s of SERVICES){
       try{
-        service=await server.getPrimaryService(s.svc);
-        char=await service.getCharacteristic(s.chr);
+        const svc=await server.getPrimaryService(s.svc);
+        char=await svc.getCharacteristic(s.chr);
+        console.log('[BT] Servicio:', s.svc);
         break;
-      }catch(e){ continue; }
+      }catch(e){ lastErr=e.message; }
     }
-    if(!char) throw new Error('No se encontró el servicio de impresión');
+
+    // Fallback: escanear todos los servicios disponibles
+    if(!char){
+      try{
+        const svcs=await server.getPrimaryServices();
+        console.log('[BT] Servicios:', svcs.map(s=>s.uuid));
+        for(const svc of svcs){
+          const chars=await svc.getCharacteristics();
+          for(const c of chars){
+            if(c.properties.write||c.properties.writeWithoutResponse){
+              char=c;
+              console.log('[BT] Char:', c.uuid);
+              break;
+            }
+          }
+          if(char) break;
+        }
+      }catch(e2){ console.warn('[BT] Scan error:', e2.message); }
+    }
+
+    if(!char) throw new Error('Impresora no soportada. '+lastErr);
 
     const data=new Uint8Array(bytes);
     for(let i=0;i<data.length;i+=CHUNK){
-      await char.writeValueWithoutResponse(data.slice(i,i+CHUNK));
-      await new Promise(r=>setTimeout(r,20)); // pequeña pausa entre chunks
+      const chunk=data.slice(i,i+CHUNK);
+      try{
+        if(char.properties.writeWithoutResponse){
+          await char.writeValueWithoutResponse(chunk);
+        } else {
+          await char.writeValue(chunk);
+        }
+      }catch(e){
+        try{ await char.writeValue(chunk); }
+        catch(e2){ throw new Error('Error enviando datos: '+e2.message); }
+      }
+      await new Promise(r=>setTimeout(r,30));
     }
     toast('✓ Impreso por Bluetooth');
   }catch(e){
+    console.error('[BT]', e.message);
     toast('Error BT: '+e.message);
     imprimirTicketConf(htmlContent,'ticket');
   }
