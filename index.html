@@ -1608,6 +1608,7 @@
   }
   @media (min-width: 700px) {
     .mob-tipo-bar { display: none !important; }
+    #mobDeliveryBar { display: none !important; }
   }
 
   /* PC: 5 columnas fijas */
@@ -2649,6 +2650,11 @@
     <button class="mob-tipo-btn"     id="mobTipoBtnLlevar"   onclick="setTipoPedido('llevar')">Para llevar</button>
     <button class="mob-tipo-btn"     id="mobTipoBtnDelivery" onclick="setTipoPedido('delivery')">Delivery</button>
   </div>
+  <!-- Barra delivery móvil — solo visible en celular al seleccionar Delivery -->
+  <div id="mobDeliveryBar" style="display:none;align-items:center;gap:8px;padding:7px 12px;background:rgba(255,152,0,.1);border-bottom:1px solid rgba(255,152,0,.3);flex-shrink:0;">
+    <span style="font-size:11px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;">Monto envío</span>
+    <button onclick="openNpDelivery()" style="flex:1;background:var(--orange);border:none;border-radius:5px;color:#fff;font-family:'Barlow',sans-serif;font-size:12px;font-weight:800;padding:7px 10px;cursor:pointer;">+ Ingresar monto</button>
+  </div>
   <!-- SPLIT WRAPPER (flex en tablet, contents en móvil) -->
   <div class="tablet-split">
 
@@ -2939,7 +2945,14 @@
       <button class="billete-btn" onclick="npBillete(50000)">50 mil</button>
       <button class="billete-btn" onclick="npBillete(100000)">100 mil</button>
     </div>
-    <div class="np-grid">
+    <!-- Modo texto: input nativo del teclado del sistema -->
+    <input type="text" id="npTextInput" autocomplete="off" autocorrect="off"
+      style="display:none;width:100%;background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;
+        color:var(--text);font-family:'Barlow',sans-serif;font-size:18px;font-weight:700;
+        padding:10px 12px;box-sizing:border-box;margin-bottom:12px;outline:none;"
+      oninput="npVal=this.value"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();npOK();}else if(event.key==='Escape'){cerrarNpTexto();document.getElementById('npOverlay').classList.remove('open');}">
+    <div class="np-grid" id="npGrid">
       <button class="npb" onclick="npP('1')">1</button><button class="npb" onclick="npP('2')">2</button><button class="npb" onclick="npP('3')">3</button>
       <button class="npb" onclick="npP('4')">4</button><button class="npb" onclick="npP('5')">5</button><button class="npb" onclick="npP('6')">6</button>
       <button class="npb" onclick="npP('7')">7</button><button class="npb" onclick="npP('8')">8</button><button class="npb" onclick="npP('9')">9</button>
@@ -3473,18 +3486,45 @@ function setTipoPedido(tipo){
     var btn = document.getElementById('mobTipoBtn'+t.charAt(0).toUpperCase()+t.slice(1));
     if(btn) btn.classList.toggle('sel', t===tipo);
   });
-  // Mostrar/ocultar panel de monto delivery — PC/Tablet
+  // Mostrar/ocultar panel delivery — PC/Tablet (dentro del panel derecho)
   var bar = document.getElementById('tabDeliveryBar');
-  if(bar){
-    bar.classList.toggle('visible', tipo==='delivery');
-    if(tipo==='delivery'){
-      var inp = document.getElementById('tabDeliveryMonto');
-      if(inp){ inp.value=''; inp.focus(); }
-    }
-  }
+  if(bar) bar.classList.toggle('visible', tipo==='delivery');
+  // Mostrar/ocultar panel delivery — Móvil (fuera del tablet-right)
+  var mobBar = document.getElementById('mobDeliveryBar');
+  if(mobBar) mobBar.style.display = tipo==='delivery' ? 'flex' : 'none';
 
   // Si cambia de delivery, quitar ítem delivery del cart
   if(tipo !== 'delivery') quitarItemDelivery();
+}
+
+function openNpTexto(ctx, inputEl){
+  // Solo abrir en móvil (pantalla < 700px)
+  if(window.innerWidth >= 700) return;
+  inputEl.blur();
+  setTimeout(function(){ inputEl.blur(); }, 10);
+  npCtx = 'texto_' + ctx;
+  npVal = inputEl.value || '';
+  var labels = { ruc: 'RUC / C.I.', nombre: 'Razón Social / Nombre' };
+  document.getElementById('npLbl').textContent = labels[ctx] || ctx;
+  document.getElementById('npDisp').style.display = 'none';
+  document.getElementById('billetesRow').classList.remove('show');
+  var grid = document.getElementById('npGrid');
+  if(grid) grid.style.display = 'none';
+  var ti = document.getElementById('npTextInput');
+  ti.style.display = 'block';
+  ti.value = npVal;
+  ti.autocapitalize = ctx === 'nombre' ? 'words' : 'off';
+  document.getElementById('npOverlay').classList.add('open');
+  setTimeout(function(){ ti.focus(); }, 300);
+}
+
+function cerrarNpTexto(){
+  document.getElementById('npDisp').style.display = '';
+  var ng = document.getElementById('npGrid');
+  if(ng) ng.style.display = '';
+  var ti = document.getElementById('npTextInput');
+  if(ti){ ti.style.display = 'none'; ti.value = ''; }
+  npCtx = '';
 }
 
 function quitarItemDelivery(){
@@ -5196,14 +5236,20 @@ function openNP(ctx){
   document.getElementById('billetesRow').classList.toggle('show', showBilletes);
   document.getElementById('npOverlay').classList.add('open');
 }
-function npOutside(e){ if(e.target===document.getElementById('npOverlay'))document.getElementById('npOverlay').classList.remove('open'); }
+function npOutside(e){
+  if(e.target===document.getElementById('npOverlay')){
+    if(npCtx && npCtx.startsWith('texto_')) cerrarNpTexto();
+    document.getElementById('npOverlay').classList.remove('open');
+  }
+}
 document.addEventListener('keydown', function(e){
   var ov = document.getElementById('npOverlay');
   if(!ov || !ov.classList.contains('open')) return;
+  if(npCtx && npCtx.startsWith('texto_')) return; // input nativo maneja texto
   if(e.key>='0' && e.key<='9'){ e.preventDefault(); npP(e.key); }
   else if(e.key==='Backspace'){ e.preventDefault(); npD(); }
   else if(e.key==='Enter'){ e.preventDefault(); npOK(); }
-  else if(e.key==='Escape'){ e.preventDefault(); ov.classList.remove('open'); }
+  else if(e.key==='Escape'){ e.preventDefault(); cerrarNpTexto(); ov.classList.remove('open'); }
 });
 function npP(d){
   if(npCtx==='comprobante'||npCtx==='divComp'){
@@ -5270,6 +5316,20 @@ function npOK(){
       if(tabInp) tabInp.value = monto;
       agregarMontoDelivery();
     }
+    document.getElementById('npOverlay').classList.remove('open');
+    return;
+  } else if(npCtx.startsWith('texto_')){
+    const campo = npCtx.replace('texto_','');
+    const ti = document.getElementById('npTextInput');
+    const val = (ti ? ti.value : npVal).trim();
+    if(campo==='ruc'){
+      const el = document.getElementById('factRuc');
+      if(el){ el.value = val; onRucInput(); }
+    } else if(campo==='nombre'){
+      const el = document.getElementById('factNombre');
+      if(el) el.value = val;
+    }
+    cerrarNpTexto();
     document.getElementById('npOverlay').classList.remove('open');
     return;
   } else if(npCtx==='comprobante'){
