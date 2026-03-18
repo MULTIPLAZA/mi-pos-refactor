@@ -899,7 +899,8 @@
 
   /* GRID */
   .products-grid {
-    display:grid; grid-template-columns:repeat(3,1fr);
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap:3px; padding:4px 4px; overflow-y:auto; flex:1;
     background:var(--bg); align-content:start;
   }
@@ -910,7 +911,7 @@
   }
   .ptile:active { filter:brightness(.78); transform:scale(.95); }
   .pname {
-    font-size:12.5px; font-weight:700; letter-spacing:.2px; line-height:1.35;
+    font-size:11.5px; font-weight:700; letter-spacing:.2px; line-height:1.3;
     color:#fff; text-transform:uppercase;
     display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
   }
@@ -1435,9 +1436,9 @@
       display: flex !important;
     }
 
-    /* Grilla de 5 columnas en tablet */
+    /* Tablet: tiles un poco más chicos */
     .products-grid {
-      grid-template-columns: repeat(4, 1fr) !important;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)) !important;
     }
 
     /* El panel de ticket móvil se oculta en tablet */
@@ -1525,7 +1526,21 @@
     .tablet-right { display: none !important; }
     #scSale .action-bar { display: grid !important; }
     #prodView { display: flex !important; }
-    .products-grid { grid-template-columns: repeat(3,1fr) !important; }
+    .products-grid { grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)) !important; }
+  }
+
+  /* PC: tiles más chicos, más columnas */
+  @media (min-width:1000px){
+    .products-grid {
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
+    }
+    .pname { font-size:10.5px; }
+  }
+  @media (min-width:1400px){
+    .products-grid {
+      grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)) !important;
+    }
+    .pname { font-size:10px; }
   }
 
   ::-webkit-scrollbar { width:2px; }
@@ -4503,21 +4518,14 @@ function getPaperSize(tipo){ return printers[tipo]?.size || localStorage.getItem
 // CSS base para impresión térmica
 function getCSSTermico(size){
   const w  = size==='58' ? '58mm' : '80mm';
-  const pw = size==='58' ? '48mm' : '72mm'; // printable width
-  const fs = size==='58' ? '9pt'  : '10pt';
+  const pw = size==='58' ? '48mm' : '72mm';
+  const fs = size==='58' ? '8.5pt': '10pt';
   const ss = size==='58' ? '7pt'  : '8pt';
-  const ls = size==='58' ? '12pt' : '14pt';
+  const ls = size==='58' ? '11pt' : '13pt';
   return `
-    @page {
-      size: ${w} auto !important;
-      margin: 0 !important;
-    }
+    @page { size: ${w} auto !important; margin: 0 !important; }
     @media print {
-      html, body {
-        width: ${w} !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
+      html, body { width: ${w} !important; margin: 0 !important; padding: 0 !important; }
     }
     * { margin:0; padding:0; box-sizing:border-box; }
     html { width:${w}; }
@@ -4531,17 +4539,28 @@ function getCSSTermico(size){
       background: #fff;
       color: #000;
     }
-    p { margin: 0; padding: 0; line-height: 1.35; }
-    .c  { text-align: center; }
-    .r  { text-align: right; }
-    .b  { font-weight: bold; }
-    .s  { font-size: ${ss}; }
-    .l  { font-size: ${ls}; font-weight: bold; }
-    .hr { border:none; border-top:1px dashed #000; margin: 1mm 0; display:block; }
-    .row{ display:flex; justify-content:space-between; }
-    .row .l1 { flex:1; padding-right:3px; overflow:hidden; }
-    .row .l2 { text-align:right; white-space:nowrap; }
-    .obs { font-size:${ss}; padding-left:6px; }
+    p  { margin:0; padding:0; line-height:1.3; }
+    .c { text-align:center; }
+    .r { text-align:right; }
+    .b { font-weight:bold; }
+    .s { font-size:${ss}; }
+    .l { font-size:${ls}; font-weight:bold; }
+    .hr{ border:none; border-top:1px dashed #000; margin:1mm 0; display:block; }
+    /* fila dos columnas: izq flexible, der fijo */
+    .row { display:flex; justify-content:space-between; align-items:baseline; }
+    .row .l1 { flex:1; padding-right:4px; word-break:break-word; }
+    .row .l2 { text-align:right; white-space:nowrap; min-width:0; }
+    /* fila de item: nombre arriba, nums abajo */
+    .it-nom { font-size:${ss}; font-weight:bold; word-break:break-word; }
+    .it-det { display:flex; justify-content:space-between; font-size:${ss}; padding-left:2px; }
+    .it-det .qty { white-space:nowrap; }
+    .it-det .pu  { flex:1; text-align:center; white-space:nowrap; }
+    .it-det .sub { white-space:nowrap; font-weight:bold; }
+    .obs { font-size:${ss}; padding-left:8px; color:#333; }
+    /* item factura: nombre + datos en dos líneas */
+    .if-nom { font-size:${ss}; font-weight:bold; word-break:break-word; }
+    .if-det { display:flex; justify-content:space-between; font-size:${ss}; padding-left:2px; }
+    .if-det span { white-space:nowrap; }
   `;
 }
 
@@ -4614,23 +4633,22 @@ function generarHTMLTicket(data, size){
   lineas += '<p class="hr"></p>';
 
   // Encabezado columnas
-  const c1 = size==='58' ? 4 : 6;
-  const c2 = size==='58' ? 16: 22;
-  const c3 = size==='58' ? 6 : 8;
-  const c4 = size==='58' ? 6 : 8;
-  lineas += '<p class="s b">'+padL('COD.',c1)+' '+padL('DESCRIPCION',c2)+' '+padR('PR.UNIT',c3)+' '+padR('SUBTOT',c4)+'</p>';
+  lineas += '<p class="s b"><span>DESCRIPCIÓN</span></p>';
+  lineas += '<p class="s b"><span style="opacity:.6">CANT × P.UNIT</span>'
+    +'<span style="float:right;font-weight:bold">SUBTOTAL</span></p>';
   lineas += '<p class="hr"></p>';
 
-  // Items
+  // Items — nombre en línea 1, cant × pu = sub en línea 2
   data.items.forEach(item => {
     const subtot = item.desc>0 ? Math.round(item.price*item.qty*(1-item.desc/100)) : item.price*item.qty;
-    const cod    = padL(item.codigo||'',c1);
-    const nom    = padL(item.name, c2);
-    const prec   = padR(gn(item.price), c3);
-    const sub    = padR(gn(subtot), c4);
-    lineas += '<p class="s">'+cod+' '+nom+' '+prec+' '+sub+'</p>';
-    if(item.desc>0) lineas += '<p class="obs s">  Desc: '+item.desc+'%</p>';
-    if(item.obs)    lineas += '<p class="obs s">  '+item.obs+'</p>';
+    lineas += '<p class="it-nom">'+item.name+'</p>';
+    lineas += '<p class="it-det">'
+      +'<span class="qty">'+item.qty+' × '+gn(item.price)+'</span>'
+      +'<span class="pu"></span>'
+      +'<span class="sub">'+gn(subtot)+'</span>'
+      +'</p>';
+    if(item.desc>0) lineas += '<p class="obs">  Desc: '+item.desc+'%</p>';
+    if(item.obs)    lineas += '<p class="obs">  '+item.obs+'</p>';
   });
   lineas += '<p class="hr"></p>';
 
@@ -4714,10 +4732,9 @@ function generarHTMLFactura(data, size){
 
   // Cabecera
   lineas += '<p class="c b">'+neg+'</p>';
-  if(ruc)  lineas += '<p class="c s">'+dir+'</p>';
+  if(dir)  lineas += '<p class="c s">'+dir+'</p>';
   if(ruc)  lineas += '<p class="c s">RUC: '+ruc+'</p>';
-  if(dir)  lineas += '<p class="c s">Avda. Mariscal Lopez</p>';
-  if(tel)  lineas += '<p class="c s">Tel:</p>';
+  if(tel)  lineas += '<p class="c s">Tel: '+tel+'</p>';
   lineas += '<p class="hr"></p>';
 
   // Timbrado
@@ -4731,22 +4748,20 @@ function generarHTMLFactura(data, size){
   lineas += '<p class="hr"></p>';
 
   // Encabezado items
-  const c1=size==='58'?5:6, c2=size==='58'?4:5, c3=size==='58'?6:7, c4=size==='58'?7:8, c5=size==='58'?4:5;
-  lineas += '<p class="s b">'+padL('DESCRIPCION',c1+c2+c3+c4+c5+4)+'</p>';
-  lineas += '<p class="s b">'+padL('COD.BAR.',c1)+' '+padR('CANT',c2)+' '+padR('PR.UNIT',c3)+' '+padR('IMPORTE',c4)+' '+padR('IVA',c5)+'</p>';
+  lineas += '<p class="s b">DESCRIPCIÓN &nbsp;&nbsp;&nbsp; CANT × PU &nbsp;&nbsp; IMP &nbsp; IVA</p>';
   lineas += '<p class="hr"></p>';
 
-  // Items (excluir descuentos — van en totales)
+  // Items — nombre en línea 1, detalle en línea 2
   data.items.filter(i=>!i.esDescuento).forEach(item=>{
     const sub = item.desc>0 ? Math.round(item.price*item.qty*(1-item.desc/100)) : item.price*item.qty;
-    lineas += '<p class="s">'+item.name+'</p>';
-    const cod  = padL(item.codigo||'',c1);
-    const cant = padR(item.qty,c2);
-    const pu   = padR(gn(item.price),c3);
-    const imp  = padR(gn(sub),c4);
-    const iv   = padR(item.iva==='exento'?'Exnt':(item.iva||'10')+'%',c5);
-    lineas += '<p class="s">'+cod+' '+cant+' '+pu+' '+imp+' '+iv+'</p>';
-    if(item.obs) lineas += '<p class="obs s">  '+item.obs+'</p>';
+    const ivaLabel = item.iva==='exento'?'Exnt':(item.iva||'10')+'%';
+    lineas += '<p class="if-nom">'+item.name+'</p>';
+    lineas += '<p class="if-det">'
+      +'<span>'+item.qty+'×'+gn(item.price)+'</span>'
+      +'<span>'+gn(sub)+'</span>'
+      +'<span>'+ivaLabel+'</span>'
+      +'</p>';
+    if(item.obs) lineas += '<p class="obs">  '+item.obs+'</p>';
   });
   lineas += '<p class="hr"></p>';
 
@@ -5243,191 +5258,11 @@ function supaInsertVenta(data){
   .then(r => {
     if(!r.ok) return r.text().then(t => { throw new Error(t); });
     console.log('[Venta] Guardada en Supabase OK');
-    // Descontar stock en background
-    const ventaItems=(data.items||[]).map(i=>({id:i.id,name:i.name,nombre:i.name,qty:i.qty,costo:i.costo||0}));
-    stockDescontarVenta(ventaItems,data.comprobante||venta.comprobante,null).catch(()=>{});
   })
   .catch(e => {
     console.warn('[Venta] Error Supabase, encolando:', e.message);
     if(db) dbQueueSync('ventas','insert', venta);
   });
-}
-
-
-// ── STOCK: descontar al vender, reponer al anular ──────────────────────
-async function stockDescontarVenta(items, comprobante, ventaId){
-  if(USAR_DEMO || !navigator.onLine) return;
-  const email    = localStorage.getItem(SK.email);
-  const depId    = parseInt(localStorage.getItem('pos_deposito_id'))  || null;
-  const sucId    = parseInt(localStorage.getItem('pos_sucursal_id'))  || null;
-  const terminal = licGetTerminal();
-  if(!depId || !email) return;
-
-  const itemsStock = (items||[]).filter(i => i.id && !isNaN(i.id) && (i.qty||0) > 0);
-  if(!itemsStock.length) return;
-
-  let licId = parseInt(localStorage.getItem('pos_licencia_id')||'0');
-  if(!licId){
-    try{
-      const r = await fetch(SUPA_URL+'/rest/v1/licencias?email_cliente=ilike.'+encodeURIComponent(email)+'&activa=eq.true&select=id&limit=1',
-        {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}});
-      const d = await r.json();
-      if(d&&d[0]){ licId=d[0].id; localStorage.setItem('pos_licencia_id', licId); }
-    }catch(e){ console.warn('[Stock] licencia_id:', e.message); return; }
-  }
-  if(!licId) return;
-
-  try{
-    // Leer stock actual de los productos involucrados
-    const prodIds = itemsStock.map(i=>i.id);
-    const r = await fetch(
-      SUPA_URL+'/rest/v1/stock?deposito_id=eq.'+depId+'&producto_id=in.('+prodIds.join(',')+')'
-      +'&licencia_id=eq.'+licId+'&select=id,producto_id,cantidad',
-      {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}}
-    );
-    const stockActual = r.ok ? await r.json() : [];
-    const stockMap = {};
-    stockActual.forEach(s => stockMap[s.producto_id] = s);
-
-    // 1. Crear comprobante encabezado
-    const compResp = await fetch(SUPA_URL+'/rest/v1/stock_comprobantes', {
-      method: 'POST',
-      headers: {'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-        'Content-Type':'application/json','Prefer':'return=representation'},
-      body: JSON.stringify({
-        licencia_id: licId, deposito_id: depId, sucursal_id: sucId,
-        tipo: 'venta', referencia: comprobante||('V-'+(ventaId||Date.now())),
-        venta_id: ventaId||null, terminal, usuario: email,
-        fecha: new Date().toISOString()
-      })
-    });
-    if(!compResp.ok) throw new Error(await compResp.text());
-    const compData = await compResp.json();
-    const compId = Array.isArray(compData) ? compData[0]?.id : compData?.id;
-    if(!compId) throw new Error('No se obtuvo comprobante_id');
-
-    // 2. Armar ítems + actualizaciones de stock
-    const itemsToInsert = [];
-    for(const item of itemsStock){
-      const sk    = stockMap[item.id];
-      const antes = sk ? (sk.cantidad||0) : 0;
-      const desp  = antes - (item.qty||0);
-      itemsToInsert.push({
-        comprobante_id: compId, producto_id: item.id,
-        nombre_producto: item.name||item.nombre||'',
-        cantidad: -(item.qty||0),
-        cantidad_antes: antes, cantidad_despues: desp,
-        costo_unitario: item.costo||0
-      });
-      // Upsert stock (fire and forget)
-      fetch(SUPA_URL+'/rest/v1/stock?on_conflict=deposito_id,producto_id', {
-        method:'POST',
-        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-          'Content-Type':'application/json',
-          'Prefer':'resolution=merge-duplicates,return=minimal'},
-        body: JSON.stringify({
-          deposito_id: depId, sucursal_id: sucId, licencia_id: licId,
-          producto_id: item.id, nombre_producto: item.name||item.nombre||'',
-          cantidad: desp, updated_at: new Date().toISOString()
-        })
-      }).catch(e=>console.warn('[Stock] upsert:', e.message));
-    }
-
-    // 3. Insertar ítems en bloque
-    await fetch(SUPA_URL+'/rest/v1/stock_comprobante_items', {
-      method:'POST',
-      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-        'Content-Type':'application/json','Prefer':'return=minimal'},
-      body: JSON.stringify(itemsToInsert)
-    });
-
-    console.log('[Stock] Venta descontada — comp', compId, '| prods:', itemsToInsert.length);
-  } catch(e){
-    console.warn('[Stock] Error descontar:', e.message);
-  }
-}
-
-async function stockReponerAnulacion(venta){
-  if(USAR_DEMO || !navigator.onLine) return;
-  const email    = localStorage.getItem(SK.email);
-  const depId    = parseInt(localStorage.getItem('pos_deposito_id'))  || null;
-  const sucId    = parseInt(localStorage.getItem('pos_sucursal_id'))  || null;
-  const terminal = licGetTerminal();
-  if(!depId || !email) return;
-
-  let items = [];
-  try{ items = typeof venta.items==='string' ? JSON.parse(venta.items) : (venta.items||[]); }catch(e){}
-  const itemsStock = items.filter(i => i.id && !isNaN(i.id) && (i.qty||0) > 0);
-  if(!itemsStock.length) return;
-
-  let licId = parseInt(localStorage.getItem('pos_licencia_id')||'0');
-  if(!licId) return;
-
-  try{
-    const prodIds = itemsStock.map(i=>i.id);
-    const r = await fetch(
-      SUPA_URL+'/rest/v1/stock?deposito_id=eq.'+depId+'&producto_id=in.('+prodIds.join(',')+')'
-      +'&licencia_id=eq.'+licId+'&select=id,producto_id,cantidad',
-      {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}}
-    );
-    const stockActual = r.ok ? await r.json() : [];
-    const stockMap = {};
-    stockActual.forEach(s => stockMap[s.producto_id] = s);
-
-    // Comprobante anulación
-    const compResp = await fetch(SUPA_URL+'/rest/v1/stock_comprobantes', {
-      method:'POST',
-      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-        'Content-Type':'application/json','Prefer':'return=representation'},
-      body: JSON.stringify({
-        licencia_id: licId, deposito_id: depId, sucursal_id: sucId,
-        tipo: 'anulacion', referencia: venta.comprobante||('ANU-'+venta.id),
-        venta_id: venta.id||null, terminal, usuario: email,
-        observacion: 'Anulación de venta',
-        fecha: new Date().toISOString()
-      })
-    });
-    if(!compResp.ok) throw new Error(await compResp.text());
-    const compData = await compResp.json();
-    const compId = Array.isArray(compData) ? compData[0]?.id : compData?.id;
-    if(!compId) throw new Error('No se obtuvo comprobante_id');
-
-    const itemsToInsert = [];
-    for(const item of itemsStock){
-      const sk    = stockMap[item.id];
-      const antes = sk ? (sk.cantidad||0) : 0;
-      const desp  = antes + (item.qty||0);
-      itemsToInsert.push({
-        comprobante_id: compId, producto_id: item.id,
-        nombre_producto: item.nombre||item.name||'',
-        cantidad: +(item.qty||0),
-        cantidad_antes: antes, cantidad_despues: desp,
-        costo_unitario: 0
-      });
-      fetch(SUPA_URL+'/rest/v1/stock?on_conflict=deposito_id,producto_id', {
-        method:'POST',
-        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-          'Content-Type':'application/json',
-          'Prefer':'resolution=merge-duplicates,return=minimal'},
-        body: JSON.stringify({
-          deposito_id: depId, sucursal_id: sucId, licencia_id: licId,
-          producto_id: item.id, nombre_producto: item.nombre||item.name||'',
-          cantidad: desp, updated_at: new Date().toISOString()
-        })
-      }).catch(e=>console.warn('[Stock] reposición:', e.message));
-    }
-
-    await fetch(SUPA_URL+'/rest/v1/stock_comprobante_items', {
-      method:'POST',
-      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-        'Content-Type':'application/json','Prefer':'return=minimal'},
-      body: JSON.stringify(itemsToInsert)
-    });
-
-    console.log('[Stock] Reposición anulación — comp', compId, '| prods:', itemsToInsert.length);
-  } catch(e){
-    console.warn('[Stock] Error reponer:', e.message);
-  }
 }
 
 // Sincronizar ventas pendientes de la cola
@@ -7454,35 +7289,169 @@ function imprimirTicketConf(htmlContent, tipo){
 }
 
 async function imprimirBluetooth(device, htmlContent, size){
-  try {
-    const server = await device.gatt.connect();
-    const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-    const char = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+  const ESC=0x1B, GS=0x1D;
+  // Comandos ESC/POS
+  const CMD = {
+    init:       [ESC,0x40],
+    left:       [ESC,0x61,0x00],
+    center:     [ESC,0x61,0x01],
+    right:      [ESC,0x61,0x02],
+    boldOn:     [ESC,0x45,0x01],
+    boldOff:    [ESC,0x45,0x00],
+    dblWideOn:  [ESC,0x21,0x20],  // doble ancho
+    dblWideOff: [ESC,0x21,0x00],
+    dblHOn:     [ESC,0x21,0x10],  // doble alto
+    dblHOff:    [ESC,0x21,0x00],
+    smallOn:    [ESC,0x21,0x01],  // fuente pequeña
+    smallOff:   [ESC,0x21,0x00],
+    cut:        [GS,0x56,0x41,0x10],
+    feed:       [ESC,0x64,0x03],  // 3 líneas avance
+    lf:         [0x0A],
+  };
 
-    // Convertir HTML a texto plano para ESC/POS
-    const tmp = document.createElement('div');
-    tmp.innerHTML = htmlContent;
-    const text = tmp.innerText || tmp.textContent;
+  const cols = size==='58' ? 32 : 42;
 
-    // Comandos ESC/POS básicos
-    const ESC = 0x1B, GS = 0x1D;
-    const init     = [ESC, 0x40];                    // Init
-    const center   = [ESC, 0x61, 0x01];              // Center align
-    const left     = [ESC, 0x61, 0x00];              // Left align
-    const bold_on  = [ESC, 0x45, 0x01];
-    const bold_off = [ESC, 0x45, 0x00];
-    const cut      = [GS, 0x56, 0x41, 0x10];         // Partial cut
+  function enc(str){
+    // Codificación ISO-8859-1 para caracteres latinos
+    const out=[];
+    for(let i=0;i<str.length;i++){
+      const c=str.charCodeAt(i);
+      if(c<128) out.push(c);
+      else if(c===0xC1||c===0xE1) out.push(0xC1);  // Á á
+      else if(c===0xC9||c===0xE9) out.push(0xC9);  // É é
+      else if(c===0xCD||c===0xED) out.push(0xCD);  // Í í
+      else if(c===0xD3||c===0xF3) out.push(0xD3);  // Ó ó
+      else if(c===0xDA||c===0xFA) out.push(0xDA);  // Ú ú
+      else if(c===0xD1||c===0xF1) out.push(0xD1);  // Ñ ñ
+      else out.push(0x3F);  // ?
+    }
+    return out;
+  }
 
-    const encoder = new TextEncoder();
-    const textBytes = encoder.encode(text + '\n\n\n');
+  function line(str){ return [...enc(str), 0x0A]; }
+  function sep(){ return line('-'.repeat(cols)); }
+  function cline(str){ // centrar
+    const s=String(str); const p=Math.max(0,cols-s.length);
+    return line(' '.repeat(Math.floor(p/2))+s);
+  }
+  function rline(l,r){ // izq + der alineados
+    const ls=String(l), rs=String(r);
+    const space=Math.max(1, cols-ls.length-rs.length);
+    return line(ls+' '.repeat(space)+rs);
+  }
+  function pad2r(s,n){ s=String(s); return s.length>=n?s.substring(0,n):' '.repeat(n-s.length)+s; }
+  function pad2l(s,n){ s=String(s); return s.length>=n?s.substring(0,n-1)+'…':s+' '.repeat(n-s.length); }
 
-    const cmd = new Uint8Array([...init, ...left, ...textBytes, ...cut]);
-    await char.writeValue(cmd);
-    toast('Impreso por Bluetooth');
-  } catch(e){
-    toast('Error BT: ' + e.message);
-    // Fallback a ventana
-    imprimirTicketConf(htmlContent, 'ticket');
+  // Parsear el HTML para extraer los datos del ticket
+  const tmp=document.createElement('div');
+  tmp.innerHTML=htmlContent;
+
+  // Función para extraer texto de un selector
+  function txt(sel){ const el=tmp.querySelector(sel); return el?(el.innerText||el.textContent||'').trim():''; }
+
+  // Extraer párrafos en orden
+  const parrafos=Array.from(tmp.querySelectorAll('p'));
+
+  // Construir bytes ESC/POS parseando las clases del HTML
+  let bytes=[...CMD.init, ESC,0x74,0x02]; // init + página latin-1
+
+  parrafos.forEach(function(p){
+    const cls=p.className||'';
+    const text=(p.innerText||p.textContent||'').trim();
+    if(!text && !cls.includes('hr')) return;
+
+    if(cls.includes('hr')){
+      bytes.push(...sep());
+      return;
+    }
+
+    const isCenter=cls.includes('c');
+    const isBold=cls.includes('b');
+    const isLarge=cls.includes('l');
+    const isSmall=cls.includes('s')&&!cls.includes('s b')&&!cls.includes('c s');
+
+    if(isCenter) bytes.push(...CMD.center); else bytes.push(...CMD.left);
+    if(isLarge)  bytes.push(...CMD.dblWideOn, ...CMD.boldOn);
+    else if(isBold) bytes.push(...CMD.boldOn);
+    if(isSmall)  bytes.push(...CMD.smallOn);
+
+    // Fila con dos columnas (clase row)
+    if(cls.includes('row')){
+      const spans=p.querySelectorAll('span');
+      if(spans.length>=2){
+        const l=(spans[0].innerText||spans[0].textContent||'').trim();
+        const r=(spans[spans.length-1].innerText||spans[spans.length-1].textContent||'').trim();
+        bytes.push(...CMD.left);
+        if(isBold||isLarge) bytes.push(...CMD.boldOn);
+        if(isLarge) bytes.push(...CMD.dblWideOn);
+        bytes.push(...rline(l,r));
+        bytes.push(...CMD.boldOff,...CMD.dblWideOff,...CMD.smallOff);
+        return;
+      }
+    }
+
+    // Item detail (it-det / if-det)
+    if(cls.includes('it-det')||cls.includes('if-det')){
+      const spans=p.querySelectorAll('span');
+      if(spans.length>=2){
+        bytes.push(...CMD.left,...CMD.smallOn);
+        const parts=Array.from(spans).map(s=>(s.innerText||s.textContent||'').trim());
+        if(parts.length===3){
+          // cant×pu  [espacio]  subtotal
+          const l=parts[0], r=parts[2];
+          bytes.push(...rline('  '+l, r));
+        } else {
+          bytes.push(...line('  '+parts.join('  ')));
+        }
+        bytes.push(...CMD.smallOff);
+        return;
+      }
+    }
+
+    // Nombre de item (it-nom / if-nom)
+    if(cls.includes('it-nom')||cls.includes('if-nom')){
+      bytes.push(...CMD.left,...CMD.boldOn);
+      bytes.push(...line(text));
+      bytes.push(...CMD.boldOff);
+      return;
+    }
+
+    // Texto normal
+    bytes.push(...line(text));
+    bytes.push(...CMD.boldOff,...CMD.dblWideOff,...CMD.smallOff);
+  });
+
+  bytes.push(...CMD.feed,...CMD.cut);
+
+  // Enviar en chunks de 512 bytes (límite BLE)
+  const CHUNK=512;
+  try{
+    const server=await device.gatt.connect();
+    // Intentar con varios servicios conocidos de impresoras BT
+    let service, char;
+    const SERVICES=[
+      {svc:'000018f0-0000-1000-8000-00805f9b34fb', chr:'00002af1-0000-1000-8000-00805f9b34fb'},
+      {svc:'e7810a71-73ae-499d-8c15-faa9aef0c3f2', chr:'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f'},
+      {svc:'49535343-fe7d-4ae5-8fa9-9fafd205e455', chr:'49535343-8841-43f4-a8d4-ecbe34729bb3'},
+    ];
+    for(const s of SERVICES){
+      try{
+        service=await server.getPrimaryService(s.svc);
+        char=await service.getCharacteristic(s.chr);
+        break;
+      }catch(e){ continue; }
+    }
+    if(!char) throw new Error('No se encontró el servicio de impresión');
+
+    const data=new Uint8Array(bytes);
+    for(let i=0;i<data.length;i+=CHUNK){
+      await char.writeValueWithoutResponse(data.slice(i,i+CHUNK));
+      await new Promise(r=>setTimeout(r,20)); // pequeña pausa entre chunks
+    }
+    toast('✓ Impreso por Bluetooth');
+  }catch(e){
+    toast('Error BT: '+e.message);
+    imprimirTicketConf(htmlContent,'ticket');
   }
 }
 
@@ -8941,7 +8910,6 @@ async function anularVentaConfirmar(id){
 
     const msgFac = venta.tiene_factura ? ' · Factura anulada' : '';
     toast('Venta anulada' + msgFac);
-    stockReponerAnulacion(venta).catch(()=>{});
     await renderVentasList();
 
     // 4. Si el turno está visible, refrescarlo también
