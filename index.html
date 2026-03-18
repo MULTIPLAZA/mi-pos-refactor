@@ -3915,7 +3915,8 @@ function confirmarPago(){
   const comprobante = document.getElementById('compDisplay')?.textContent || '';
   const efectivoEntregado = document.getElementById('efecVal')?.textContent || '';
   const vuelto = document.getElementById('vueltoAmt')?.textContent || '';
-  const nroTicket = currentTicketNro;
+  // Capturar nro ANTES de limpiar — si es ticket nuevo usar ticketCounter actual
+  const nroTicket = currentTicketNro !== null ? currentTicketNro : ticketCounter;
 
   // ── Validaciones de factura ──────────────────────────────
   if(facturaActiva){
@@ -4615,6 +4616,16 @@ function generarRecibo(data){
   // Botón comanda
   const btnComanda = document.getElementById('btnComandaRecibo');
   if(btnComanda) btnComanda.style.display = data.items?.length ? 'flex' : 'none';
+
+  // Auto-imprimir al generar recibo
+  const p = printers && printers['ticket'];
+  if(p && p.type==='bt' && p.device){
+    // BT: ESC/POS directo
+    setTimeout(function(){ imprimirBluetooth(p.device, htmlImpresion, size); }, 400);
+  } else {
+    // Impresora interna (Vizzion/Android) o PC: iframe sin segunda confirmación
+    setTimeout(function(){ abrirVentanaImpresion(htmlImpresion, size); }, 400);
+  }
 }
 
 function mostrarPreviewRecibo(html, size){
