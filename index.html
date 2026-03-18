@@ -1465,10 +1465,13 @@
     flex-shrink: 0;
   }
   .tab-ticket-nro {
-    font-size: 13px; font-weight: 800; color: var(--text);
-    letter-spacing: .5px;
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    letter-spacing: .4px; text-transform: uppercase;
   }
-  .tab-ticket-nro span { color: var(--green); }
+  .tab-ticket-nro span {
+    font-size: 18px; font-weight: 800; color: var(--green);
+    display: block; line-height: 1.1; margin-top: 1px;
+  }
   .tab-tipo-btns { display: flex; gap: 4px; }
   .tab-tipo-btn {
     background: var(--bg-card); border: 1.5px solid var(--border2);
@@ -2642,11 +2645,10 @@
 
   <!-- Barra tipo pedido móvil -->
   <div class="mob-tipo-bar">
-    <button class="mob-tipo-btn sel" id="mobTipoBtnLocal"    onclick="setTipoPedido('local')">🍽 Local</button>
-    <button class="mob-tipo-btn"     id="mobTipoBtnLlevar"   onclick="setTipoPedido('llevar')">📦 Para llevar</button>
-    <button class="mob-tipo-btn"     id="mobTipoBtnDelivery" onclick="setTipoPedido('delivery')">🛵 Delivery</button>
+    <button class="mob-tipo-btn sel" id="mobTipoBtnLocal"    onclick="setTipoPedido('local')">Local</button>
+    <button class="mob-tipo-btn"     id="mobTipoBtnLlevar"   onclick="setTipoPedido('llevar')">Para llevar</button>
+    <button class="mob-tipo-btn"     id="mobTipoBtnDelivery" onclick="setTipoPedido('delivery')">Delivery</button>
   </div>
-
   <!-- SPLIT WRAPPER (flex en tablet, contents en móvil) -->
   <div class="tablet-split">
 
@@ -2676,20 +2678,19 @@
     <div class="tablet-right" id="tabletRight">
       <!-- Header: Nro ticket + tipo pedido -->
       <div class="tab-ticket-header">
-        <div class="tab-ticket-nro">🎫 Ticket <span id="tabTicketNro">#—</span></div>
+        <div class="tab-ticket-nro">Nro. Ticket: <span id="tabTicketNro">#—</span></div>
         <div class="tab-tipo-btns">
-          <button class="tab-tipo-btn sel" id="tipoBtnLocal" onclick="setTipoPedido('local')">🍽 Local</button>
-          <button class="tab-tipo-btn" id="tipoBtnLlevar" onclick="setTipoPedido('llevar')">📦 Llevar</button>
-          <button class="tab-tipo-btn" id="tipoBtnDelivery" onclick="setTipoPedido('delivery')">🛵 Delivery</button>
+          <button class="tab-tipo-btn sel" id="tipoBtnLocal" onclick="setTipoPedido('local')">Local</button>
+          <button class="tab-tipo-btn" id="tipoBtnLlevar" onclick="setTipoPedido('llevar')">Llevar</button>
+          <button class="tab-tipo-btn" id="tipoBtnDelivery" onclick="setTipoPedido('delivery')">Delivery</button>
         </div>
       </div>
       <!-- Panel monto delivery -->
       <div class="tab-delivery-bar" id="tabDeliveryBar">
-        <span class="tab-delivery-label">🛵 Envío</span>
+        <span class="tab-delivery-label">Monto envío</span>
         <input type="number" class="tab-delivery-input" id="tabDeliveryMonto"
-          placeholder="Monto..." min="0" step="1000"
-          onkeydown="if(event.key==='Enter') agregarMontoDelivery()">
-        <button class="tab-delivery-btn" onclick="agregarMontoDelivery()">+ Agregar</button>
+          placeholder="0" style="display:none">
+        <button class="tab-delivery-btn" onclick="openNpDelivery()">+ Ingresar monto</button>
       </div>
       <div class="tab-action-bar">
         <button class="tab-btn-left" onclick="onBtnGuardar()">
@@ -3472,7 +3473,7 @@ function setTipoPedido(tipo){
     var btn = document.getElementById('mobTipoBtn'+t.charAt(0).toUpperCase()+t.slice(1));
     if(btn) btn.classList.toggle('sel', t===tipo);
   });
-  // Mostrar/ocultar panel de monto delivery
+  // Mostrar/ocultar panel de monto delivery — PC/Tablet
   var bar = document.getElementById('tabDeliveryBar');
   if(bar){
     bar.classList.toggle('visible', tipo==='delivery');
@@ -3481,6 +3482,7 @@ function setTipoPedido(tipo){
       if(inp){ inp.value=''; inp.focus(); }
     }
   }
+
   // Si cambia de delivery, quitar ítem delivery del cart
   if(tipo !== 'delivery') quitarItemDelivery();
 }
@@ -3489,6 +3491,18 @@ function quitarItemDelivery(){
   var idx = cart.findIndex(function(i){ return i.esDelivery; });
   if(idx >= 0){ cart.splice(idx,1); updUI(); updBtnGuardar(); }
 }
+
+function openNpDelivery(){
+  var existing = cart.find(function(i){ return i.esDelivery; });
+  npCtx = 'delivery';
+  npVal = existing ? String(existing.price) : '';
+  document.getElementById('npLbl').textContent = 'Monto del envío (Delivery)';
+  document.getElementById('npDisp').textContent = existing ? gs(existing.price) : '₲0';
+  document.getElementById('billetesRow').classList.remove('show');
+  document.getElementById('npOverlay').classList.add('open');
+}
+
+
 
 function agregarMontoDelivery(){
   var inp = document.getElementById('tabDeliveryMonto');
@@ -3502,7 +3516,7 @@ function agregarMontoDelivery(){
   cart.push({
     lineId: Date.now()*1000 + 999,
     id: 'delivery_item',
-    name: '🛵 Envío delivery',
+    name: 'Envío delivery',
     price: monto,
     qty: 1,
     obs: '',
@@ -4743,29 +4757,48 @@ function abrirVentanaImpresion(html, size){
   const mmW = size==='58' ? '58mm' : '80mm';
   const pxW = size==='58' ? 230 : 310;
 
-  // Inject print instructions into HTML
-  const instruccion = `
-    <div id="printInfo" style="font-family:Arial,sans-serif;font-size:11px;color:#666;
-      background:#fff3cd;border:1px solid #ffc107;padding:8px 10px;margin-bottom:8px;
-      border-radius:4px;">
-      <b>⚠️ Configurar impresión:</b><br>
-      1. Más opciones → <b>Tamaño del papel: ${mmW}</b><br>
-      2. Márgenes: <b>Ninguno / Sin márgenes</b><br>
-      3. Desactivar "Encabezados y pies de página"
-    </div>`;
+  // En PWA instalada window.open no funciona — usar iframe oculto
+  const isPWA = window.matchMedia('(display-mode: standalone)').matches
+             || window.navigator.standalone === true;
 
+  if(isPWA){
+    // Método PWA: iframe oculto que imprime directo
+    let iframe = document.getElementById('printFrame');
+    if(!iframe){
+      iframe = document.createElement('iframe');
+      iframe.id = 'printFrame';
+      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;';
+      document.body.appendChild(iframe);
+    }
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(html);
+    doc.close();
+    setTimeout(function(){
+      try{
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      }catch(e){
+        // Fallback: abrir en misma ventana
+        const w = window.open('','_blank');
+        if(w){ w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(),300); }
+      }
+    }, 600);
+    return;
+  }
+
+  // Navegador normal — ventana nueva
+  const instruccion = `<div id="printInfo" style="font-family:Arial,sans-serif;font-size:11px;color:#666;background:#fff3cd;border:1px solid #ffc107;padding:8px 10px;margin-bottom:8px;border-radius:4px;"><b>⚠️ Configurar impresión:</b><br>1. Más opciones → <b>Tamaño del papel: ${mmW}</b><br>2. Márgenes: <b>Ninguno / Sin márgenes</b><br>3. Desactivar "Encabezados y pies de página"</div>`;
   const htmlFinal = html.replace('<body>', '<body>'+instruccion);
-
-  const win = window.open('','_blank',
-    'width='+pxW+',height=700,menubar=no,toolbar=no,location=no');
+  const win = window.open('','_blank','width='+pxW+',height=700,menubar=no,toolbar=no,location=no');
+  if(!win){ alert('Permitir ventanas emergentes para imprimir'); return; }
   win.document.write(htmlFinal);
   win.document.close();
   win.focus();
-  // Hide instructions when printing
   const style = win.document.createElement('style');
   style.textContent = '@media print { #printInfo { display:none !important; } }';
   win.document.head.appendChild(style);
-  setTimeout(()=>{ win.print(); }, 500);
+  setTimeout(()=>{ win.print(); win.close(); }, 500);
 }
 
 // Formatear número guaraní sin símbolo (para ticket)
@@ -4996,7 +5029,7 @@ function generarHTMLComanda(data, size){
   lineas += '<p class="c l">'+hora+'</p>';
   lineas += '<p class="c s">TICKET: #'+String(data.nroTicket||0).padStart(4,'0')+'</p>';
   if(data.tipoPedido && data.tipoPedido!=='local'){
-    const tipos={'llevar':'📦 PARA LLEVAR','delivery':'🛵 DELIVERY'};
+    const tipos={'llevar':'PARA LLEVAR','delivery':'DELIVERY'};
     lineas += '<p class="c b" style="font-size:14px;border:1px solid #000;padding:2px 0;margin:2px 0">'+( tipos[data.tipoPedido]||data.tipoPedido.toUpperCase())+'</p>';
   }
   lineas += '<p class="c s">CLIENTE: '+(data.factura?.nombre||'SIN NOMBRE')+'</p>';
@@ -5071,7 +5104,13 @@ function imprimirRecibo(){
   const html = esFactura
     ? generarHTMLFactura(ultimoReciboData, size)
     : generarHTMLTicket(ultimoReciboData, size);
-  abrirVentanaImpresion(html, size);
+  // Si hay impresora BT configurada, usar ESC/POS; si no, ventana de impresión
+  const p = printers['ticket'];
+  if(p && p.type==='bt' && p.device){
+    imprimirBluetooth(p.device, html, size);
+  } else {
+    abrirVentanaImpresion(html, size);
+  }
 }
 
 // ── IMPRIMIR COMANDA ──────────────────────────────────────
@@ -5120,6 +5159,14 @@ function openNP(ctx){
   document.getElementById('npOverlay').classList.add('open');
 }
 function npOutside(e){ if(e.target===document.getElementById('npOverlay'))document.getElementById('npOverlay').classList.remove('open'); }
+document.addEventListener('keydown', function(e){
+  var ov = document.getElementById('npOverlay');
+  if(!ov || !ov.classList.contains('open')) return;
+  if(e.key>='0' && e.key<='9'){ e.preventDefault(); npP(e.key); }
+  else if(e.key==='Backspace'){ e.preventDefault(); npD(); }
+  else if(e.key==='Enter'){ e.preventDefault(); npOK(); }
+  else if(e.key==='Escape'){ e.preventDefault(); ov.classList.remove('open'); }
+});
 function npP(d){
   if(npCtx==='comprobante'||npCtx==='divComp'){
     npVal+=d; if(npVal.length>15)npVal=npVal.slice(0,15);
@@ -5176,6 +5223,15 @@ function npOK(){
       if(tDisp) tDisp.textContent = gs(tot);
     }
     updCierreDiff();
+    document.getElementById('npOverlay').classList.remove('open');
+    return;
+  } else if(npCtx==='delivery'){
+    const monto = parseInt(npVal)||0;
+    if(monto > 0){
+      const tabInp = document.getElementById('tabDeliveryMonto');
+      if(tabInp) tabInp.value = monto;
+      agregarMontoDelivery();
+    }
     document.getElementById('npOverlay').classList.remove('open');
     return;
   } else if(npCtx==='comprobante'){
@@ -7317,7 +7373,7 @@ function imprimirCierre(){
   w.document.write('<!DOCTYPE html><html><head><title>Rendicion</title><style>'+css+'<\/style><\/head><body>'+cierreTicketHTML+'<\/body><\/html>');
   w.document.close();
   w.focus();
-  setTimeout(function(){ w.print(); }, 500);
+  setTimeout(function(){ w.print(); w.close(); }, 500);
 }
 
 function compartirWhatsApp(){
@@ -7411,6 +7467,14 @@ function updPrinterUI(tipo){
   }
 }
 
+// UUIDs de servicios conocidos de impresoras térmicas BT
+const BT_SERVICES = [
+  '000018f0-0000-1000-8000-00805f9b34fb', // ESC/POS genérico
+  'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Xprinter / Zjiang
+  '49535343-fe7d-4ae5-8fa9-9fafd205e455', // Microprinter / innprinter
+  '0000ff00-0000-1000-8000-00805f9b34fb', // Alternativo genérico
+];
+
 async function conectarBluetooth(tipo){
   if(!navigator.bluetooth){
     toast('Web Bluetooth no disponible en este dispositivo/browser');
@@ -7418,18 +7482,20 @@ async function conectarBluetooth(tipo){
   }
   try {
     toast('Buscando impresoras...');
-    const device = await navigator.bluetooth.requestDevice({
-      filters: [
-        { services: ['000018f0-0000-1000-8000-00805f9b34fb'] }, // ESC/POS común
-      ],
-      optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
-    }).catch(async () => {
-      // Fallback: mostrar todas las impresoras
-      return await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+    let device;
+    try {
+      // Intento 1: filtrar por servicio ESC/POS conocido
+      device = await navigator.bluetooth.requestDevice({
+        filters: BT_SERVICES.map(s => ({ services: [s] })),
+        optionalServices: BT_SERVICES
       });
-    });
+    } catch(e1) {
+      // Intento 2: mostrar todos los dispositivos BT
+      device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: BT_SERVICES
+      });
+    }
     printers[tipo].device = device;
     printers[tipo].name   = device.name || 'Impresora BT';
     printers[tipo].type   = 'bt';
@@ -7613,33 +7679,73 @@ async function imprimirBluetooth(device, htmlContent, size){
 
   bytes.push(...CMD.feed,...CMD.cut);
 
-  // Enviar en chunks de 512 bytes (límite BLE)
-  const CHUNK=512;
+  // Enviar en chunks conservadores para mayor compatibilidad
+  const CHUNK=200;
   try{
-    const server=await device.gatt.connect();
-    // Intentar con varios servicios conocidos de impresoras BT
-    let service, char;
+    // Reconectar si se desconectó
+    let server;
+    if(device.gatt.connected){
+      server=device.gatt;
+    } else {
+      server=await device.gatt.connect();
+    }
+
+    // Intentar servicios conocidos de impresoras BT
+    let char=null;
     const SERVICES=[
       {svc:'000018f0-0000-1000-8000-00805f9b34fb', chr:'00002af1-0000-1000-8000-00805f9b34fb'},
       {svc:'e7810a71-73ae-499d-8c15-faa9aef0c3f2', chr:'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f'},
       {svc:'49535343-fe7d-4ae5-8fa9-9fafd205e455', chr:'49535343-8841-43f4-a8d4-ecbe34729bb3'},
     ];
+    let lastErr='';
     for(const s of SERVICES){
       try{
-        service=await server.getPrimaryService(s.svc);
-        char=await service.getCharacteristic(s.chr);
+        const svc=await server.getPrimaryService(s.svc);
+        char=await svc.getCharacteristic(s.chr);
+        console.log('[BT] Servicio:', s.svc);
         break;
-      }catch(e){ continue; }
+      }catch(e){ lastErr=e.message; }
     }
-    if(!char) throw new Error('No se encontró el servicio de impresión');
+
+    // Fallback: escanear todos los servicios disponibles
+    if(!char){
+      try{
+        const svcs=await server.getPrimaryServices();
+        console.log('[BT] Servicios:', svcs.map(s=>s.uuid));
+        for(const svc of svcs){
+          const chars=await svc.getCharacteristics();
+          for(const c of chars){
+            if(c.properties.write||c.properties.writeWithoutResponse){
+              char=c;
+              console.log('[BT] Char:', c.uuid);
+              break;
+            }
+          }
+          if(char) break;
+        }
+      }catch(e2){ console.warn('[BT] Scan error:', e2.message); }
+    }
+
+    if(!char) throw new Error('Impresora no soportada. '+lastErr);
 
     const data=new Uint8Array(bytes);
     for(let i=0;i<data.length;i+=CHUNK){
-      await char.writeValueWithoutResponse(data.slice(i,i+CHUNK));
-      await new Promise(r=>setTimeout(r,20)); // pequeña pausa entre chunks
+      const chunk=data.slice(i,i+CHUNK);
+      try{
+        if(char.properties.writeWithoutResponse){
+          await char.writeValueWithoutResponse(chunk);
+        } else {
+          await char.writeValue(chunk);
+        }
+      }catch(e){
+        try{ await char.writeValue(chunk); }
+        catch(e2){ throw new Error('Error enviando datos: '+e2.message); }
+      }
+      await new Promise(r=>setTimeout(r,30));
     }
     toast('✓ Impreso por Bluetooth');
   }catch(e){
+    console.error('[BT]', e.message);
     toast('Error BT: '+e.message);
     imprimirTicketConf(htmlContent,'ticket');
   }
@@ -8272,20 +8378,30 @@ const DEMO_KEYS = {
 };
 const USAR_DEMO = (SUPA_URL === 'https://XXXXXXXXXXXXXXXX.supabase.co');
 
+// Cookie helpers para device_id (sobrevive borrar caché en algunos casos)
+function cookieSet(name, val, days){
+  const d = new Date(); d.setTime(d.getTime()+(days*86400000));
+  document.cookie = name+'='+encodeURIComponent(val)+';expires='+d.toUTCString()+';path=/;SameSite=Lax';
+}
+function cookieGet(name){
+  const m = document.cookie.match('(?:^|; )'+name+'=([^;]*)');
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
 function licGetDeviceId(){
-  // Priority: localStorage → sessionStorage → generate NEW unique ID
+  // Priority: localStorage → cookie → sessionStorage → generate NEW
   let id = localStorage.getItem(SK.deviceId)
+         || cookieGet('pos_device_id')
          || sessionStorage.getItem(SK.deviceId);
   if(!id){
-    // Generate cryptographically random ID — never based on fingerprint alone
-    // so two identical devices ALWAYS get different IDs
     const rand = typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2);
     id = 'dev_' + rand.replace(/-/g,'').slice(0, 20);
   }
-  // Persist in all layers (but NEVER overwrite with someone else's ID)
+  // Persistir en todas las capas
   localStorage.setItem(SK.deviceId, id);
+  cookieSet('pos_device_id', id, 365); // cookie dura 1 año
   sessionStorage.setItem(SK.deviceId, id);
   if(typeof db !== 'undefined' && db){
     try { db.config.put({key:'device_id', value:id}); } catch(e){}
@@ -8298,14 +8414,22 @@ async function licGetDeviceIdAsync(){
   let id = localStorage.getItem(SK.deviceId) || sessionStorage.getItem(SK.deviceId);
   if(id) return id;
 
-  // 2. Try IndexedDB — survives localStorage.clear()
+  // 2. Try cookie — survives localStorage.clear() in most browsers
+  if(!id) id = cookieGet('pos_device_id');
+  if(id){
+    localStorage.setItem(SK.deviceId, id);
+    sessionStorage.setItem(SK.deviceId, id);
+    return id;
+  }
+
+  // 3. Try IndexedDB — survives localStorage.clear()
   try {
     if(typeof db !== 'undefined' && db){
       const row = await db.config.get('device_id');
       if(row && row.value){
         id = row.value;
-        // Restore to localStorage/sessionStorage
         localStorage.setItem(SK.deviceId, id);
+        cookieSet('pos_device_id', id, 365);
         sessionStorage.setItem(SK.deviceId, id);
         return id;
       }
@@ -8523,6 +8647,9 @@ async function doEntrar(){
   localStorage.setItem('pos_terminal', terminal);
   localStorage.setItem('pos_sucursal', sucursal);
   localStorage.setItem('pos_deposito', deposito);
+  cookieSet('pos_terminal', terminal, 365);
+  cookieSet('pos_sucursal', sucursal, 365);
+  cookieSet('pos_deposito', deposito, 365);
   if(db){
     await dbSaveConfig('terminal', terminal);
     await dbSaveConfig('sucursal', sucursal);
@@ -8607,12 +8734,17 @@ function doDesactivar(){
 // ── FUNCIÓN CENTRAL DE INICIO ─────────────────────────────
 async function iniciarApp(){
   // ── PASO 1: Config local (sin red) ───────────────────────
-  const terminal = localStorage.getItem('pos_terminal');
-  const sucursal = localStorage.getItem('pos_sucursal');
-  const deposito = localStorage.getItem('pos_deposito');
-  if(terminal) configData.terminal = terminal;
-  if(sucursal) configData.sucursal = sucursal;
-  if(deposito) configData.deposito = deposito;
+  // Restaurar desde localStorage o cookies (cookies sobreviven al borrar caché)
+  const terminal = localStorage.getItem('pos_terminal') || cookieGet('pos_terminal');
+  const sucursal = localStorage.getItem('pos_sucursal') || cookieGet('pos_sucursal');
+  const deposito = localStorage.getItem('pos_deposito') || cookieGet('pos_deposito');
+  const sucId    = localStorage.getItem('pos_sucursal_id') || cookieGet('pos_suc_id');
+  const depId    = localStorage.getItem('pos_deposito_id') || cookieGet('pos_dep_id');
+  if(terminal) { configData.terminal=terminal; localStorage.setItem('pos_terminal',terminal); }
+  if(sucursal) { configData.sucursal=sucursal; localStorage.setItem('pos_sucursal',sucursal); }
+  if(deposito) { configData.deposito=deposito; localStorage.setItem('pos_deposito',deposito); }
+  if(sucId)    localStorage.setItem('pos_sucursal_id',sucId);
+  if(depId)    localStorage.setItem('pos_deposito_id',depId);
   cargarConfigLocal();
   cargarTimbradoSesion();
 
@@ -8700,12 +8832,14 @@ async function guardarConfigTerminalSupabase(cfg){
       body:JSON.stringify({
         clave: 'terminal_config_'+deviceId,
         valor: JSON.stringify({
-          negocio:  cfg.negocio,
-          terminal: cfg.terminal,
-          sucursal: cfg.sucursal,
-          deposito: cfg.deposito,
-          deviceId: deviceId,  // guardamos el deviceId para validar al recuperar
-          savedAt:  new Date().toISOString()
+          negocio:     cfg.negocio,
+          terminal:    cfg.terminal,
+          sucursal:    cfg.sucursal,
+          deposito:    cfg.deposito,
+          sucursal_id: localStorage.getItem('pos_sucursal_id')||null,
+          deposito_id: localStorage.getItem('pos_deposito_id')||null,
+          deviceId:    deviceId,
+          savedAt:     new Date().toISOString()
         }),
         licencia_email: email
       })
@@ -8715,30 +8849,49 @@ async function guardarConfigTerminalSupabase(cfg){
 }
 
 async function recuperarConfigTerminalSupabase(){
-  // IMPORTANTE: solo recupera config del device_id de ESTE dispositivo.
-  // NO usa fallback al último registro — eso causaría que un nuevo dispositivo
-  // adopte la configuración de otro.
   if(USAR_DEMO) return null;
   const email = localStorage.getItem(SK.email);
   if(!email) return null;
   const deviceId = await licGetDeviceIdAsync();
-  if(!deviceId) return null;
+
   try{
-    const r = await fetch(
+    // Intento 1: buscar por device_id específico
+    if(deviceId){
+      const r = await fetch(
+        SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)
+        +'&clave=eq.terminal_config_'+encodeURIComponent(deviceId)+'&select=valor',
+        {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}}
+      );
+      const data = await r.json();
+      if(data && data[0]){
+        const cfg = JSON.parse(data[0].valor);
+        if(!cfg.deviceId || cfg.deviceId === deviceId){
+          console.log('[Terminal] Config recuperada por deviceId');
+          return cfg;
+        }
+      }
+    }
+
+    // Intento 2 (fallback): buscar cualquier config de este email
+    // Útil cuando se borró caché y se perdió el device_id
+    const r2 = await fetch(
       SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)
-      +'&clave=eq.terminal_config_'+encodeURIComponent(deviceId)+'&select=valor',
+      +'&clave=like.terminal_config_*&select=valor,clave&order=id.desc&limit=1',
       {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}}
     );
-    const data = await r.json();
-    if(data && data[0]){
-      const cfg = JSON.parse(data[0].valor);
-      // Verificar que el deviceId guardado coincide con este dispositivo
-      // Si no coincide, ignorar (puede pasar si se copió la DB)
-      if(cfg.deviceId && cfg.deviceId !== deviceId){
-        console.warn('[Terminal] deviceId mismatch — ignoring config from other device');
-        return null;
+    const data2 = await r2.json();
+    if(data2 && data2[0]){
+      const cfg = JSON.parse(data2[0].valor);
+      // Si tiene config válida, restaurar y guardar el device_id que estaba en esa config
+      if(cfg.terminal && cfg.sucursal){
+        console.log('[Terminal] Config recuperada por email (fallback) — terminal:', cfg.terminal);
+        // Restaurar el device_id guardado en esa config para mantener consistencia
+        if(cfg.deviceId && !localStorage.getItem(SK.deviceId)){
+          localStorage.setItem(SK.deviceId, cfg.deviceId);
+          cookieSet('pos_device_id', cfg.deviceId, 365);
+        }
+        return cfg;
       }
-      return cfg;
     }
     return null;
   }catch(e){
@@ -8749,13 +8902,13 @@ async function recuperarConfigTerminalSupabase(){
 
 function aplicarConfigTerminal(cfg){
   if(!cfg) return false;
-  // Aplica negocio, terminal, sucursal, depósito — pero NUNCA el deviceId
-  // El deviceId pertenece a este dispositivo y no debe copiarse de otro
-  if(cfg.negocio)  { localStorage.setItem(SK.negocio,cfg.negocio);   if(typeof configData!=='undefined') configData.negocio=cfg.negocio; }
-  if(cfg.terminal) { localStorage.setItem('pos_terminal',cfg.terminal); if(typeof configData!=='undefined') configData.terminal=cfg.terminal; }
-  if(cfg.sucursal) { localStorage.setItem('pos_sucursal',cfg.sucursal); if(typeof configData!=='undefined') configData.sucursal=cfg.sucursal; }
-  if(cfg.deposito) { localStorage.setItem('pos_deposito',cfg.deposito); if(typeof configData!=='undefined') configData.deposito=cfg.deposito; }
-  // ⚠️ NUNCA copiar cfg.deviceId — cada dispositivo tiene su propio ID único
+  if(cfg.negocio)     { localStorage.setItem(SK.negocio,cfg.negocio);          if(typeof configData!=='undefined') configData.negocio=cfg.negocio; }
+  if(cfg.terminal)    { localStorage.setItem('pos_terminal',cfg.terminal);      if(typeof configData!=='undefined') configData.terminal=cfg.terminal; }
+  if(cfg.sucursal)    { localStorage.setItem('pos_sucursal',cfg.sucursal);      if(typeof configData!=='undefined') configData.sucursal=cfg.sucursal; }
+  if(cfg.deposito)    { localStorage.setItem('pos_deposito',cfg.deposito);      if(typeof configData!=='undefined') configData.deposito=cfg.deposito; }
+  // Restaurar IDs de sucursal y depósito si están en la config
+  if(cfg.sucursal_id) { localStorage.setItem('pos_sucursal_id',String(cfg.sucursal_id)); cookieSet('pos_suc_id',String(cfg.sucursal_id),365); }
+  if(cfg.deposito_id) { localStorage.setItem('pos_deposito_id',String(cfg.deposito_id)); cookieSet('pos_dep_id',String(cfg.deposito_id),365); }
   return true;
 }
 
