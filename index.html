@@ -4082,8 +4082,9 @@ function renderGeneralInfo(){
   const el = document.getElementById('generalInfoPanel');
   if(!el) return;
 
-  const terminal = localStorage.getItem('pos_terminal') || 'Terminal 1';
-  const sucursal = localStorage.getItem('pos_sucursal') || '—';
+  const terminal   = localStorage.getItem('pos_terminal') || 'Terminal 1';
+  const sucursal   = localStorage.getItem('pos_sucursal') || '—';
+  const depId      = localStorage.getItem('pos_deposito_id') || null;
   const tim = getTimbradoActivo();
   const pad3 = n => String(n||0).padStart(3,'0');
   const padN = n => String(n||0).padStart(7,'0');
@@ -4100,10 +4101,36 @@ function renderGeneralInfo(){
           <span style="font-size:12px;color:#777;">Nombre</span>
           <span style="font-size:16px;font-weight:800;color:#fff;">${terminal}</span>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
           <span style="font-size:12px;color:#777;">Sucursal</span>
           <span style="font-size:13px;font-weight:600;color:#ccc;">${sucursal}</span>
         </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:#777;">Depósito ID (stock)</span>
+          ${depId
+            ? '<span style="font-size:13px;font-weight:800;color:var(--green);">ID: '+depId+'</span>'
+            : '<span style="font-size:12px;color:var(--red);font-weight:700;">⚠️ No configurado</span>'
+          }
+        </div>
+        ${!depId ? `
+        <div style="margin-top:8px;padding:10px;background:rgba(239,83,80,.08);border:1px solid rgba(239,83,80,.3);border-radius:8px;">
+          <div style="font-size:11px;color:var(--red);margin-bottom:8px;font-weight:700;">Sin depósito — el stock no se descuenta al vender</div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <input id="cfgDepId" type="number" placeholder="ID depósito (ej: 19)"
+              style="flex:1;min-width:100px;background:#1a1a1a;border:1px solid #444;border-radius:6px;color:#fff;font-family:Barlow,sans-serif;font-size:13px;padding:8px 10px;outline:none;">
+            <input id="cfgSucId" type="number" placeholder="ID sucursal"
+              style="width:100px;background:#1a1a1a;border:1px solid #444;border-radius:6px;color:#fff;font-family:Barlow,sans-serif;font-size:13px;padding:8px 10px;outline:none;">
+            <button onclick="guardarDepositoId()"
+              style="background:var(--green);border:none;border-radius:6px;color:#fff;font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:8px 14px;cursor:pointer;">
+              Guardar
+            </button>
+          </div>
+          <div style="font-size:10px;color:#666;margin-top:6px;">Consultá el ID en Admin → Inventarios. SAN ANTONIO = 19, ASUNCION = 6</div>
+        </div>` : `
+        <button onclick="resetDepositoId()"
+          style="margin-top:6px;background:none;border:1px solid #333;border-radius:6px;color:#666;font-family:Barlow,sans-serif;font-size:11px;padding:5px 10px;cursor:pointer;width:100%;">
+          Cambiar depósito (ID actual: ${depId})
+        </button>`}
       </div>
     </div>
 
@@ -8989,6 +9016,38 @@ async function iniciarApp(){
   }
 
   // ── PASO 5: Sync background ───────────────────────────────
+  // Auto-recuperar deposito_id si se perdió con el caché
+  if(!localStorage.getItem('pos_deposito_id') && navigator.onLine && !USAR_DEMO){
+    setTimeout(async function(){
+      try{
+        const email  = localStorage.getItem(SK.email);
+        const sucNom = localStorage.getItem('pos_sucursal');
+        if(!email || !sucNom) return;
+        const lr = await fetch(SUPA_URL+'/rest/v1/licencias?email_cliente=ilike.'+encodeURIComponent(email)+'&activa=eq.true&select=id&limit=1',
+          {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
+        const ld = await lr.json();
+        if(!ld||!ld[0]) return;
+        const licId = ld[0].id;
+        localStorage.setItem('ali', String(licId));
+        cookieSet('ali', String(licId), 365);
+        const sr = await fetch(SUPA_URL+'/rest/v1/sucursales?licencia_id=eq.'+licId+'&nombre=ilike.'+encodeURIComponent(sucNom)+'&select=id&limit=1',
+          {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
+        const sd = await sr.json();
+        if(!sd||!sd[0]) return;
+        localStorage.setItem('pos_sucursal_id', String(sd[0].id));
+        cookieSet('pos_suc_id', String(sd[0].id), 365);
+        const dr = await fetch(SUPA_URL+'/rest/v1/depositos?licencia_id=eq.'+licId+'&sucursal_id=eq.'+sd[0].id+'&activo=eq.true&select=id&order=id.asc&limit=1',
+          {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
+        const dd = await dr.json();
+        if(!dd||!dd[0]) return;
+        localStorage.setItem('pos_deposito_id', String(dd[0].id));
+        cookieSet('pos_dep_id', String(dd[0].id), 365);
+        console.log('[App] Depósito restaurado:', dd[0].id);
+        toast('✓ Depósito listo (ID '+dd[0].id+')');
+      }catch(e){ console.warn('[App] Error recuperando depósito:', e.message); }
+    }, 4000);
+  }
+
   setTimeout(sincronizarConfigNegocio, 3000);
   setTimeout(syncConSupabase, 5000);
   setTimeout(syncVentasPendientes, 8000);
@@ -9119,6 +9178,36 @@ function aplicarConfigTerminal(cfg){
 // ── VENTAS (reporte) ─────────────────────────────────────────────────────────
 
 let ventasTabActual = 'vendidas';
+
+function guardarDepositoId(){
+  const depId = parseInt(document.getElementById('cfgDepId')?.value)||0;
+  const sucId = parseInt(document.getElementById('cfgSucId')?.value)||0;
+  if(!depId){ toast('Ingresá el ID del depósito'); return; }
+  localStorage.setItem('pos_deposito_id', String(depId));
+  cookieSet('pos_dep_id', String(depId), 365);
+  if(sucId){
+    localStorage.setItem('pos_sucursal_id', String(sucId));
+    cookieSet('pos_suc_id', String(sucId), 365);
+  }
+  // Guardar en Supabase para recuperar en futuro
+  guardarConfigTerminalSupabase({
+    negocio:     localStorage.getItem(SK.negocio)||configData.negocio||'',
+    terminal:    localStorage.getItem('pos_terminal')||'Terminal 1',
+    sucursal:    localStorage.getItem('pos_sucursal')||'',
+    deposito:    localStorage.getItem('pos_deposito')||'',
+    sucursal_id: sucId || localStorage.getItem('pos_sucursal_id'),
+    deposito_id: depId,
+  }).catch(()=>{});
+  toast('✓ Depósito ID '+depId+' guardado');
+  renderGeneralInfo();
+}
+
+function resetDepositoId(){
+  if(!confirm('¿Cambiar el depósito configurado?')) return;
+  localStorage.removeItem('pos_deposito_id');
+  localStorage.removeItem('pos_sucursal_id');
+  renderGeneralInfo();
+}
 
 async function goToVentas(){
   goTo('scVentas');
