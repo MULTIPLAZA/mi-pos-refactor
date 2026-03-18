@@ -7452,8 +7452,9 @@ function confirmarCierre(){
 }
 
 function imprimirCierre(){
-  var size = getPaperSize('ticket') || '58';
-  buildCierreTicket(size); // Regenerar con el tamaño correcto
+  // NO regenerar — turnoData ya fue borrado en confirmarCierre
+  // Usar cierreTicketHTML generado con datos correctos
+  if(!cierreTicketHTML){ toast('Sin datos de cierre'); return; }
   var isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true;
   if(isPWA){
     var iframe = document.getElementById('printFrame');
