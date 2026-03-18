@@ -1465,10 +1465,13 @@
     flex-shrink: 0;
   }
   .tab-ticket-nro {
-    font-size: 13px; font-weight: 800; color: var(--text);
-    letter-spacing: .5px;
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    letter-spacing: .4px; text-transform: uppercase;
   }
-  .tab-ticket-nro span { color: var(--green); }
+  .tab-ticket-nro span {
+    font-size: 18px; font-weight: 800; color: var(--green);
+    display: block; line-height: 1.1; margin-top: 1px;
+  }
   .tab-tipo-btns { display: flex; gap: 4px; }
   .tab-tipo-btn {
     background: var(--bg-card); border: 1.5px solid var(--border2);
@@ -2642,9 +2645,17 @@
 
   <!-- Barra tipo pedido móvil -->
   <div class="mob-tipo-bar">
-    <button class="mob-tipo-btn sel" id="mobTipoBtnLocal"    onclick="setTipoPedido('local')">🍽 Local</button>
-    <button class="mob-tipo-btn"     id="mobTipoBtnLlevar"   onclick="setTipoPedido('llevar')">📦 Para llevar</button>
-    <button class="mob-tipo-btn"     id="mobTipoBtnDelivery" onclick="setTipoPedido('delivery')">🛵 Delivery</button>
+    <button class="mob-tipo-btn sel" id="mobTipoBtnLocal"    onclick="setTipoPedido('local')">Local</button>
+    <button class="mob-tipo-btn"     id="mobTipoBtnLlevar"   onclick="setTipoPedido('llevar')">Para llevar</button>
+    <button class="mob-tipo-btn"     id="mobTipoBtnDelivery" onclick="setTipoPedido('delivery')">Delivery</button>
+  </div>
+  <!-- Barra monto delivery móvil -->
+  <div class="tab-delivery-bar" id="mobDeliveryBar" style="display:none">
+    <span class="tab-delivery-label">Monto envío</span>
+    <input type="number" class="tab-delivery-input" id="mobDeliveryMonto"
+      placeholder="0" inputmode="numeric"
+      onkeydown="if(event.key==='Enter') agregarMontoDeliveryMob()">
+    <button class="tab-delivery-btn" onclick="agregarMontoDeliveryMob()">+ Agregar</button>
   </div>
 
   <!-- SPLIT WRAPPER (flex en tablet, contents en móvil) -->
@@ -2676,16 +2687,16 @@
     <div class="tablet-right" id="tabletRight">
       <!-- Header: Nro ticket + tipo pedido -->
       <div class="tab-ticket-header">
-        <div class="tab-ticket-nro">🎫 Ticket <span id="tabTicketNro">#—</span></div>
+        <div class="tab-ticket-nro">Nro. Ticket: <span id="tabTicketNro">#—</span></div>
         <div class="tab-tipo-btns">
-          <button class="tab-tipo-btn sel" id="tipoBtnLocal" onclick="setTipoPedido('local')">🍽 Local</button>
-          <button class="tab-tipo-btn" id="tipoBtnLlevar" onclick="setTipoPedido('llevar')">📦 Llevar</button>
-          <button class="tab-tipo-btn" id="tipoBtnDelivery" onclick="setTipoPedido('delivery')">🛵 Delivery</button>
+          <button class="tab-tipo-btn sel" id="tipoBtnLocal" onclick="setTipoPedido('local')">Local</button>
+          <button class="tab-tipo-btn" id="tipoBtnLlevar" onclick="setTipoPedido('llevar')">Llevar</button>
+          <button class="tab-tipo-btn" id="tipoBtnDelivery" onclick="setTipoPedido('delivery')">Delivery</button>
         </div>
       </div>
       <!-- Panel monto delivery -->
       <div class="tab-delivery-bar" id="tabDeliveryBar">
-        <span class="tab-delivery-label">🛵 Envío</span>
+        <span class="tab-delivery-label">Envío</span>
         <input type="number" class="tab-delivery-input" id="tabDeliveryMonto"
           placeholder="Monto..." min="0" step="1000"
           onkeydown="if(event.key==='Enter') agregarMontoDelivery()">
@@ -3472,13 +3483,22 @@ function setTipoPedido(tipo){
     var btn = document.getElementById('mobTipoBtn'+t.charAt(0).toUpperCase()+t.slice(1));
     if(btn) btn.classList.toggle('sel', t===tipo);
   });
-  // Mostrar/ocultar panel de monto delivery
+  // Mostrar/ocultar panel de monto delivery — PC/Tablet
   var bar = document.getElementById('tabDeliveryBar');
   if(bar){
     bar.classList.toggle('visible', tipo==='delivery');
     if(tipo==='delivery'){
       var inp = document.getElementById('tabDeliveryMonto');
       if(inp){ inp.value=''; inp.focus(); }
+    }
+  }
+  // Móvil
+  var mobBar = document.getElementById('mobDeliveryBar');
+  if(mobBar){
+    mobBar.style.display = tipo==='delivery' ? 'flex' : 'none';
+    if(tipo==='delivery'){
+      var mobInp = document.getElementById('mobDeliveryMonto');
+      if(mobInp){ mobInp.value=''; mobInp.focus(); }
     }
   }
   // Si cambia de delivery, quitar ítem delivery del cart
@@ -3488,6 +3508,16 @@ function setTipoPedido(tipo){
 function quitarItemDelivery(){
   var idx = cart.findIndex(function(i){ return i.esDelivery; });
   if(idx >= 0){ cart.splice(idx,1); updUI(); updBtnGuardar(); }
+}
+
+function agregarMontoDeliveryMob(){
+  var inp = document.getElementById('mobDeliveryMonto');
+  var monto = parseInt((inp||{}).value||0)||0;
+  if(!monto || monto<=0){ toast('Ingresá el monto del envío'); return; }
+  // Reutilizar la lógica del delivery de PC
+  document.getElementById('tabDeliveryMonto') && (document.getElementById('tabDeliveryMonto').value = monto);
+  agregarMontoDelivery();
+  if(inp) inp.value='';
 }
 
 function agregarMontoDelivery(){
@@ -3502,7 +3532,7 @@ function agregarMontoDelivery(){
   cart.push({
     lineId: Date.now()*1000 + 999,
     id: 'delivery_item',
-    name: '🛵 Envío delivery',
+    name: 'Envío delivery',
     price: monto,
     qty: 1,
     obs: '',
@@ -4996,7 +5026,7 @@ function generarHTMLComanda(data, size){
   lineas += '<p class="c l">'+hora+'</p>';
   lineas += '<p class="c s">TICKET: #'+String(data.nroTicket||0).padStart(4,'0')+'</p>';
   if(data.tipoPedido && data.tipoPedido!=='local'){
-    const tipos={'llevar':'📦 PARA LLEVAR','delivery':'🛵 DELIVERY'};
+    const tipos={'llevar':'PARA LLEVAR','delivery':'DELIVERY'};
     lineas += '<p class="c b" style="font-size:14px;border:1px solid #000;padding:2px 0;margin:2px 0">'+( tipos[data.tipoPedido]||data.tipoPedido.toUpperCase())+'</p>';
   }
   lineas += '<p class="c s">CLIENTE: '+(data.factura?.nombre||'SIN NOMBRE')+'</p>';
