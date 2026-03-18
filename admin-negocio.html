@@ -4511,8 +4511,155 @@ async function balanceBuscar(licId){
         :'')
       ;
 
+    // ── GRÁFICOS ──────────────────────────────────────────
+    // Calcular datos históricos por mes para el gráfico de tendencia
+    var grafDiv='<div class="card" style="margin-top:14px;margin-bottom:10px">'
+      +'<div class="card-h"><span class="card-t">Ventas vs Utilidad neta por mes</span></div>'
+      +'<div style="padding:16px 18px"><canvas id="balGraf1" height="90"></canvas></div>'
+    +'</div>'
+    +'<div class="card" style="margin-bottom:10px">'
+      +'<div class="card-h"><span class="card-t">Composición de costos sobre ventas</span></div>'
+      +'<div style="padding:16px 18px;display:flex;align-items:center;gap:24px;flex-wrap:wrap">'
+        +'<canvas id="balGraf2" width="200" height="200" style="max-width:200px"></canvas>'
+        +'<div id="balGraf2Leyenda" style="flex:1;min-width:160px"></div>'
+      +'</div>'
+    +'</div>';
+    body.innerHTML+=grafDiv;
+
+    // Esperar al siguiente frame para que el canvas esté en el DOM
+    await new Promise(function(r){setTimeout(r,50);});
+    balDibujarTendencia(fd,fh,ventaBruta,utilidadFinal!==null?utilidadFinal:utilidadNeta,licId);
+    balDibujarComposicion(ventaBruta,costoVentas,totalGastos,ivaAPagar||0);
+
   }catch(e){
     body.innerHTML='<div style="padding:24px;color:var(--red)">Error: '+e.message+'</div>';
+  }
+}
+
+async function balDibujarTendencia(fd,fh,ventaActual,utilActual,licId){
+  var canvas=document.getElementById('balGraf1');
+  if(!canvas) return;
+  // Construir 6 meses hacia atrás desde fd
+  var meses=[];
+  var dRef=fd?new Date(fd):new Date();
+  for(var i=5;i>=0;i--){
+    var m=new Date(dRef.getFullYear(),dRef.getMonth()-i,1);
+    meses.push({año:m.getFullYear(),mes:m.getMonth()+1});
+  }
+  // Para cada mes cargar ventas
+  var puntos=[];
+  await Promise.all(meses.map(async function(m){
+    var mStr=m.año+'-'+pad(m.mes);
+    var ultimoDia=new Date(m.año,m.mes,0).getDate();
+    try{
+      var v=await sg('pos_ventas',
+        'licencia_email=ilike.'+encodeURIComponent(SE)
+        +'&fecha=gte.'+mStr+'-01T00:00:00'
+        +'&fecha=lte.'+mStr+'-'+ultimoDia+'T23:59:59'
+        +'&select=total&limit=5000'
+      );
+      var venta=v.reduce(function(s,x){return s+(x.total||0);},0);
+      var g=await sg('gastos','licencia_id=eq.'+licId+'&fecha=gte.'+mStr+'-01&fecha=lte.'+mStr+'-'+ultimoDia+'&select=monto&limit=500');
+      var gasto=g.reduce(function(s,x){return s+(x.monto||0);},0);
+      puntos.push({label:mStr,venta:venta,util:venta*0.9-gasto}); // aproximación
+    }catch(e){ puntos.push({label:mStr,venta:0,util:0}); }
+  }));
+  puntos.sort(function(a,b){return a.label.localeCompare(b.label);});
+
+  var W=canvas.offsetWidth||canvas.parentElement.offsetWidth||560;
+  canvas.width=W; canvas.height=180;
+  var ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,180);
+
+  var vals=puntos.map(function(p){return Math.max(p.venta,Math.abs(p.util));});
+  var maxV=Math.max.apply(null,vals)||1;
+  var n=puntos.length;
+  var PAD={t:16,b:28,l:12,r:12};
+  var gW=W-PAD.l-PAD.r;
+  var gH=180-PAD.t-PAD.b;
+  var bW=Math.floor(gW/n*0.35);
+  var gap=gW/n;
+
+  // Grid
+  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
+  for(var gi=0;gi<=4;gi++){
+    var yg=PAD.t+gH-(gH/4*gi);
+    ctx.beginPath(); ctx.moveTo(PAD.l,yg); ctx.lineTo(PAD.l+gW,yg); ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='9px Barlow,sans-serif'; ctx.textAlign='right';
+    var lv=Math.round(maxV/4*gi);
+    ctx.fillText(lv>=1000000?Math.round(lv/1000000)+'M':lv>=1000?Math.round(lv/1000)+'K':lv, PAD.l+gW+10, yg+3);
+  }
+
+  puntos.forEach(function(p,i){
+    var x=PAD.l+i*gap+gap/2;
+    var hV=Math.max(2,(p.venta/maxV)*gH);
+    var hU=p.util>=0?Math.max(2,(p.util/maxV)*gH):Math.max(2,(Math.abs(p.util)/maxV)*gH);
+    // Barra ventas
+    ctx.fillStyle='rgba(76,175,80,0.7)';
+    ctx.beginPath(); ctx.roundRect(x-bW-2,PAD.t+gH-hV,bW,hV,2); ctx.fill();
+    // Barra utilidad
+    ctx.fillStyle=p.util>=0?'rgba(66,165,245,0.8)':'rgba(239,83,80,0.8)';
+    ctx.beginPath(); ctx.roundRect(x+2,PAD.t+gH-hU,bW,hU,2); ctx.fill();
+    // Label mes
+    ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.font='9px Barlow,sans-serif'; ctx.textAlign='center';
+    var lbl=p.label.substring(5); // MM
+    ctx.fillText(lbl,x,180-PAD.b+12);
+  });
+
+  // Leyenda
+  ctx.fillStyle='rgba(76,175,80,0.8)'; ctx.fillRect(PAD.l,8,12,8);
+  ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='10px Barlow,sans-serif'; ctx.textAlign='left';
+  ctx.fillText('Ventas',PAD.l+16,16);
+  ctx.fillStyle='rgba(66,165,245,0.8)'; ctx.fillRect(PAD.l+70,8,12,8);
+  ctx.fillStyle='rgba(255,255,255,0.5)';
+  ctx.fillText('Utilidad neta',PAD.l+86,16);
+}
+
+function balDibujarComposicion(venta,costo,gastos,iva){
+  var canvas=document.getElementById('balGraf2');
+  var leyenda=document.getElementById('balGraf2Leyenda');
+  if(!canvas||!venta) return;
+  var util=Math.max(0,venta-costo-gastos-iva);
+  var segmentos=[
+    {label:'Costo de ventas',  valor:costo,  color:'#ef5350'},
+    {label:'Gastos',           valor:gastos, color:'#ff9800'},
+    {label:'IVA estimado',     valor:iva,    color:'#9c27b0'},
+    {label:'Utilidad neta',    valor:util,   color:'#4caf50'},
+  ].filter(function(s){return s.valor>0;});
+
+  var ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,200,200);
+  var total=segmentos.reduce(function(s,x){return s+x.valor;},0)||1;
+  var cx=100,cy=100,r=85,ri=52,start=-Math.PI/2;
+
+  segmentos.forEach(function(s){
+    var angle=(s.valor/total)*Math.PI*2;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,r,start,start+angle);
+    ctx.closePath();
+    ctx.fillStyle=s.color;
+    ctx.fill();
+    start+=angle;
+  });
+  // Hueco central
+  ctx.beginPath(); ctx.arc(cx,cy,ri,0,Math.PI*2);
+  ctx.fillStyle='var(--card)'; ctx.fill();
+  // Texto central
+  ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='bold 11px Barlow,sans-serif'; ctx.textAlign='center';
+  ctx.fillText('sobre',cx,cy-4); ctx.fillText('ventas',cx,cy+10);
+
+  // Leyenda
+  if(leyenda){
+    leyenda.innerHTML=segmentos.map(function(s){
+      var pct=Math.round(s.valor/venta*100);
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+        +'<div style="width:12px;height:12px;border-radius:3px;background:'+s.color+';flex-shrink:0"></div>'
+        +'<div style="flex:1"><div style="font-size:12px;font-weight:600">'+s.label+'</div>'
+          +'<div style="font-size:11px;color:var(--muted)">'+pct+'% de ventas</div></div>'
+        +'<div style="font-size:13px;font-weight:800">'+pct+'%</div>'
+      +'</div>';
+    }).join('');
   }
 }
 
