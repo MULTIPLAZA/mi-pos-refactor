@@ -900,7 +900,7 @@
   /* GRID */
   .products-grid {
     display:grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap:3px; padding:4px 4px; overflow-y:auto; flex:1;
     background:var(--bg); align-content:start;
   }
@@ -1074,8 +1074,8 @@
   @media(min-width:700px){
     .search-bar { display:flex !important; }
     .fsearch { display:none !important; }
-    #prodView { flex:1 1 0 !important; min-width:0 !important; max-width:calc(100% - 300px) !important; }
-    .tablet-right { width:300px !important; flex-shrink:0 !important; min-width:300px !important; }
+    #prodView { flex:1 1 0 !important; min-width:0 !important; max-width:calc(100% - 420px) !important; }
+    .tablet-right { width:420px !important; flex-shrink:0 !important; min-width:420px !important; }
   }
   .cat-item.sel { color:var(--green); }
 
@@ -1438,7 +1438,7 @@
 
     /* Tablet: tiles un poco más chicos */
     .products-grid {
-      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)) !important;
+      grid-template-columns: repeat(4, 1fr) !important;
     }
 
     /* El panel de ticket móvil se oculta en tablet */
@@ -1450,7 +1450,7 @@
   /* ── TABLET RIGHT PANEL (siempre en DOM, oculto en móvil) ── */
   .tablet-right {
     display: none;
-    width: 300px;
+    width: 420px;
     flex-shrink: 0;
     flex-direction: column;
     background: var(--bg-card);
@@ -1526,21 +1526,15 @@
     .tablet-right { display: none !important; }
     #scSale .action-bar { display: grid !important; }
     #prodView { display: flex !important; }
-    .products-grid { grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)) !important; }
+    .products-grid { grid-template-columns: repeat(3, 1fr) !important; }
   }
 
-  /* PC: tiles más chicos, más columnas */
+  /* PC: 5 columnas fijas */
   @media (min-width:1000px){
     .products-grid {
-      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
+      grid-template-columns: repeat(5, 1fr) !important;
     }
-    .pname { font-size:10.5px; }
-  }
-  @media (min-width:1400px){
-    .products-grid {
-      grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)) !important;
-    }
-    .pname { font-size:10px; }
+    .pname { font-size:11px; }
   }
 
   ::-webkit-scrollbar { width:2px; }
