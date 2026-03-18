@@ -2652,10 +2652,7 @@
   <!-- Barra monto delivery móvil -->
   <div class="tab-delivery-bar" id="mobDeliveryBar" style="display:none">
     <span class="tab-delivery-label">Monto envío</span>
-    <input type="number" class="tab-delivery-input" id="mobDeliveryMonto"
-      placeholder="0" inputmode="numeric"
-      onkeydown="if(event.key==='Enter') agregarMontoDeliveryMob()">
-    <button class="tab-delivery-btn" onclick="agregarMontoDeliveryMob()">+ Agregar</button>
+    <button class="tab-delivery-btn" style="flex:1" onclick="openNpDelivery()">+ Ingresar monto</button>
   </div>
 
   <!-- SPLIT WRAPPER (flex en tablet, contents en móvil) -->
@@ -2696,11 +2693,10 @@
       </div>
       <!-- Panel monto delivery -->
       <div class="tab-delivery-bar" id="tabDeliveryBar">
-        <span class="tab-delivery-label">Envío</span>
+        <span class="tab-delivery-label">Monto envío</span>
         <input type="number" class="tab-delivery-input" id="tabDeliveryMonto"
-          placeholder="Monto..." min="0" step="1000"
-          onkeydown="if(event.key==='Enter') agregarMontoDelivery()">
-        <button class="tab-delivery-btn" onclick="agregarMontoDelivery()">+ Agregar</button>
+          placeholder="0" style="display:none">
+        <button class="tab-delivery-btn" onclick="openNpDelivery()">+ Ingresar monto</button>
       </div>
       <div class="tab-action-bar">
         <button class="tab-btn-left" onclick="onBtnGuardar()">
@@ -3510,15 +3506,17 @@ function quitarItemDelivery(){
   if(idx >= 0){ cart.splice(idx,1); updUI(); updBtnGuardar(); }
 }
 
-function agregarMontoDeliveryMob(){
-  var inp = document.getElementById('mobDeliveryMonto');
-  var monto = parseInt((inp||{}).value||0)||0;
-  if(!monto || monto<=0){ toast('Ingresá el monto del envío'); return; }
-  // Reutilizar la lógica del delivery de PC
-  document.getElementById('tabDeliveryMonto') && (document.getElementById('tabDeliveryMonto').value = monto);
-  agregarMontoDelivery();
-  if(inp) inp.value='';
+function openNpDelivery(){
+  var existing = cart.find(function(i){ return i.esDelivery; });
+  npCtx = 'delivery';
+  npVal = existing ? String(existing.price) : '';
+  document.getElementById('npLbl').textContent = 'Monto del envío (Delivery)';
+  document.getElementById('npDisp').textContent = existing ? gs(existing.price) : '₲0';
+  document.getElementById('billetesRow').classList.remove('show');
+  document.getElementById('npOverlay').classList.add('open');
 }
+
+
 
 function agregarMontoDelivery(){
   var inp = document.getElementById('tabDeliveryMonto');
@@ -5150,6 +5148,14 @@ function openNP(ctx){
   document.getElementById('npOverlay').classList.add('open');
 }
 function npOutside(e){ if(e.target===document.getElementById('npOverlay'))document.getElementById('npOverlay').classList.remove('open'); }
+document.addEventListener('keydown', function(e){
+  var ov = document.getElementById('npOverlay');
+  if(!ov || !ov.classList.contains('open')) return;
+  if(e.key>='0' && e.key<='9'){ e.preventDefault(); npP(e.key); }
+  else if(e.key==='Backspace'){ e.preventDefault(); npD(); }
+  else if(e.key==='Enter'){ e.preventDefault(); npOK(); }
+  else if(e.key==='Escape'){ e.preventDefault(); ov.classList.remove('open'); }
+});
 function npP(d){
   if(npCtx==='comprobante'||npCtx==='divComp'){
     npVal+=d; if(npVal.length>15)npVal=npVal.slice(0,15);
