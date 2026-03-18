@@ -1456,6 +1456,34 @@
     background: var(--bg-card);
     border-left: 1px solid var(--border);
   }
+  /* Header nro ticket + tipo pedido */
+  .tab-ticket-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 10px 6px;
+    background: var(--bg-dark);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .tab-ticket-nro {
+    font-size: 13px; font-weight: 800; color: var(--text);
+    letter-spacing: .5px;
+  }
+  .tab-ticket-nro span { color: var(--green); }
+  .tab-tipo-btns { display: flex; gap: 4px; }
+  .tab-tipo-btn {
+    background: var(--bg-card); border: 1.5px solid var(--border2);
+    border-radius: 5px; color: var(--muted);
+    font-family: 'Barlow', sans-serif; font-size: 10px; font-weight: 700;
+    padding: 4px 8px; cursor: pointer; transition: all .15s;
+    display: flex; align-items: center; gap: 3px;
+    text-transform: uppercase; letter-spacing: .3px;
+  }
+  .tab-tipo-btn.sel {
+    background: var(--green); border-color: var(--green);
+    color: #fff;
+  }
+  .tab-tipo-btn:active { transform: scale(.95); }
+
   .tablet-right .tab-action-bar {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -2588,6 +2616,15 @@
 
     <!-- ── PANEL DERECHO TABLET ── -->
     <div class="tablet-right" id="tabletRight">
+      <!-- Header: Nro ticket + tipo pedido -->
+      <div class="tab-ticket-header">
+        <div class="tab-ticket-nro">🎫 Ticket <span id="tabTicketNro">#—</span></div>
+        <div class="tab-tipo-btns">
+          <button class="tab-tipo-btn sel" id="tipoBtnLocal" onclick="setTipoPedido('local')">🍽 Local</button>
+          <button class="tab-tipo-btn" id="tipoBtnLlevar" onclick="setTipoPedido('llevar')">📦 Llevar</button>
+          <button class="tab-tipo-btn" id="tipoBtnDelivery" onclick="setTipoPedido('delivery')">🛵 Delivery</button>
+        </div>
+      </div>
       <div class="tab-action-bar">
         <button class="tab-btn-left" onclick="onBtnGuardar()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
@@ -3072,6 +3109,7 @@ function updUI(){
   if(tabAmt) tabAmt.textContent=gs(t);
   if(tabTotal) tabTotal.textContent=gs(t);
   renderTabletTicket();
+  updTabTicketHeader();
 }
 
 // TICKET
@@ -3302,6 +3340,7 @@ function imprimirComandaPreCobro(){
     items:     cart,
     fecha:     d,
     nroTicket: nroTicket || ticketCounter,
+    tipoPedido: tipoPedido||'local',
     factura:   null
   });
 }
@@ -3337,6 +3376,9 @@ function vaciarTicket(){
   if(!cart.length) return;
   cart = [];
   currentTicketNro = null;
+  tipoPedido = 'local';
+  setTipoPedido('local');
+  updTabTicketHeader();
   updUI();
   updBtnGuardar();
   goTo('scSale');
@@ -3345,8 +3387,26 @@ function vaciarTicket(){
 
 // ── GUARDAR / TICKETS PENDIENTES ────────────────────────────────────────────
 let ticketCounter = 1;   // autonumérico creciente
+let tipoPedido = 'local'; // 'local' | 'llevar' | 'delivery'
 let pendientes = [];     // [{nro, obs, cart, total, fecha}]
 let currentTicketNro = null; // nro del ticket cargado actualmente (null = nuevo)
+
+function setTipoPedido(tipo){
+  tipoPedido = tipo;
+  ['local','llevar','delivery'].forEach(function(t){
+    var btn = document.getElementById('tipoBtn'+t.charAt(0).toUpperCase()+t.slice(1));
+    if(btn) btn.classList.toggle('sel', t===tipo);
+  });
+}
+
+function updTabTicketHeader(){
+  var nroEl = document.getElementById('tabTicketNro');
+  if(!nroEl) return;
+  var nro = currentTicketNro !== null
+    ? String(currentTicketNro).padStart(4,'0')
+    : String(ticketCounter).padStart(4,'0');
+  nroEl.textContent = '#' + nro;
+}
 
 function onBtnGuardar(){
   const tieneProductos = calcTotal() > 0;
@@ -3797,6 +3857,7 @@ function confirmarPago(){
     efectivo: efectivoEntregado,
     vuelto: document.getElementById('vueltoRow').classList.contains('show') ? vuelto : '',
     nroTicket,
+    tipoPedido: tipoPedido||'local',
     fecha: new Date(),
     factura: facturaData
   });
@@ -4814,7 +4875,11 @@ function generarHTMLComanda(data, size){
   lineas += '<p class="c b">Orden #: '+String(data.nroTicket||0)+'</p>';
   lineas += '<p class="c s">Fecha: '+fecha+'</p>';
   lineas += '<p class="c l">'+hora+'</p>';
-  lineas += '<p class="c s">NRO_TICKET: '+String(data.nroTicket||0).padStart(3,'0')+'-'+String((data.nroTicket||0)+1)+'</p>';
+  lineas += '<p class="c s">TICKET: #'+String(data.nroTicket||0).padStart(4,'0')+'</p>';
+  if(data.tipoPedido && data.tipoPedido!=='local'){
+    const tipos={'llevar':'📦 PARA LLEVAR','delivery':'🛵 DELIVERY'};
+    lineas += '<p class="c b" style="font-size:14px;border:1px solid #000;padding:2px 0;margin:2px 0">'+( tipos[data.tipoPedido]||data.tipoPedido.toUpperCase())+'</p>';
+  }
   lineas += '<p class="c s">CLIENTE: '+(data.factura?.nombre||'SIN NOMBRE')+'</p>';
   lineas += '<p class="hr"></p>';
 
