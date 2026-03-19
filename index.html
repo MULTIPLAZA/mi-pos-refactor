@@ -3510,6 +3510,51 @@ function supaInsertTurno(estado, efectivoInicial){
     if(rows&&rows[0]) turnoData.supaId = rows[0].id;
   }).catch(e=>console.warn('[Turno] Error Supabase:', e.message));
 }
+function openNpTexto(ctx, inputEl){
+  if(window.innerWidth >= 700) return;
+  inputEl.blur();
+  setTimeout(function(){ inputEl.blur(); }, 10);
+  npCtx = 'texto_' + ctx;
+  npVal = inputEl.value || '';
+  var labels = { ruc: 'RUC / C.I.', nombre: 'Razón Social / Nombre' };
+  document.getElementById('npLbl').textContent = labels[ctx] || ctx;
+  document.getElementById('npDisp').style.display = 'none';
+  document.getElementById('billetesRow').classList.remove('show');
+  var grid = document.getElementById('npGrid');
+  if(grid) grid.style.display = 'none';
+  var ti = document.getElementById('npTextInput');
+  ti.style.display = 'block';
+  ti.value = npVal;
+  ti.autocapitalize = ctx === 'nombre' ? 'words' : 'off';
+  document.getElementById('npOverlay').classList.add('open');
+  setTimeout(function(){ ti.focus(); }, 300);
+}
+function openNpRuc(){
+  npCtx = 'ruc';
+  npVal = document.getElementById('factRuc').value.trim() || '';
+  document.getElementById('npLbl').textContent = 'RUC / C.I.';
+  document.getElementById('npDisp').textContent = npVal || '—';
+  document.getElementById('billetesRow').classList.remove('show');
+  document.getElementById('npOverlay').classList.add('open');
+}
+function cerrarNpTexto(){
+  document.getElementById('npDisp').style.display = '';
+  var ng = document.getElementById('npGrid');
+  if(ng) ng.style.display = '';
+  var ti = document.getElementById('npTextInput');
+  if(ti){ ti.style.display = 'none'; ti.value = ''; }
+  npCtx = '';
+}
+function openNpDelivery(){
+  var existing = cart.find(function(i){ return i.esDelivery; });
+  npCtx = 'delivery';
+  npVal = existing ? String(existing.price) : '';
+  document.getElementById('npLbl').textContent = 'Monto del envío (Delivery)';
+  document.getElementById('npDisp').textContent = existing ? gs(existing.price) : '₲0';
+  document.getElementById('billetesRow').classList.remove('show');
+  document.getElementById('npOverlay').classList.add('open');
+}
+
 function goCobrar(){
   const t=calcTotal(); if(!t){toast('Agregá productos primero');return;}
   document.getElementById('ctotal').textContent=gs(t);
