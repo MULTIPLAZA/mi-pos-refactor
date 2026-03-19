@@ -7554,14 +7554,38 @@ async function conectarBluetooth(tipo){
     return;
   }
   try {
-    // requestDevice DEBE ser lo primero sin nada antes
-    // cualquier await o cambio de DOM previo rompe el "user gesture" en Android Chrome
-    const device = await navigator.bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: BT_SERVICES
-    });
+    // Filtrar por nombres conocidos de impresoras térmicas BT genéricas
+    // + fallback acceptAllDevices si no matchea ninguno
+    const PRINTER_NAMES = [
+      'Bluetooth Printer', 'BlueTooth Printer',
+      'MTP-II', 'MTP-3', 'RPP02', 'RPP300',
+      'Printer', 'printer',
+    ];
+    const PRINTER_PREFIXES = ['XP-', 'ZJ-', 'BT-', 'PT-', 'MT-', 'DP-', 'GP-'];
+
+    let device;
+    try {
+      // Intento 1: filtrar por nombre exacto (mucho más limpio)
+      device = await navigator.bluetooth.requestDevice({
+        filters: [
+          // Nombre exacto
+          ...PRINTER_NAMES.map(name => ({ name })),
+          // Prefijos comunes
+          ...PRINTER_PREFIXES.map(prefix => ({ namePrefix: prefix })),
+        ],
+        optionalServices: BT_SERVICES
+      });
+    } catch(e1) {
+      if(e1.name === 'NotFoundError') throw e1; // usuario canceló
+      // Si el filtro falla (algunos Android no lo soportan), mostrar todos
+      device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: BT_SERVICES
+      });
+    }
+
     printers[tipo].device         = device;
-    printers[tipo].name           = device.name || 'Impresora BT';
+    printers[tipo].name           = device.name || 'Bluetooth Printer';
     printers[tipo].type           = 'bt';
     printers[tipo].needsReconnect = false;
     localStorage.setItem('printerType_'+tipo, 'bt');
