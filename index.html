@@ -3540,9 +3540,11 @@ function vaciarTicket(){
   if(!cart.length) return;
   cart = [];
   currentTicketNro = null;
+  mesaActual = null;
   tipoPedido = 'local';
   setTipoPedido('local');
   updTabTicketHeader();
+  updMesaBtn();
   var dBar = document.getElementById('tabDeliveryBar');
   if(dBar) dBar.classList.remove('visible');
   updUI();
@@ -3664,18 +3666,22 @@ function agregarMontoDelivery(){
 }
 
 function updTabTicketHeader(){
-  // Mostrar nombre de mesa si hay una asignada
-  var mesaLabel = mesaActual ? ' · '+mesaActual.nombre : '';
+  updMesaBtn();
   var nro = currentTicketNro !== null
     ? String(currentTicketNro).padStart(4,'0')
     : String(ticketCounter).padStart(4,'0');
   var nroEl = document.getElementById('tabTicketNro');
-  if(nroEl) nroEl.textContent = '#' + nro + (mesaActual ? ' · '+mesaActual.nombre : '');
+  if(nroEl) nroEl.textContent = '#' + nro + (mesaActual ? '  '+mesaActual.nombre : '');
   var mobNroEl = document.getElementById('mobTicketNro');
   if(mobNroEl) mobNroEl.textContent = '#' + nro;
 }
 
 function onBtnGuardar(){
+  // Si hay mesa asignada, usar flujo de mesas
+  if(mesaActual){
+    guardarConMesa();
+    return;
+  }
   const tieneProductos = calcTotal() > 0;
   if(tieneProductos){
     // siempre guardar si hay productos, sin importar si hay pendientes
@@ -3841,8 +3847,10 @@ function nuevaVenta(){
   }
   cart=[];
   currentTicketNro = null;
+  mesaActual = null;
   updUI();
   updBtnGuardar();
+  updMesaBtn();
   goTo('scSale');
 }
 
@@ -5294,7 +5302,14 @@ function imprimirComanda(data){
 }
 
 function finalizarRecibo(){
-  goTo('scSale');
+  mesaActual = null;
+  updMesaBtn();
+  // Si hay mesas configuradas, volver a la pantalla de mesas
+  if(mesasSalones.length > 0){
+    abrirPantallaMesas();
+  } else {
+    goTo('scSale');
+  }
 }
 
 // NUMPAD
@@ -9165,8 +9180,15 @@ async function iniciarApp(){
   // ── PASO 3: Restaurar turno ── ANTES de cualquier await ──
   const turnoOk = turnoRestaurar();
   if(turnoOk){
-    goTo('scSale');
-    toast('Sesión restaurada — '+turnoData.ventas.length+' venta'+(turnoData.ventas.length!==1?'s':''));
+    // Si hay mesas configuradas, ir a pantalla mesas; sino, a la venta
+    if(mesasSalones.length > 0){
+      goTo('scMesas');
+      renderMesasScreen();
+      toast('Sesión restaurada');
+    } else {
+      goTo('scSale');
+      toast('Sesión restaurada — '+turnoData.ventas.length+' venta'+(turnoData.ventas.length!==1?'s':''));
+    }
   } else {
     goTo('scClosed');
   }
@@ -9423,10 +9445,14 @@ async function mesasCargar(){
 async function abrirPantallaMesas(){
   await mesasCargar();
   if(mesasSalones.length === 0){
-    // Sin salones → preguntar si crear
     const ok = confirm('No hay salones configurados. ¿Deseas crear uno ahora?');
     if(ok) { goTo('scMesas'); renderMesasScreen(); abrirGestionMesas(); }
     return;
+  }
+  // Si hay mesa activa, ir al salón de esa mesa
+  if(mesaActual){
+    const mesa = mesasMesas.find(m => m.id === mesaActual.id);
+    if(mesa) mesaSalonSel = mesa.salon_id;
   }
   if(!mesaSalonSel && mesasSalones.length) mesaSalonSel = mesasSalones[0].id;
   goTo('scMesas');
@@ -9465,9 +9491,11 @@ function renderMesasScreen(){
     const info   = ocupada
       ? ('₲'+Math.round(pend.total||0).toLocaleString('es-PY'))
       : (m.capacidad ? m.capacidad+' pers.' : '');
-    return '<div class="mesa-tile '+dot+'" onclick="onMesaTap('+m.id+')" '+
-      'style="border-color:'+(ocupada?'#e53935':salon.color)+
-      ';background:'+(ocupada?'rgba(229,57,53,.12)':'rgba('+hexToRgb(salon.color)+',.1)')+'">'+
+    const esActiva = mesaActual && mesaActual.id === m.id;
+    var borderColor = ocupada ? '#e53935' : esActiva ? '#fff' : salon.color;
+    var bgColor = ocupada ? 'rgba(229,57,53,.12)' : esActiva ? 'rgba(255,255,255,.08)' : 'rgba('+hexToRgb(salon.color)+',.1)';
+    return '<div class="mesa-tile '+dot+(esActiva?' activa':'')+'" onclick="onMesaTap('+m.id+')" '+
+      'style="border-color:'+borderColor+';background:'+bgColor+(esActiva?';box-shadow:0 0 0 2px #fff3':'')+'">' +
       '<div class="mesa-dot '+dot+'"></div>'+
       '<div class="mesa-tile-nombre">'+m.nombre+'</div>'+
       '<div class="mesa-tile-info">'+info+'</div>'+
@@ -9482,35 +9510,48 @@ function mesaSelSalon(id){
 
 // ── Tap en una mesa ───────────────────────────────────
 function onMesaTap(mesaId){
-  const mesa  = mesasMesas.find(m => m.id === mesaId);
+  const mesa = mesasMesas.find(m => m.id === mesaId);
   if(!mesa) return;
-  const pend  = pendientes.find(p => p.mesa_id === mesaId);
+  const pend = pendientes.find(p => p.mesa_id === mesaId);
 
   if(pend){
-    // Mesa OCUPADA → cargar ese ticket
+    // Mesa OCUPADA → cargar su ticket y volver al POS
     mesaActual = mesa;
     cargarPendiente(pendientes.indexOf(pend));
-    goTo('scSale');
-    toast('Mesa '+mesa.nombre+' — ticket #'+String(pend.nro).padStart(4,'0'));
-  } else {
-    // Mesa LIBRE → asignar al ticket actual
-    mesaActual = mesa;
     setTipoPedido('local');
+    updMesaBtn();
     goTo('scSale');
-    toast('Mesa '+mesa.nombre+' seleccionada');
-    // Si hay items en el carrito, guardar como pendiente automáticamente
-    if(cart.length > 0){
-      setTimeout(function(){ guardarConMesa(); }, 200);
+    toast('Mesa '+mesa.nombre+' — Ticket #'+String(pend.nro).padStart(4,'0'));
+  } else {
+    // Mesa LIBRE → asignar al ticket actual (vaciar si había otro)
+    if(mesaActual && mesaActual.id !== mesa.id){
+      // Había otra mesa asignada sin guardar — limpiar
+      mesaActual = null;
     }
+    // Si hay carrito activo de otra fuente, preguntar
+    if(cart.length > 0 && currentTicketNro === null){
+      if(!confirm('Hay productos en el ticket actual. ¿Asignar esta mesa y continuar?')){
+        return;
+      }
+    }
+    mesaActual = mesa;
+    tipoPedido = 'local';
+    setTipoPedido('local');
+    updMesaBtn();
+    updTabTicketHeader();
+    goTo('scSale');
+    toast('Mesa '+mesa.nombre+' lista — agregá productos');
   }
 }
 
 // ── Guardar ticket con mesa asignada ──────────────────
 function guardarConMesa(){
   if(!mesaActual) return;
+  if(!cart.length){ toast('Agregá productos primero'); return; }
   const obs = mesaActual.nombre;
-  // Guardar como pendiente igual que onBtnGuardar pero con mesa_id
+
   if(currentTicketNro !== null){
+    // Actualizar pendiente existente
     const idx = pendientes.findIndex(t => t.nro === currentTicketNro);
     if(idx >= 0){
       pendientes[idx].cart    = JSON.parse(JSON.stringify(cart));
@@ -9520,26 +9561,28 @@ function guardarConMesa(){
       pendientes[idx].fecha   = new Date().toISOString();
       guardarPendientesLocal();
       updBtnGuardar();
+      renderMesasScreen();
+      toast('Mesa '+mesaActual.nombre+' — actualizada');
       return;
     }
   }
+  // Crear nuevo pendiente
   const nro = ticketCounter++;
   pendientes.push({
     nro,
-    obs:     obs,
-    cart:    JSON.parse(JSON.stringify(cart)),
-    total:   calcTotal(),
-    fecha:   new Date().toISOString(),
-    mesa_id: mesaActual.id,
+    obs:           obs,
+    cart:          JSON.parse(JSON.stringify(cart)),
+    total:         calcTotal(),
+    fecha:         new Date().toISOString(),
+    mesa_id:       mesaActual.id,
     esPresupuesto: false,
   });
-  currentTicketNro = null;
-  cart = [];
-  updUI(); updBtnGuardar();
+  currentTicketNro = nro; // mantener vínculo — la mesa sigue abierta
   guardarPendientesLocal();
-  // Mostrar nro en header
+  updBtnGuardar();
   updTabTicketHeader();
-  toast('Mesa '+mesaActual.nombre+' — Ticket guardado');
+  renderMesasScreen();
+  toast('Mesa '+mesaActual.nombre+' — Ticket #'+String(nro).padStart(4,'0')+' guardado');
 }
 
 // ── onBtnLocal: abrir pantalla mesas ──────────────────
@@ -9547,14 +9590,25 @@ function onBtnLocal(){
   if(mesasSalones.length > 0){
     abrirPantallaMesas();
   } else {
-    // Sin mesas configuradas → comportamiento normal
     setTipoPedido('local');
   }
+}
+
+// ── updMesaBtn: actualiza texto del botón Local con la mesa actual ──
+function updMesaBtn(){
+  var label = mesaActual ? mesaActual.nombre : 'Local';
+  // Botón móvil
+  var mbtn = document.getElementById('mobTipoBtnLocal');
+  if(mbtn) mbtn.textContent = label;
+  // Botón tablet/PC
+  var tbtn = document.getElementById('tipoBtnLocal');
+  if(tbtn) tbtn.textContent = label;
 }
 
 // ── Limpiar mesa al confirmar pago ────────────────────
 function mesaLimpiarAlPagar(){
   mesaActual = null;
+  updMesaBtn();
 }
 
 // ── Helpers ───────────────────────────────────────────
