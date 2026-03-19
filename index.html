@@ -7550,40 +7550,28 @@ const BT_SERVICES = [
 
 async function conectarBluetooth(tipo){
   if(!navigator.bluetooth){
-    toast('Web Bluetooth no disponible en este dispositivo/browser');
+    toast('Web Bluetooth no disponible — usá Chrome o Edge en Android');
     return;
   }
   try {
-    toast('Buscando impresoras...');
-    let device;
-    try {
-      // Intento 1: filtrar por servicio ESC/POS conocido
-      device = await navigator.bluetooth.requestDevice({
-        filters: BT_SERVICES.map(s => ({ services: [s] })),
-        optionalServices: BT_SERVICES
-      });
-    } catch(e1) {
-      // Intento 2: mostrar todos los dispositivos BT
-      device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: BT_SERVICES
-      });
-    }
-    printers[tipo].device = device;
-    printers[tipo].name   = device.name || 'Impresora BT';
-    printers[tipo].type   = 'bt';
-    // Guardar configuración para restaurar al reabrir
+    // requestDevice DEBE ser lo primero sin nada antes
+    // cualquier await o cambio de DOM previo rompe el "user gesture" en Android Chrome
+    const device = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: BT_SERVICES
+    });
+    printers[tipo].device         = device;
+    printers[tipo].name           = device.name || 'Impresora BT';
+    printers[tipo].type           = 'bt';
+    printers[tipo].needsReconnect = false;
     localStorage.setItem('printerType_'+tipo, 'bt');
     localStorage.setItem('printerName_'+tipo, printers[tipo].name);
     updPrinterUI(tipo);
-    toast('Conectada: ' + printers[tipo].name);
+    toast('\u2713 Conectada: ' + printers[tipo].name);
   } catch(e) {
-    if(e.name !== 'NotFoundError'){
-      toast('Error: ' + e.message);
-    }
+    if(e.name !== 'NotFoundError') toast('Error BT: ' + e.message);
   }
 }
-
 function usarImpresoraPC(tipo){
   printers[tipo].name   = 'Impresora del sistema';
   printers[tipo].type   = 'pc';
