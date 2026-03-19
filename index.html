@@ -3555,7 +3555,7 @@ function vaciarTicket(){
 }
 
 // ── GUARDAR / TICKETS PENDIENTES ────────────────────────────────────────────
-let ticketCounter = 1;   // autonumérico creciente
+let ticketCounter = parseInt(localStorage.getItem('pos_ticket_counter')||'1');   // autonumérico creciente
 let tipoPedido = 'llevar'; // 'local' | 'llevar' | 'delivery'
 let pendientes = [];     // [{nro, obs, cart, total, fecha}]
 let currentTicketNro = null; // nro del ticket cargado actualmente (null = nuevo)
@@ -3746,7 +3746,7 @@ function doGuardar(){
     toast('✓ Ticket #'+String(nro).padStart(4,'0')+' actualizado');
   } else {
     // Ticket nuevo — siempre pendiente (nunca presupuesto por defecto)
-    const nro = ticketCounter++;
+    const nro = ticketCounter++; localStorage.setItem('pos_ticket_counter', ticketCounter);
     pendientes.push({
       nro,
       obs:           obs || '',
@@ -3844,7 +3844,7 @@ function nuevaVenta(){
       fecha: new Date(),
       esPresupuesto: false,
     });
-    ticketCounter++;
+    ticketCounter++; localStorage.setItem('pos_ticket_counter', ticketCounter);
   }
   cart=[];
   currentTicketNro = null;
@@ -4059,7 +4059,7 @@ function confirmarPago(){
   const efectivoEntregado = document.getElementById('efecVal')?.textContent || '';
   const vuelto = document.getElementById('vueltoAmt')?.textContent || '';
   // Capturar nro ANTES de limpiar — si es ticket nuevo usar ticketCounter y avanzarlo
-  const nroTicket = currentTicketNro !== null ? currentTicketNro : ticketCounter++;
+  const nroTicket = currentTicketNro !== null ? currentTicketNro : ticketCounter++; localStorage.setItem('pos_ticket_counter', ticketCounter);
 
   // ── Validaciones de factura ──────────────────────────────
   if(facturaActiva){
@@ -4945,32 +4945,26 @@ function abrirVentanaImpresion(html, size){
              || window.navigator.standalone === true;
 
   if(isPWA){
-    // Eliminar iframe anterior si existe (para forzar recarga limpia)
-    const old = document.getElementById('printFrame');
-    if(old) old.remove();
-
-    const iframe = document.createElement('iframe');
-    iframe.id = 'printFrame';
-    // Tamaño real del papel para que el layout sea correcto
-    iframe.style.cssText = 'position:fixed;top:0;left:0;width:'+pxW+'px;height:100vh;border:none;opacity:0;pointer-events:none;z-index:-1;';
-    document.body.appendChild(iframe);
-
-    // Escribir y esperar carga completa antes de imprimir
-    iframe.onload = function(){
-      setTimeout(function(){
-        try{
-          iframe.contentWindow.focus();
-          iframe.contentWindow.print();
-        }catch(e){
-          console.warn('[Print] iframe.print failed:', e.message);
-          window.print();
-        }
-      }, 300);
-    };
+    let iframe = document.getElementById('printFrame');
+    if(!iframe){
+      iframe = document.createElement('iframe');
+      iframe.id = 'printFrame';
+      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;';
+      document.body.appendChild(iframe);
+    }
     const doc = iframe.contentWindow.document;
     doc.open();
     doc.write(html);
     doc.close();
+    setTimeout(function(){
+      try{
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      }catch(e){
+        const w = window.open('','_blank');
+        if(w){ w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(),300); }
+      }
+    }, 600);
     return;
   }
 
@@ -9184,6 +9178,10 @@ async function iniciarApp(){
         console.log('[App] Pendientes restaurados:', sp.length);
       }
     }
+    // Asegurar que ticketCounter es siempre mayor que cualquier nro cobrado
+    const savedCounter = parseInt(localStorage.getItem('pos_ticket_counter')||'1');
+    if(savedCounter > ticketCounter) ticketCounter = savedCounter;
+    localStorage.setItem('pos_ticket_counter', ticketCounter);
   } catch(e){ console.warn('[Pendientes]', e.message); }
 
   // ── PASO 3: Restaurar turno ── ANTES de cualquier await ──
@@ -9590,7 +9588,7 @@ function guardarConMesa(){
     }
   }
   // Crear nuevo pendiente
-  const nro = ticketCounter++;
+  const nro = ticketCounter++; localStorage.setItem('pos_ticket_counter', ticketCounter);
   const mesaNombre = mesaActual.nombre;
   pendientes.push({
     nro,
