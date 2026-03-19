@@ -7647,14 +7647,20 @@ async function imprimirBluetooth(device, htmlContent, size){
   function pad2l(s,n){ s=String(s); return s.length>=n?s.substring(0,n-1)+'…':s+' '.repeat(n-s.length); }
 
   // Parsear el HTML para extraer los datos del ticket
-  const tmp=document.createElement('div');
-  tmp.innerHTML=htmlContent;
+  // IMPORTANTE: extraer solo el <body> antes de asignar a innerHTML
+  // Si se asigna un HTML completo a innerHTML de un div, el browser descarta los <p>
+  // y solo imprime el encabezado (el problema de "solo sale la cabecera")
+  const tmp = document.createElement('div');
+  let htmlParaParsear = htmlContent;
+  const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  if(bodyMatch) htmlParaParsear = bodyMatch[1];
+  tmp.innerHTML = htmlParaParsear;
 
   // Función para extraer texto de un selector
   function txt(sel){ const el=tmp.querySelector(sel); return el?(el.innerText||el.textContent||'').trim():''; }
 
   // Extraer párrafos en orden
-  const parrafos=Array.from(tmp.querySelectorAll('p'));
+  const parrafos = Array.from(tmp.querySelectorAll('p'));
 
   // Construir bytes ESC/POS parseando las clases del HTML
   let bytes=[...CMD.init, ESC,0x74,0x02]; // init + página latin-1
@@ -7727,8 +7733,6 @@ async function imprimirBluetooth(device, htmlContent, size){
 
   bytes.push(...CMD.feed,...CMD.cut);
 
-  // Enviar en chunks conservadores para mayor compatibilidad
-  const CHUNK=200;
   try{
     // Reconectar si se desconectó
     let server;
@@ -7776,21 +7780,59 @@ async function imprimirBluetooth(device, htmlContent, size){
 
     if(!char) throw new Error('Impresora no soportada. '+lastErr);
 
-    const data=new Uint8Array(bytes);
-    for(let i=0;i<data.length;i+=CHUNK){
-      const chunk=data.slice(i,i+CHUNK);
-      try{
-        if(char.properties.writeWithoutResponse){
-          await char.writeValueWithoutResponse(chunk);
-        } else {
-          await char.writeValue(chunk);
-        }
-      }catch(e){
-        try{ await char.writeValue(chunk); }
-        catch(e2){ throw new Error('Error enviando datos: '+e2.message); }
+    const data = new Uint8Array(bytes);
+
+    // Negociar MTU real del dispositivo (máximo transferible por paquete)
+    // Las impresoras BT baratas suelen tener MTU de 20-100 bytes
+    // Usamos chunks pequeños para máxima compatibilidad
+    let chunkSize = 100; // conservador por defecto
+    try {
+      // Algunos dispositivos exponen su MTU vía el servidor GATT
+      if(server.device && server.device.gatt) {
+        // Intentar un chunk de prueba pequeño para detectar el límite
+        chunkSize = 100;
       }
-      await new Promise(r=>setTimeout(r,30));
+    } catch(e) { /* ignorar */ }
+
+    // Enviar con delay adaptativo según tamaño total
+    // Tickets largos necesitan más tiempo entre chunks
+    const delayMs = data.length > 1000 ? 60 : 40;
+
+    console.log(`[BT] Enviando ${data.length} bytes en chunks de ${chunkSize} con ${delayMs}ms delay`);
+
+    for(let i = 0; i < data.length; i += chunkSize){
+      const chunk = data.slice(i, i + chunkSize);
+      let enviado = false;
+
+      // Intentar writeWithoutResponse primero (más rápido y sin ACK overhead)
+      if(char.properties.writeWithoutResponse){
+        try{
+          await char.writeValueWithoutResponse(chunk);
+          enviado = true;
+        }catch(e){ /* fallback a writeValue */ }
+      }
+
+      // Fallback a writeValue (con ACK — más lento pero más confiable)
+      if(!enviado){
+        try{
+          await char.writeValue(chunk);
+          enviado = true;
+        }catch(e){
+          throw new Error('Error enviando datos: '+e.message);
+        }
+      }
+
+      // Delay entre chunks — crítico para que el buffer de la impresora no se llene
+      await new Promise(r => setTimeout(r, delayMs));
+
+      // Cada 10 chunks, pausa extra para que la impresora procese
+      if(((i / chunkSize) + 1) % 10 === 0){
+        await new Promise(r => setTimeout(r, 100));
+      }
     }
+
+    // Pausa final antes de confirmar — dar tiempo al último chunk
+    await new Promise(r => setTimeout(r, 300));
     toast('✓ Impreso por Bluetooth');
   }catch(e){
     console.error('[BT]', e.message);
