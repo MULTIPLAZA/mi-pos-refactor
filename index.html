@@ -2730,8 +2730,8 @@
 
   <!-- Barra tipo pedido móvil -->
   <div class="mob-tipo-bar">
-    <button class="mob-tipo-btn sel" id="mobTipoBtnLocal"    onclick="onBtnLocal()">Local</button>
-    <button class="mob-tipo-btn"     id="mobTipoBtnLlevar"   onclick="setTipoPedido('llevar')">Para llevar</button>
+    <button class="mob-tipo-btn" id="mobTipoBtnLocal"    onclick="onBtnLocal()">Local</button>
+    <button class="mob-tipo-btn sel" id="mobTipoBtnLlevar"   onclick="setTipoPedido('llevar')">Para llevar</button>
     <button class="mob-tipo-btn"     id="mobTipoBtnDelivery" onclick="setTipoPedido('delivery')">Delivery</button>
   </div>
   <!-- Barra delivery móvil — solo visible en celular al seleccionar Delivery -->
@@ -2770,8 +2770,8 @@
       <div class="tab-ticket-header">
         <div class="tab-ticket-nro">Nro. Ticket: <span id="tabTicketNro">#—</span></div>
         <div class="tab-tipo-btns">
-          <button class="tab-tipo-btn sel" id="tipoBtnLocal" onclick="onBtnLocal()">Local</button>
-          <button class="tab-tipo-btn" id="tipoBtnLlevar" onclick="setTipoPedido('llevar')">Llevar</button>
+          <button class="tab-tipo-btn" id="tipoBtnLocal" onclick="onBtnLocal()">Local</button>
+          <button class="tab-tipo-btn sel" id="tipoBtnLlevar" onclick="setTipoPedido('llevar')">Llevar</button>
           <button class="tab-tipo-btn" id="tipoBtnDelivery" onclick="setTipoPedido('delivery')">Delivery</button>
         </div>
       </div>
@@ -3504,7 +3504,8 @@ function imprimirComandaPreCobro(){
     items:     cart,
     fecha:     d,
     nroTicket: nroTicket || ticketCounter,
-    tipoPedido: tipoPedido||'local',
+    tipoPedido: tipoPedido||'llevar',
+    mesa:      mesaActual ? mesaActual.nombre : null,
     factura:   null
   });
 }
@@ -3541,8 +3542,8 @@ function vaciarTicket(){
   cart = [];
   currentTicketNro = null;
   mesaActual = null;
-  tipoPedido = 'local';
-  setTipoPedido('local');
+  tipoPedido = 'llevar';
+  setTipoPedido('llevar');
   updTabTicketHeader();
   updMesaBtn();
   var dBar = document.getElementById('tabDeliveryBar');
@@ -3555,7 +3556,7 @@ function vaciarTicket(){
 
 // ── GUARDAR / TICKETS PENDIENTES ────────────────────────────────────────────
 let ticketCounter = 1;   // autonumérico creciente
-let tipoPedido = 'local'; // 'local' | 'llevar' | 'delivery'
+let tipoPedido = 'llevar'; // 'local' | 'llevar' | 'delivery'
 let pendientes = [];     // [{nro, obs, cart, total, fecha}]
 let currentTicketNro = null; // nro del ticket cargado actualmente (null = nuevo)
 
@@ -4134,7 +4135,8 @@ function confirmarPago(){
     efectivo: efectivoEntregado,
     vuelto: document.getElementById('vueltoRow').classList.contains('show') ? vuelto : '',
     nroTicket,
-    tipoPedido: tipoPedido||'local',
+    tipoPedido: tipoPedido||'llevar',
+    mesa: mesaActual ? mesaActual.nombre : null,
     fecha: new Date(),
     factura: facturaData
   });
@@ -5205,15 +5207,21 @@ function generarHTMLComanda(data, size){
 
   let lineas = '';
 
-  lineas += '<p class="c b">Orden #: '+String(data.nroTicket||0)+'</p>';
-  lineas += '<p class="c s">Fecha: '+fecha+'</p>';
-  lineas += '<p class="c l">'+hora+'</p>';
-  lineas += '<p class="c s">TICKET: #'+String(data.nroTicket||0).padStart(4,'0')+'</p>';
+  // Mesa: mostrar MUY GRANDE si aplica
+  if(data.mesa){
+    lineas += '<p class="hr"></p>';
+    lineas += '<p class="c" style="font-size:28px;font-weight:900;letter-spacing:2px;margin:4px 0;">'+data.mesa.toUpperCase()+'</p>';
+    lineas += '<p class="hr"></p>';
+  }
+  lineas += '<p class="c b">Orden #: '+String(data.nroTicket||0).padStart(4,'0')+'</p>';
+  lineas += '<p class="c s">'+fecha+' '+hora+'</p>';
   if(data.tipoPedido && data.tipoPedido!=='local'){
     const tipos={'llevar':'PARA LLEVAR','delivery':'DELIVERY'};
-    lineas += '<p class="c b" style="font-size:14px;border:1px solid #000;padding:2px 0;margin:2px 0">'+( tipos[data.tipoPedido]||data.tipoPedido.toUpperCase())+'</p>';
+    lineas += '<p class="c b" style="font-size:13px;border:1px solid #000;padding:2px 0;margin:2px 0">'+(tipos[data.tipoPedido]||data.tipoPedido.toUpperCase())+'</p>';
   }
-  lineas += '<p class="c s">CLIENTE: '+(data.factura?.nombre||'SIN NOMBRE')+'</p>';
+  if(data.factura && data.factura.nombre){
+    lineas += '<p class="c s">CLIENTE: '+data.factura.nombre+'</p>';
+  }
   lineas += '<p class="hr"></p>';
 
   lineas += '<p class="row s"><span class="l1">Canc.</span><span class="l2">Descripcion</span></p>';
