@@ -3058,54 +3058,277 @@
 
 <div class="toast" id="toast"></div>
 
-<script type="module">
-// ── IMPORTS ──────────────────────────────────────────────────
-import { gs, toast, goTo } from './ui.js';
-import {
-  cart, curCat, showTkt, npCtx, npVal, ticketDescuento,
-  ticketCounter, tipoPedido, pendientes, currentTicketNro,
-  divPagos, divNpIdx, PAY_METHODS,
-  setCart, setNpCtx, setNpVal, setShowTkt,
-  addCart, chgQty, calcItemTotal, calcSubtotal, calcTotalDescuentos,
-  calcTotal, calcDescuentoMonto, vaciarTicket,
-  setTipoPedido, quitarItemDelivery, agregarMontoDelivery,
-  guardarPendientesLocal, updTabTicketHeader, onBtnGuardar,
-  goGuardar, doGuardar, goPendientes, renderPendientes,
-  cargarTicket, nuevaVenta, updBtnGuardar,
-  goDividir, divChgCount, renderDivList, updDivRestante,
-  divRemove, divCobrar, dividirHecho,
-  openDivMethodSheet, pickDivMethod, openDivNumpad, openDivNPComp,
-} from './ventas.js';
-
-// Exponer al scope global para los onclick del HTML
-// (necesario mientras el HTML use onclick="función()")
-Object.assign(window, {
-  gs, toast, goTo,
-  addCart, chgQty, calcTotal, calcSubtotal, calcDescuentoMonto,
-  vaciarTicket, setTipoPedido, quitarItemDelivery, agregarMontoDelivery,
-  updTabTicketHeader, onBtnGuardar: (...a) => onBtnGuardar(...a, mesaActual, guardarConMesa, goGuardar, () => goPendientes(renderPendientes)),
-  goGuardar, doGuardar: () => doGuardar(updUI, updBtnGuardar),
-  goPendientes: () => goPendientes(renderPendientes),
-  renderPendientes,
-  cargarTicket: (i) => cargarTicket(i, updUI, updBtnGuardar),
-  nuevaVenta: () => nuevaVenta(updUI, updBtnGuardar, updMesaBtn),
-  updBtnGuardar,
-  goDividir, divChgCount, renderDivList, updDivRestante,
-  divRemove, divCobrar,
-  dividirHecho: () => dividirHecho(confirmarPago),
-  openDivMethodSheet, pickDivMethod, openDivNumpad, openDivNPComp,
-  // UI functions defined later in this file
-  updUI: (...a) => updUI(...a),
-  toggleTicket: () => toggleTicket(),
-  renderTkt: () => renderTkt(),
-});
-// ─────────────────────────────────────────────────────────────
+<script>
 
 const PRODS = [
   // El ítem libre siempre existe (id:99) — no se guarda en Supabase
   {id:99,name:'ÍTEM LIBRE',price:0,color:'#546e7a',cat:'Otros',
    precioVariable:true,itemLibre:true,iva:'10',colorPropio:false},
 ]
+
+// ── ESTADO GLOBAL ────────────────────────────────────────────
+let cart=[], curCat='Todos los artículos', showTkt=false, npCtx='', npVal='';
+let ticketDescuento=0;
+let ticketCounter = parseInt(localStorage.getItem('pos_ticket_counter')||'1');
+let tipoPedido = 'llevar';
+let pendientes = [];
+let currentTicketNro = null;
+let divPagos = [];
+let divNpIdx = -1;
+const PAY_METHODS = ['Efectivo','POS','Transferencia'];
+let divMethodIdx = -1;
+
+// ── UTILIDADES ───────────────────────────────────────────────
+function gs(n){ return '₲'+Math.round(n||0).toLocaleString('es-PY'); }
+let _tt;
+function toast(m){
+  const t=document.getElementById('toast');
+  if(!t) return;
+  t.textContent=m; t.classList.add('show');
+  clearTimeout(_tt); _tt=setTimeout(()=>t.classList.remove('show'),1800);
+}
+function goTo(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(id==='scConfig') setTimeout(()=>renderConfigInfo?.(),50);
+  if(id==='scConfigGeneral') setTimeout(()=>renderGeneralInfo?.(),50);
+  if(id==='scDescuentos') setTimeout(()=>renderDescList?.(),50);
+  if(id==='scArticulosList') setTimeout(()=>renderArtList?.(),50);
+}
+
+// ── CARRITO ──────────────────────────────────────────────────
+function addCart(id, tileEl){
+  const p=PRODS.find(x=>x.id===id); if(!p)return;
+  if(p.precioVariable){ addCartConPrecioVariable(id); return; }
+  const existing = cart.find(l=>l.id===id && !l.obs);
+  if(existing){ existing.qty++; }
+  else { cart.push({lineId: Date.now()*1000+Math.floor(Math.random()*1000), ...p, qty:1, obs:''}); }
+  updUI(); updBtnGuardar(); toast('+'+p.name.substring(0,16));
+  if(showTkt)renderTkt();
+  if(tileEl) animAddToCart(tileEl, getProductColor(p));
+}
+function chgQty(lineId,d){
+  const idx=cart.findIndex(l=>l.lineId===lineId);
+  if(idx<0)return;
+  if(cart[idx].esDelivery) return;
+  cart[idx].qty+=d;
+  if(cart[idx].qty<=0) cart.splice(idx,1);
+  updUI(); updBtnGuardar(); renderTkt();
+}
+function calcItemTotal(item){
+  if(item.esDescuento) return item.price;
+  const base = item.price * item.qty;
+  if(item.desc && item.desc > 0) return Math.round(base * (1 - item.desc/100));
+  return base;
+}
+function calcSubtotal(){
+  return cart.filter(i=>!i.esDescuento).reduce((s,i)=>s+calcItemTotal(i),0);
+}
+function calcTotalDescuentos(){
+  return cart.filter(i=>i.esDescuento).reduce((s,i)=>s+(i.montoDesc||0),0);
+}
+function calcTotal(){
+  const sub  = calcSubtotal();
+  const desc = calcTotalDescuentos();
+  const conTicketDesc = ticketDescuento>0 ? Math.round(sub*(1-ticketDescuento/100)) : sub;
+  return conTicketDesc - desc;
+}
+function calcDescuentoMonto(){ return calcSubtotal() - calcTotal(); }
+function updUI(){
+  const t=calcTotal(), c=cart.reduce((s,i)=>s+i.qty,0);
+  document.getElementById('sAmt').textContent=gs(t);
+  document.getElementById('sBadge').textContent=c;
+  document.getElementById('ttotal').textContent=gs(t);
+  const tabAmt = document.getElementById('tabCobrarAmt');
+  const tabTotal = document.getElementById('tabTotal');
+  if(tabAmt) tabAmt.textContent=gs(t);
+  if(tabTotal) tabTotal.textContent=gs(t);
+  if(typeof renderTabletTicket==='function') renderTabletTicket();
+  updTabTicketHeader();
+}
+function toggleTicket(){
+  showTkt=!showTkt;
+  document.getElementById('tpanel').classList.toggle('open',showTkt);
+  document.getElementById('prodView').style.display=showTkt?'none':'flex';
+  if(showTkt)renderTkt();
+}
+function renderTkt(){
+  const tl=document.getElementById('tlist');
+  if(!cart.length){tl.innerHTML='<div class="tempty"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg><p>Ticket vacío</p></div>';return;}
+  tl.innerHTML=cart.map(i=>i.esDescuento
+    ? `<div class="titem" style="border-left:2px solid #ef5350;"><div class="tiname" style="color:#ef9a9a;">${i.name}</div><div class="tictrl"><button class="qbtn" onclick="chgQty(${i.lineId},-1)">✕</button></div><div class="tiprice" style="color:#ef5350;">-${gs(i.montoDesc)}</div></div>`
+    : `<div class="titem"><div class="tiname">${i.name}${i.obs?'<div style="font-size:11px;color:#888;font-weight:400;text-transform:none;margin-top:2px;">'+i.obs+'</div>':''}</div><div class="tictrl"><button class="qbtn" onclick="chgQty(${i.lineId},-1)">−</button><span class="qnum">${i.qty}</span><button class="qbtn" onclick="chgQty(${i.lineId},1)">+</button></div><div class="tiprice">${gs(i.price*i.qty)}</div></div>`
+  ).join('');
+}
+
+// ── TICKETS PENDIENTES ───────────────────────────────────────
+function guardarPendientesLocal(){
+  try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){}
+}
+function updTabTicketHeader(){
+  updMesaBtn?.();
+  const nro = currentTicketNro !== null
+    ? String(currentTicketNro).padStart(4,'0')
+    : String(ticketCounter).padStart(4,'0');
+  const nroEl = document.getElementById('tabTicketNro');
+  if(nroEl) nroEl.textContent = '#' + nro + (typeof mesaActual!=='undefined' && mesaActual ? '  '+mesaActual.nombre : '');
+  const mobNroEl = document.getElementById('mobTicketNro');
+  if(mobNroEl) mobNroEl.textContent = '#' + nro;
+}
+function onBtnGuardar(){
+  if(typeof mesaActual!=='undefined' && mesaActual){ guardarConMesa(); return; }
+  if(calcTotal() > 0){ goGuardar(); }
+  else if(pendientes.length > 0){ goPendientes(); }
+  else { toast('Agregá productos primero'); }
+}
+function goGuardar(){
+  const total = calcTotal();
+  if(total === 0){ toast('Agregá productos primero'); return; }
+  const nro = currentTicketNro !== null ? String(currentTicketNro).padStart(4,'0') : String(ticketCounter).padStart(4,'0');
+  document.getElementById('guardNro').textContent = '#' + nro;
+  const existente = currentTicketNro !== null ? pendientes.find(t => t.nro === currentTicketNro) : null;
+  document.getElementById('guardObs').value = existente ? existente.obs : '';
+  document.getElementById('guardItemsList').innerHTML = cart.map(i =>
+    `<div class="guard-item-row"><span class="gin">${i.qty}× ${i.name}${i.obs?' <span style="color:#777;font-weight:400;font-size:11px;">('+i.obs+')</span>':''}</span><span class="gip">${gs(i.price*i.qty)}</span></div>`
+  ).join('');
+  goTo('scGuardar');
+  setTimeout(()=>document.getElementById('guardObs').focus(),300);
+}
+function doGuardar(){
+  const obs = document.getElementById('guardObs').value.trim();
+  if(currentTicketNro !== null){
+    const idx = pendientes.findIndex(t => t.nro === currentTicketNro);
+    if(idx >= 0){ pendientes[idx].cart=JSON.parse(JSON.stringify(cart)); pendientes[idx].total=calcTotal(); pendientes[idx].obs=obs||pendientes[idx].obs; pendientes[idx].fecha=new Date().toISOString(); }
+    const nro = currentTicketNro;
+    currentTicketNro = null; cart = []; updUI(); updBtnGuardar(); guardarPendientesLocal();
+    goTo('scSale'); toast('✓ Ticket #'+String(nro).padStart(4,'0')+' actualizado');
+  } else {
+    const nro = ticketCounter++; localStorage.setItem('pos_ticket_counter', ticketCounter);
+    pendientes.push({nro, obs:obs||'', cart:JSON.parse(JSON.stringify(cart)), total:calcTotal(), fecha:new Date().toISOString(), esPresupuesto:false});
+    currentTicketNro = null; cart = []; updUI(); updBtnGuardar(); guardarPendientesLocal();
+    goTo('scSale'); toast('✓ Ticket #'+String(nro).padStart(4,'0')+' guardado');
+  }
+}
+function goPendientes(){ renderPendientes(); goTo('scPendientes'); }
+function renderPendientes(){
+  const list = document.getElementById('pendList');
+  if(!pendientes.length){
+    list.innerHTML=`<div class="pend-empty"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg><p>No hay tickets pendientes</p></div>`;
+    return;
+  }
+  list.innerHTML = pendientes.map((t,i) => `
+    <div class="pend-item" style="display:flex;align-items:center;gap:0;">
+      <div style="flex:1;display:flex;align-items:center;gap:10px;padding:14px 0 14px 14px;cursor:pointer;" onclick="cargarTicket(${i})">
+        <div class="pend-item-num">#${String(t.nro).padStart(4,'0')}</div>
+        <div class="pend-item-info"><div class="pend-item-title">Ticket #${String(t.nro).padStart(4,'0')}${t.esPresupuesto?' 📋':''}</div><div class="pend-item-obs">${t.obs||'Sin observación'} · ${t.cart.reduce((s,i)=>s+i.qty,0)} art.</div></div>
+        <div class="pend-item-total">${gs(t.total)}</div>
+      </div>
+      <button onclick="event.stopPropagation();imprimirTicketPendiente(${i})" title="Imprimir" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:14px 12px;display:flex;align-items:center;flex-shrink:0;border-left:1px solid var(--border);">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      </button>
+    </div>`).join('');
+}
+function cargarTicket(i){
+  const t = pendientes[i];
+  const totalActual = calcTotal();
+  if(totalActual > 0){
+    if(currentTicketNro !== null){
+      const idx = pendientes.findIndex(p=>p.nro===currentTicketNro);
+      if(idx>=0){ pendientes[idx].cart=JSON.parse(JSON.stringify(cart)); pendientes[idx].total=totalActual; pendientes[idx].fecha=new Date(); }
+    } else {
+      pendientes.push({nro:ticketCounter,obs:'Auto-guardado',cart:JSON.parse(JSON.stringify(cart)),total:totalActual,fecha:new Date(),esPresupuesto:false});
+      ticketCounter++;
+    }
+  }
+  cart=JSON.parse(JSON.stringify(t.cart)); currentTicketNro=t.nro;
+  updUI(); updBtnGuardar(); goTo('scSale');
+  toast('Ticket #'+String(t.nro).padStart(4,'0')+' cargado');
+}
+function nuevaVenta(){
+  guardarPendientesLocal();
+  const totalActual = calcTotal();
+  if(totalActual > 0){
+    pendientes.push({nro:ticketCounter,obs:'Auto-guardado',cart:JSON.parse(JSON.stringify(cart)),total:totalActual,fecha:new Date(),esPresupuesto:false});
+    ticketCounter++; localStorage.setItem('pos_ticket_counter', ticketCounter);
+  }
+  cart=[]; currentTicketNro=null; mesaActual=null;
+  updUI(); updBtnGuardar(); updMesaBtn?.(); goTo('scSale');
+}
+function updBtnGuardar(){
+  const n=pendientes.length, tieneProductos=calcTotal()>0;
+  const badge=document.getElementById('pendingBadge'), txt=document.getElementById('btnGuardarTxt'), icon=document.getElementById('btnGuardarIcon');
+  const tabBadge=document.getElementById('tabPendingBadge'), tabTxt=document.getElementById('tabBtnTxt');
+  if(tieneProductos){
+    txt.textContent='GUARDAR'; if(tabTxt)tabTxt.textContent='GUARDAR';
+    icon.innerHTML='<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>';
+    if(n>0){ badge.textContent=n>9?'9+':n; badge.classList.add('show'); if(tabBadge){tabBadge.textContent=badge.textContent;tabBadge.style.display='flex';} }
+    else { badge.classList.remove('show'); if(tabBadge)tabBadge.style.display='none'; }
+  } else if(n>0){
+    badge.textContent=n>9?'9+':n; badge.classList.add('show');
+    txt.textContent='PENDIENTES'; icon.innerHTML='<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>';
+    if(tabBadge){tabBadge.textContent=badge.textContent;tabBadge.style.display='flex';} if(tabTxt)tabTxt.textContent='PENDIENTES';
+  } else {
+    badge.classList.remove('show'); txt.textContent='GUARDAR';
+    icon.innerHTML='<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>';
+    if(tabBadge)tabBadge.style.display='none'; if(tabTxt)tabTxt.textContent='GUARDAR';
+  }
+}
+
+// ── TIPO DE PEDIDO ───────────────────────────────────────────
+function setTipoPedido(tipo){
+  tipoPedido=tipo;
+  ['local','llevar','delivery'].forEach(t=>{
+    const b=document.getElementById('tipoBtn'+t.charAt(0).toUpperCase()+t.slice(1)); if(b)b.classList.toggle('sel',t===tipo);
+    const mb=document.getElementById('mobTipoBtn'+t.charAt(0).toUpperCase()+t.slice(1)); if(mb)mb.classList.toggle('sel',t===tipo);
+  });
+  const bar=document.getElementById('tabDeliveryBar'); if(bar)bar.classList.toggle('visible',tipo==='delivery');
+  const mobBar=document.getElementById('mobDeliveryBar'); if(mobBar)mobBar.style.display=tipo==='delivery'?'flex':'none';
+  if(tipo!=='delivery') quitarItemDelivery();
+}
+function quitarItemDelivery(){
+  const idx=cart.findIndex(i=>i.esDelivery); if(idx>=0){cart.splice(idx,1); updUI(); updBtnGuardar();}
+}
+function agregarMontoDelivery(){
+  const inp=document.getElementById('tabDeliveryMonto');
+  const monto=parseInt((inp||{}).value||0)||0;
+  if(!monto||monto<=0){toast('Ingresá el monto del envío');inp&&inp.focus();return;}
+  quitarItemDelivery();
+  cart.push({lineId:Date.now()*1000+999,id:'delivery_item',name:'Envío delivery',price:monto,qty:1,obs:'',iva:'10',esDelivery:true,color:'#e65100',colorPropio:true});
+  updUI(); updBtnGuardar(); toast('✓ Envío ₲'+monto.toLocaleString('es-PY')+' agregado'); if(inp)inp.value='';
+}
+function vaciarTicket(){
+  if(!cart.length) return;
+  cart=[]; ticketDescuento=0; currentTicketNro=null; mesaActual=null; tipoPedido='llevar';
+  setTipoPedido('llevar'); updTabTicketHeader(); updMesaBtn?.();
+  const dBar=document.getElementById('tabDeliveryBar'); if(dBar)dBar.classList.remove('visible');
+  updUI(); updBtnGuardar(); goTo('scSale'); toast('Ticket vaciado');
+}
+
+// ── PAGO DIVIDIDO ────────────────────────────────────────────
+function goDividir(){ const total=calcTotal(); if(!total){toast('Agregá productos primero');return;} divPagos=[]; divChgCount(0,2); goTo('scDividir'); }
+function divChgCount(delta,forceN){
+  const total=calcTotal(); let n=forceN!==undefined?forceN:(divPagos.length+delta); if(n<1)n=1; if(n>6)n=6;
+  while(divPagos.length<n){const base=Math.floor(total/n);divPagos.push({metodo:'Efectivo',monto:base,comprobante:'',cobrado:false});}
+  while(divPagos.length>n)divPagos.pop();
+  const base=Math.floor(total/n),resto=total-base*n;
+  divPagos.forEach((p,i)=>{if(!p.cobrado){p.monto=base+(i===0?resto:0);}});
+  document.getElementById('divCount').textContent=n; document.getElementById('divMinus').disabled=(n<=1); renderDivList(); updDivRestante();
+}
+function renderDivList(){
+  const container=document.getElementById('divList');
+  container.innerHTML=divPagos.map((p,i)=>{
+    const needsComp=p.metodo==='POS'||p.metodo==='Transferencia';
+    return `<div class="div-pago-item" id="divItem${i}"><div class="div-pago-row1"><button class="div-trash" onclick="divRemove(${i})"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button><div class="div-method-sel" onclick="openDivMethodSheet(${i})"><span>${p.metodo}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></div></div><div class="div-pago-row2"><input class="div-monto" id="divMonto${i}" type="text" readonly value="${gs(p.monto)}" onclick="openDivNumpad(${i})" ${p.cobrado?'disabled style="opacity:.5"':''}><button class="div-cobrar-btn ${p.cobrado?'cobrado':''}" onclick="${p.cobrado?'':'divCobrar('+i+')'}" ${p.cobrado?'disabled':''}>${p.cobrado?'✓ COBRADO':'COBRAR'}</button></div><div class="div-comp ${needsComp?'open':''}" id="divComp${i}"><label>Nro. Comprobante / Observación</label><div class="efec-row" style="margin-top:4px;${p.cobrado?'opacity:.5;pointer-events:none':''}" onclick="openDivNPComp(${i})"><span class="efec-val" id="divCompDisp${i}" style="font-size:16px;color:${p.comprobante?'#fff':'#666'}">${p.comprobante||'—'}</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#777" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div></div></div>`;
+  }).join('');
+}
+function updDivRestante(){ const total=calcTotal(),cobrado=divPagos.filter(p=>p.cobrado).reduce((s,p)=>s+p.monto,0),restante=total-cobrado; document.getElementById('divRestante').textContent=restante<=0?'Pagado ✓':'Restante '+gs(restante); }
+function divRemove(i){ if(divPagos.length<=1){toast('Mínimo 1 pago');return;} if(divPagos[i].cobrado){toast('Ya fue cobrado');return;} divPagos.splice(i,1); document.getElementById('divCount').textContent=divPagos.length; document.getElementById('divMinus').disabled=(divPagos.length<=1); renderDivList(); updDivRestante(); }
+function divCobrar(i){ const p=divPagos[i]; if(p.monto<=0){toast('El monto debe ser mayor a 0');return;} p.cobrado=true; renderDivList(); updDivRestante(); toast('✓ Pago cobrado'); if(divPagos.every(p=>p.cobrado))toast('✓ Todos los pagos cobrados — presioná HECHO'); }
+function dividirHecho(){ if(!divPagos.every(p=>p.cobrado)){toast('Faltan cobrar algunos pagos');return;} confirmarPago(); }
+function openDivMethodSheet(i){ divMethodIdx=i; const sheet=document.getElementById('catSheetContent'); sheet.innerHTML=PAY_METHODS.map(m=>`<div class="cat-item ${divPagos[i].metodo===m?'sel':''}" onclick="pickDivMethod(this)">${m}</div>`).join(''); document.getElementById('catOv').classList.add('open'); }
+function pickDivMethod(el){ if(divMethodIdx<0)return; const m=typeof el==='string'?el:el.textContent.trim(); divPagos[divMethodIdx].metodo=m; divPagos[divMethodIdx].comprobante=''; document.getElementById('catOv').classList.remove('open'); renderDivList(); }
+function openDivNumpad(i){ if(divPagos[i].cobrado)return; divNpIdx=i; npCtx='div'; npVal=String(divPagos[i].monto); document.getElementById('npLbl').textContent='Monto pago '+(i+1); document.getElementById('npDisp').textContent=gs(divPagos[i].monto); document.getElementById('billetesRow').classList.remove('show'); document.getElementById('npOverlay').classList.add('open'); }
+function openDivNPComp(i){ if(divPagos[i].cobrado)return; divNpIdx=i; npCtx='divComp'; npVal=divPagos[i].comprobante||''; document.getElementById('npLbl').textContent='Nro. Comprobante - Pago '+(i+1); document.getElementById('npDisp').textContent=npVal||'—'; document.getElementById('billetesRow').classList.remove('show'); document.getElementById('npOverlay').classList.add('open'); }
 async function doOpenShift(){
   const v = parseInt(document.getElementById('shiftDisp').textContent.replace(/[₲.,]/g,''))||0;
 
@@ -3256,35 +3479,6 @@ function toggleSearch(){
   else{document.getElementById('sinput').value='';filterP();}
 }
 
-// Funciones de carrito y ventas → ventas.js
-
-// ── FUNCIONES UI DEL POS (dependen del DOM, se quedan aquí) ─────────────────
-function updUI(){
-  const t=calcTotal(), c=cart.reduce((s,i)=>s+i.qty,0);
-  document.getElementById('sAmt').textContent=gs(t);
-  document.getElementById('sBadge').textContent=c;
-  document.getElementById('ttotal').textContent=gs(t);
-  const tabAmt = document.getElementById('tabCobrarAmt');
-  const tabTotal = document.getElementById('tabTotal');
-  if(tabAmt) tabAmt.textContent=gs(t);
-  if(tabTotal) tabTotal.textContent=gs(t);
-  if(typeof renderTabletTicket==='function') renderTabletTicket();
-  updTabTicketHeader(typeof mesaActual!=='undefined'?mesaActual:null);
-}
-function toggleTicket(){
-  showTkt=!showTkt;
-  document.getElementById('tpanel').classList.toggle('open',showTkt);
-  document.getElementById('prodView').style.display=showTkt?'none':'flex';
-  if(showTkt)renderTkt();
-}
-function renderTkt(){
-  const tl=document.getElementById('tlist');
-  if(!cart.length){tl.innerHTML='<div class="tempty"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg><p>Ticket vacío</p></div>';return;}
-  tl.innerHTML=cart.map(i=>i.esDescuento
-    ? `<div class="titem" style="border-left:2px solid #ef5350;"><div class="tiname" style="color:#ef9a9a;">${i.name}</div><div class="tictrl"><button class="qbtn" onclick="chgQty(${i.lineId},-1)">✕</button></div><div class="tiprice" style="color:#ef5350;">-${gs(i.montoDesc)}</div></div>`
-    : `<div class="titem"><div class="tiname">${i.name}${i.obs?'<div style="font-size:11px;color:#888;font-weight:400;text-transform:none;margin-top:2px;">'+i.obs+'</div>':''}</div><div class="tictrl"><button class="qbtn" onclick="chgQty(${i.lineId},-1)">−</button><span class="qnum">${i.qty}</span><button class="qbtn" onclick="chgQty(${i.lineId},1)">+</button></div><div class="tiprice">${gs(i.price*i.qty)}</div></div>`
-  ).join('');
-}
 
 // CONFIRM PAYMENT
 function confirmarPago(){
@@ -7618,7 +7812,6 @@ async function supaUpsertCategoria(cat){
   } catch(e){ console.warn('[Supabase] Error guardando categoría:', e.message); }
 }
 
-// UTILS — gs y toast vienen de ui.js (importados arriba)
 
 // ══════════════════════════════════════════════════════════
 // DEXIE.JS — BASE DE DATOS LOCAL (IndexedDB)
