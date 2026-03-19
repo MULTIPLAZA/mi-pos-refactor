@@ -960,7 +960,7 @@
     margin-left:auto; background:none; border:none; color:#fff;
     font-family:'Barlow',sans-serif; font-size:14px; font-weight:700; letter-spacing:.8px; cursor:pointer; padding:8px;
   }
-  .cbody { flex:1; overflow-y:auto; padding:32px 20px 24px; display:flex; flex-direction:column; background:var(--bg); }
+  .cbody { flex:1; overflow-y:auto; padding:24px 20px 8px; display:flex; flex-direction:column; background:var(--bg); }
   .ctotal { font-size:44px; font-weight:800; text-align:center; letter-spacing:-1px; line-height:1; color:var(--text); }
   .ctotal-lbl { font-size:14px; color:var(--muted); text-align:center; margin-top:6px; margin-bottom:32px; }
   .efec-sec { margin-bottom:28px; }
@@ -1094,11 +1094,12 @@
 
   /* CONFIRM PAYMENT BUTTON */
   .cobrar-footer {
-    padding:16px 20px;
+    padding:12px 20px 20px;
     background:var(--bg);
     border-top:1px solid var(--border);
     flex-shrink:0;
   }
+  #scCobrar { display:flex; flex-direction:column; }
   .btn-confirmar {
     width:100%; background:var(--green); border:none; border-radius:6px;
     color:#fff; font-family:'Barlow',sans-serif; font-size:15px; font-weight:800;
@@ -5426,6 +5427,18 @@ function npOK(){
     cerrarNpTexto();
     document.getElementById('npOverlay').classList.remove('open');
     return;
+  } else if(npCtx==='ruc'){
+    const elRuc = document.getElementById('factRuc');
+    if(elRuc){
+      elRuc.value = npVal;
+      document.getElementById('npOverlay').classList.remove('open');
+      if(npVal.replace(/-/g,'').length >= 5){
+        setTimeout(consultarRuc, 200);
+      }
+    } else {
+      document.getElementById('npOverlay').classList.remove('open');
+    }
+    return;
   } else if(npCtx==='comprobante'){
     const display = document.getElementById('compDisplay');
     display.textContent = npVal || '—';
@@ -9621,6 +9634,10 @@ function abrirFormSalon(salonId){
   const s = salonId ? mesasSalones.find(x => x.id === salonId) : null;
   mesaColorSel = s ? s.color : '#1565c0';
   const mc = document.getElementById('mesasModalContent');
+  const coloresHTML = MESA_COLORES.map(c =>
+    '<div class="mesas-color-swatch'+(c===mesaColorSel?' sel':'')+
+    '" style="background:'+c+'" onclick="selMesaColor(this)" data-color="'+c+'"></div>'
+  ).join('');
   mc.innerHTML =
     '<div class="mesas-modal-title">'+(s?'Editar':'Nuevo')+' Salón</div>'+
     '<div class="mesas-form-row">'+
@@ -9628,14 +9645,17 @@ function abrirFormSalon(salonId){
       '<input class="mesas-form-input" id="formSalonNombre" placeholder="Ej: Terraza, Salón Principal" value="'+(s?s.nombre:'')+'" maxlength="40">'+
     '</div>'+
     '<div class="mesas-form-row">'+
-      '<label class="mesas-form-label">Color</label>'+
-      '<div class="mesas-color-row" id="mesasColorRow">'+
-      MESA_COLORES.map(c =>
-        '<div class="mesas-color-swatch'+(c===mesaColorSel?' sel':'')+'" style="background:'+c+'" onclick="selMesaColor(this)" data-color="'+c+'"></div>'
-      ).join('')+
-      '</div>'+
+      '<label class="mesas-form-label">Color del salón</label>'+
+      '<div class="mesas-color-row" id="mesasColorRow">'+coloresHTML+'</div>'+
     '</div>'+
-    '<button class="mesas-btn-primary" onclick="guardarSalon('+(salonId||'null')+')">'+
+    (!s ?
+      '<div class="mesas-form-row">'+
+        '<label class="mesas-form-label">Cantidad de mesas a crear</label>'+
+        '<input class="mesas-form-input" id="formSalonCantMesas" type="number" min="0" max="50" value="4" placeholder="Ej: 6">'+
+        '<div style="font-size:11px;color:var(--muted);margin-top:3px;">Se crearán automáticamente: Mesa 1, Mesa 2...</div>'+
+      '</div>'
+    : '')+
+    '<button class="mesas-btn-primary" style="margin-top:12px;" onclick="guardarSalon('+(salonId||'null')+')">'+
       (s ? 'Guardar cambios' : 'Crear Salón')+'</button>'+
     '<button class="mesas-btn-sm" style="width:100%;margin-top:8px;padding:12px;" onclick="abrirGestionMesas()">← Volver</button>';
 }
@@ -9648,29 +9668,75 @@ function selMesaColor(el){
 
 async function guardarSalon(salonId){
   const nombre = document.getElementById('formSalonNombre').value.trim();
-  if(!nombre){ toast('Ingresá un nombre'); return; }
-  const licId = parseInt(localStorage.getItem('ali'))||null;
+  if(!nombre){ toast('Ingresá el nombre del salón'); return; }
+
+  // Obtener licId — intentar varias fuentes
+  let licId = parseInt(localStorage.getItem('ali'))||null;
+  if(!licId){
+    // Intentar recuperar desde Supabase por email
+    const email = localStorage.getItem('lic_email');
+    if(email && !USAR_DEMO){
+      try{
+        const lr = await fetch(SUPA_URL+'/rest/v1/licencias?email_cliente=ilike.'+encodeURIComponent(email)+'&activa=eq.true&select=id&limit=1',
+          {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
+        const ld = await lr.json();
+        if(ld&&ld[0]){ licId=ld[0].id; localStorage.setItem('ali',String(licId)); }
+      }catch(e){}
+    }
+  }
+  if(!licId){ toast('Error: sin licencia configurada'); return; }
+
   const sucId = parseInt(localStorage.getItem('pos_sucursal_id'))||null;
-  if(!licId) return;
+  const cantEl = document.getElementById('formSalonCantMesas');
+  const cantMesas = cantEl ? (parseInt(cantEl.value)||0) : 0;
+
   try{
     if(salonId){
-      await fetch(SUPA_URL+'/rest/v1/pos_salones?id=eq.'+salonId,{
+      // Solo editar nombre y color
+      const r = await fetch(SUPA_URL+'/rest/v1/pos_salones?id=eq.'+salonId,{
         method:'PATCH',
         headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
         body:JSON.stringify({nombre, color:mesaColorSel})
       });
+      if(!r.ok){ const t=await r.text(); throw new Error(t); }
     } else {
-      await fetch(SUPA_URL+'/rest/v1/pos_salones',{
+      // Crear salón y obtener su id
+      const r = await fetch(SUPA_URL+'/rest/v1/pos_salones',{
         method:'POST',
-        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
+        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=representation'},
         body:JSON.stringify({licencia_id:licId, sucursal_id:sucId, nombre, color:mesaColorSel})
       });
+      if(!r.ok){ const t=await r.text(); throw new Error(t); }
+      const data = await r.json();
+      const nuevoSalonId = Array.isArray(data) ? data[0].id : data.id;
+
+      // Crear mesas automáticamente si cantMesas > 0
+      if(cantMesas > 0 && nuevoSalonId){
+        const mesasPayload = [];
+        for(let i=1; i<=cantMesas; i++){
+          mesasPayload.push({
+            salon_id:    nuevoSalonId,
+            licencia_id: licId,
+            sucursal_id: sucId,
+            nombre:      'Mesa '+i,
+            capacidad:   4,
+          });
+        }
+        const rm = await fetch(SUPA_URL+'/rest/v1/pos_mesas',{
+          method:'POST',
+          headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:JSON.stringify(mesasPayload)
+        });
+        if(!rm.ok){ console.warn('[Mesas] Error creando mesas:', await rm.text()); }
+      }
     }
     await mesasCargar();
     if(!mesaSalonSel && mesasSalones.length) mesaSalonSel = mesasSalones[0].id;
-    toast('✓ Salón guardado');
+    const msg = salonId ? '✓ Salón actualizado' : '✓ Salón creado'+(cantMesas>0?' con '+cantMesas+' mesas':'');
+    toast(msg);
+    renderMesasScreen();
     abrirGestionMesas();
-  }catch(e){ toast('Error: '+e.message); }
+  }catch(e){ console.error('[Mesas]', e); toast('Error: '+e.message); }
 }
 
 async function eliminarSalon(id){
