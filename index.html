@@ -7457,6 +7457,24 @@ let printers = {
   comanda: { type: null, name: null, device: null, size: '58' },
 };
 
+// Restaurar configuración de impresoras al iniciar
+function restaurarConfigImpresoras(){
+  ['ticket','comanda'].forEach(tipo => {
+    const savedType = localStorage.getItem('printerType_'+tipo);
+    const savedName = localStorage.getItem('printerName_'+tipo);
+    const savedSize = localStorage.getItem('printerSize_'+tipo);
+    if(savedSize) printers[tipo].size = savedSize;
+    if(savedType && savedName){
+      printers[tipo].type = savedType;
+      printers[tipo].name = savedName;
+      // device = null siempre al reabrir (BT no persiste entre sesiones)
+      // Si era BT, mostramos el nombre pero marcamos que necesita reconectar
+      if(savedType === 'bt') printers[tipo].needsReconnect = true;
+      updPrinterUI(tipo);
+    }
+  });
+}
+
 function goToConfig(){
   document.getElementById('cfgNegocio').value   = configData.negocio;
   document.getElementById('cfgDireccion').value = configData.direccion;
@@ -7489,6 +7507,7 @@ function cerrarSesion(){
 
 function selPrinterSize(tipo, size){
   printers[tipo].size = size;
+  localStorage.setItem('printerSize_'+tipo, size);
   document.getElementById(tipo+'Size58').classList.toggle('sel', size==='58');
   document.getElementById(tipo+'Size80').classList.toggle('sel', size==='80');
   toast('Papel '+size+'mm configurado para '+tipo);
@@ -7502,10 +7521,16 @@ function updPrinterUI(tipo){
   const card     = document.getElementById(tipo+'PrinterCard');
   if(p.name){
     nameEl.textContent = p.name;
-    statusEl.textContent = p.type==='bt' ? 'Conectada por Bluetooth' : 'Configurada (PC/USB)';
-    statusEl.className = 'printer-status ok';
+    if(p.type === 'bt' && p.needsReconnect){
+      statusEl.textContent = '⚠️ Reconectar Bluetooth';
+      statusEl.className = 'printer-status off';
+      card.classList.remove('connected');
+    } else {
+      statusEl.textContent = p.type==='bt' ? 'Conectada por Bluetooth' : 'Configurada (PC/USB)';
+      statusEl.className = 'printer-status ok';
+      card.classList.add('connected');
+    }
     discBtn.style.display = 'block';
-    card.classList.add('connected');
   } else {
     nameEl.textContent = 'Sin impresora';
     statusEl.textContent = 'No conectada';
@@ -7547,6 +7572,9 @@ async function conectarBluetooth(tipo){
     printers[tipo].device = device;
     printers[tipo].name   = device.name || 'Impresora BT';
     printers[tipo].type   = 'bt';
+    // Guardar configuración para restaurar al reabrir
+    localStorage.setItem('printerType_'+tipo, 'bt');
+    localStorage.setItem('printerName_'+tipo, printers[tipo].name);
     updPrinterUI(tipo);
     toast('Conectada: ' + printers[tipo].name);
   } catch(e) {
@@ -7560,6 +7588,8 @@ function usarImpresoraPC(tipo){
   printers[tipo].name   = 'Impresora del sistema';
   printers[tipo].type   = 'pc';
   printers[tipo].device = null;
+  localStorage.setItem('printerType_'+tipo, 'pc');
+  localStorage.setItem('printerName_'+tipo, 'Impresora del sistema');
   updPrinterUI(tipo);
   toast('Configurada impresora PC/USB para '+tipo);
 }
@@ -7569,6 +7599,8 @@ function desconectarImpresora(tipo){
     printers[tipo].device.gatt.disconnect();
   }
   printers[tipo] = { type:null, name:null, device:null, size: printers[tipo].size };
+  localStorage.removeItem('printerType_'+tipo);
+  localStorage.removeItem('printerName_'+tipo);
   updPrinterUI(tipo);
   toast('Impresora desconectada');
 }
@@ -7580,15 +7612,30 @@ function imprimirTicketConf(htmlContent, tipo){
   const widthPx = size==='58' ? '200px' : '280px';
 
   if(p && p.type === 'bt' && p.device){
-    // Bluetooth ESC/POS — enviar comandos
+    // Bluetooth ESC/POS conectado — enviar comandos
     imprimirBluetooth(p.device, htmlContent, size);
+  } else if(p && p.type === 'bt' && p.needsReconnect){
+    // Era BT pero se cerró la app — pedir reconectar
+    toast('⚠️ Reconectá la impresora Bluetooth primero');
+    goTo('scConfigImpresoras');
   } else {
-    // PC/USB o fallback — window.print()
-    const css = 'body{font-family:"Courier New",monospace;font-size:11px;width:'+widthPx+';margin:0;padding:8px;}@media print{body{padding:0;}}';
-    const w = window.open('','_blank','width=400,height=600');
-    w.document.write('<!DOCTYPE html><html><head><title>Ticket</title><style>'+css+'<\/style><\/head><body>'+htmlContent+'<\/body><\/html>');
-    w.document.close(); w.focus();
-    setTimeout(function(){ w.print(); w.close(); }, 400);
+    // PC/USB o sin impresora — abrir PDF en nueva pestaña
+    const css = [
+      'body{font-family:"Courier New",monospace;font-size:11px;width:'+widthPx+';margin:0 auto;padding:8px;}',
+      '@media print{body{padding:0;}@page{margin:0;size:'+widthPx+' auto;}}'
+    ].join('');
+    // Usar blob URL para evitar bloqueo de popups y abrir sin nueva ventana
+    const fullHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket</title><style>'+css+'</style></head><body>'+htmlContent+'<script>window.onload=function(){window.print();}<\/script></body></html>';
+    const blob = new Blob([fullHtml], {type:'text/html'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=> URL.revokeObjectURL(url), 10000);
   }
 }
 
@@ -8771,6 +8818,7 @@ async function iniciarApp(){
   if(sucId)    localStorage.setItem('pos_sucursal_id',sucId);
   if(depId)    localStorage.setItem('pos_deposito_id',depId);
   cargarConfigLocal();
+  restaurarConfigImpresoras();
   cargarTimbradoSesion();
 
   // ── PASO 2: Restaurar pendientes ──────────────────────────
