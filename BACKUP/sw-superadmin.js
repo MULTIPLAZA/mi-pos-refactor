@@ -1,5 +1,5 @@
-const CACHE = 'ampersand-admin-v1773947046';
-const ASSETS = ['/admin-negocio.html', '/manifest-admin.json', '/icon.png', '/icon-192.png'];
+const CACHE = 'ampersand-superadmin-v1';
+const ASSETS = ['/super-admin.html', '/manifest-superadmin.json', '/icon.png', '/icon-192.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -41,7 +41,7 @@ self.addEventListener('fetch', e => {
       })
       .catch(() =>
         caches.match(e.request)
-          .then(cached => cached || caches.match('/admin-negocio.html'))
+          .then(cached => cached || caches.match('/super-admin.html'))
       )
   );
 });

@@ -1,4 +1,4 @@
-const CACHE = 'ampersand-superadmin-v1';
+const CACHE = 'ampersand-superadmin-v1773947046';
 const ASSETS = ['/super-admin.html', '/manifest-superadmin.json', '/icon.png', '/icon-192.png'];
 
 self.addEventListener('install', e => {

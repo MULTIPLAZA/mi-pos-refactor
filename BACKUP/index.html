@@ -3058,54 +3058,18 @@
 
 <div class="toast" id="toast"></div>
 
-<script type="module">
-// ── IMPORTS ──────────────────────────────────────────────────
-import { gs, toast, goTo } from './ui.js';
-import {
-  cart, curCat, showTkt, npCtx, npVal, ticketDescuento,
-  ticketCounter, tipoPedido, pendientes, currentTicketNro,
-  divPagos, divNpIdx, PAY_METHODS,
-  setCart, setNpCtx, setNpVal, setShowTkt,
-  addCart, chgQty, calcItemTotal, calcSubtotal, calcTotalDescuentos,
-  calcTotal, calcDescuentoMonto, vaciarTicket,
-  setTipoPedido, quitarItemDelivery, agregarMontoDelivery,
-  guardarPendientesLocal, updTabTicketHeader, onBtnGuardar,
-  goGuardar, doGuardar, goPendientes, renderPendientes,
-  cargarTicket, nuevaVenta, updBtnGuardar,
-  goDividir, divChgCount, renderDivList, updDivRestante,
-  divRemove, divCobrar, dividirHecho,
-  openDivMethodSheet, pickDivMethod, openDivNumpad, openDivNPComp,
-} from './ventas.js';
-
-// Exponer al scope global para los onclick del HTML
-// (necesario mientras el HTML use onclick="función()")
-Object.assign(window, {
-  gs, toast, goTo,
-  addCart, chgQty, calcTotal, calcSubtotal, calcDescuentoMonto,
-  vaciarTicket, setTipoPedido, quitarItemDelivery, agregarMontoDelivery,
-  updTabTicketHeader, onBtnGuardar: (...a) => onBtnGuardar(...a, mesaActual, guardarConMesa, goGuardar, () => goPendientes(renderPendientes)),
-  goGuardar, doGuardar: () => doGuardar(updUI, updBtnGuardar),
-  goPendientes: () => goPendientes(renderPendientes),
-  renderPendientes,
-  cargarTicket: (i) => cargarTicket(i, updUI, updBtnGuardar),
-  nuevaVenta: () => nuevaVenta(updUI, updBtnGuardar, updMesaBtn),
-  updBtnGuardar,
-  goDividir, divChgCount, renderDivList, updDivRestante,
-  divRemove, divCobrar,
-  dividirHecho: () => dividirHecho(confirmarPago),
-  openDivMethodSheet, pickDivMethod, openDivNumpad, openDivNPComp,
-  // UI functions defined later in this file
-  updUI: (...a) => updUI(...a),
-  toggleTicket: () => toggleTicket(),
-  renderTkt: () => renderTkt(),
-});
-// ─────────────────────────────────────────────────────────────
-
+<script>
 const PRODS = [
   // El ítem libre siempre existe (id:99) — no se guarda en Supabase
   {id:99,name:'ÍTEM LIBRE',price:0,color:'#546e7a',cat:'Otros',
    precioVariable:true,itemLibre:true,iva:'10',colorPropio:false},
 ]
+
+let cart=[], curCat='Todos los artículos', showTkt=false, npCtx='', npVal='';
+let ticketDescuento=0; // % descuento en ticket total
+
+// NAV
+function goTo(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); if(id==='scConfig') setTimeout(renderConfigInfo,50); if(id==='scConfigGeneral') setTimeout(renderGeneralInfo,50); if(id==='scDescuentos') setTimeout(renderDescList,50); if(id==='scArticulosList') setTimeout(renderArtList,50); }
 async function doOpenShift(){
   const v = parseInt(document.getElementById('shiftDisp').textContent.replace(/[₲.,]/g,''))||0;
 
@@ -3256,21 +3220,63 @@ function toggleSearch(){
   else{document.getElementById('sinput').value='';filterP();}
 }
 
-// Funciones de carrito y ventas → ventas.js
-
-// ── FUNCIONES UI DEL POS (dependen del DOM, se quedan aquí) ─────────────────
+// CART
+function addCart(id, tileEl){
+  const p=PRODS.find(x=>x.id===id); if(!p)return;
+  // si precio variable, pedir precio primero
+  if(p.precioVariable){ addCartConPrecioVariable(id); return; }
+  const existing = cart.find(l=>l.id===id && !l.obs);
+  if(existing){ existing.qty++; }
+  else { cart.push({lineId: Date.now()*1000+Math.floor(Math.random()*1000), ...p, qty:1, obs:''}); }
+  updUI(); updBtnGuardar(); toast('+'+p.name.substring(0,16));
+  if(showTkt)renderTkt();
+  if(tileEl) animAddToCart(tileEl, getProductColor(p));
+}
+function chgQty(lineId,d){
+  const idx=cart.findIndex(l=>l.lineId===lineId);
+  if(idx<0)return;
+  if(cart[idx].esDelivery) return; // delivery no tiene qty
+  cart[idx].qty+=d;
+  if(cart[idx].qty<=0) cart.splice(idx,1);
+  updUI(); updBtnGuardar(); renderTkt();
+}
+function calcItemTotal(item){
+  if(item.esDescuento) return item.price; // ya es negativo
+  const base = item.price * item.qty;
+  if(item.desc && item.desc > 0) return Math.round(base * (1 - item.desc/100));
+  return base;
+}
+function calcSubtotal(){
+  // Solo ítems normales (sin descuentos)
+  return cart.filter(i=>!i.esDescuento).reduce((s,i)=>s+calcItemTotal(i),0);
+}
+function calcTotalDescuentos(){
+  // Suma de descuentos aplicados (montoDesc positivo)
+  return cart.filter(i=>i.esDescuento).reduce((s,i)=>s+(i.montoDesc||0),0);
+}
+function calcTotal(){
+  const sub  = calcSubtotal();
+  const desc = calcTotalDescuentos();
+  // Aplicar descuento de ticket si hay
+  const conTicketDesc = ticketDescuento>0 ? Math.round(sub*(1-ticketDescuento/100)) : sub;
+  return conTicketDesc - desc;
+}
+function calcDescuentoMonto(){ return calcSubtotal() - calcTotal(); }
 function updUI(){
   const t=calcTotal(), c=cart.reduce((s,i)=>s+i.qty,0);
   document.getElementById('sAmt').textContent=gs(t);
   document.getElementById('sBadge').textContent=c;
   document.getElementById('ttotal').textContent=gs(t);
+  // tablet panel sync
   const tabAmt = document.getElementById('tabCobrarAmt');
   const tabTotal = document.getElementById('tabTotal');
   if(tabAmt) tabAmt.textContent=gs(t);
   if(tabTotal) tabTotal.textContent=gs(t);
-  if(typeof renderTabletTicket==='function') renderTabletTicket();
-  updTabTicketHeader(typeof mesaActual!=='undefined'?mesaActual:null);
+  renderTabletTicket();
+  updTabTicketHeader();
 }
+
+// TICKET
 function toggleTicket(){
   showTkt=!showTkt;
   document.getElementById('tpanel').classList.toggle('open',showTkt);
@@ -3281,9 +3287,766 @@ function renderTkt(){
   const tl=document.getElementById('tlist');
   if(!cart.length){tl.innerHTML='<div class="tempty"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg><p>Ticket vacío</p></div>';return;}
   tl.innerHTML=cart.map(i=>i.esDescuento
-    ? `<div class="titem" style="border-left:2px solid #ef5350;"><div class="tiname" style="color:#ef9a9a;">${i.name}</div><div class="tictrl"><button class="qbtn" onclick="chgQty(${i.lineId},-1)">✕</button></div><div class="tiprice" style="color:#ef5350;">-${gs(i.montoDesc)}</div></div>`
+    ? `<div class="titem" style="border-left:2px solid #ef5350;">
+        <div class="tiname" style="color:#ef9a9a;">${i.name}</div>
+        <div class="tictrl"><button class="qbtn" onclick="chgQty(${i.lineId},-1)">✕</button></div>
+        <div class="tiprice" style="color:#ef5350;">-${gs(i.montoDesc)}</div>
+       </div>`
     : `<div class="titem"><div class="tiname">${i.name}${i.obs?'<div style="font-size:11px;color:#888;font-weight:400;text-transform:none;margin-top:2px;">'+i.obs+'</div>':''}</div><div class="tictrl"><button class="qbtn" onclick="chgQty(${i.lineId},-1)">−</button><span class="qnum">${i.qty}</span><button class="qbtn" onclick="chgQty(${i.lineId},1)">+</button></div><div class="tiprice">${gs(i.price*i.qty)}</div></div>`
   ).join('');
+}
+
+// CATEGORIES
+function openCat(){
+  const sheet = document.getElementById('catSheetContent');
+  const todos = 'Todos los artículos';
+
+  function catItem(nombre, color){
+    const sel = curCat===nombre;
+    const colorStyle = color ? 'color:'+color+';border-left-color:'+color+';' : '';
+    const ic = color ? 'background:'+color+';' : '';
+    return '<div class="cat-item'+(sel?' sel':'')+'" onclick="pickCat(this)" style="'+colorStyle+'">'
+      +'<div class="cat-item-ic" style="'+ic+'"></div>'
+      +nombre
+      +(sel?'<svg style="margin-left:auto" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>':'')
+      +'</div>';
+  }
+
+  let html = catItem(todos);
+  CATEGORIAS.forEach(c => { html += catItem(c.nombre, c.color||null); });
+
+  const hasDescs = DESCUENTOS.filter(d=>d.activo!==false).length
+    || PRODS.filter(p=>p.cat==='🏷️ Descuentos'&&p.activo!==false).length;
+  if(hasDescs) html += catItem('🏷️ Descuentos','#ef5350');
+
+  sheet.innerHTML = html;
+  document.getElementById('catOv').classList.add('open');
+}
+
+function renderCatPills(){
+  const bar = document.getElementById('catPillBar');
+  if(!bar) return;
+  const todos = 'Todos los artículos';
+  const cats = [todos, ...CATEGORIAS.map(c=>c.nombre)];
+  const hasDescs = DESCUENTOS.filter(d=>d.activo!==false).length ||
+    PRODS.filter(p=>p.cat==='Descuentos'&&p.activo!==false).length;
+  if(hasDescs) cats.push('🏷️ Descuentos');
+
+  bar.innerHTML = cats.map(function(c){
+    const sel = curCat===c ? ' sel' : '';
+    return '<button class="cat-pill'+sel+'" onclick="pickCat(this)">'+c+'</button>';
+  }).join('');
+}
+
+function renderCategoriasVenta(){
+  // Refrescar el catOv si está abierto
+  if(document.getElementById('catOv')?.classList.contains('open')) openCat();
+}
+function closeCat(e){ if(e.target===document.getElementById('catOv'))document.getElementById('catOv').classList.remove('open'); }
+function pickCat(el){
+  const cat = typeof el === 'string' ? el : el.textContent.trim();
+  curCat = cat;
+  const lbl = document.getElementById('catLbl');
+  if(lbl) lbl.textContent = cat;
+  document.getElementById('catOv').classList.remove('open');
+  renderCatPills();
+  filterP();
+}
+
+// PAYMENT
+function selPay(btn,m){
+  document.querySelectorAll('.pay-btn').forEach(b=>b.classList.remove('sel')); btn.classList.add('sel');
+  document.getElementById('efecSec').style.display=m==='efectivo'?'block':'none';
+  const comp=document.getElementById('compSec');
+  const needsComp=m==='pos'||m==='transferencia';
+  comp.classList.toggle('open', needsComp);
+  if(!needsComp){
+    // limpiar comprobante al volver a efectivo
+    const d=document.getElementById('compDisplay');
+    if(d){ d.textContent='—'; d.style.color='#ccc'; }
+  }
+}
+
+// ── DETALLE TICKET ───────────────────────────────────────────────────────────
+function goDetalle(){
+  if(calcTotal() === 0){ toast('El ticket está vacío'); return; }
+  renderDetalle();
+  goTo('scDetalle');
+}
+
+function renderDetalle(){
+  const items = cart;
+  const total = calcTotal();
+  const count = items.reduce((s,i)=>s+i.qty,0);
+
+  document.getElementById('detTitle').textContent =
+    currentTicketNro !== null ? 'Ticket #' + String(currentTicketNro).padStart(4,'0') : 'Ticket actual';
+  document.getElementById('detSubtitle').textContent =
+    count + ' artículo' + (count!==1?'s':'') + ' · ' + gs(total);
+  document.getElementById('detItems').textContent = count + ' artículo' + (count!==1?'s':'');
+  document.getElementById('detTotal').textContent = gs(total);
+
+  const list = document.getElementById('detList');
+  list.innerHTML = '';
+  items.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'det-item';
+    div.id = 'detItem_' + item.lineId;
+
+    const delIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
+
+    // Ítem de descuento — renderizado especial
+    if(item.esDescuento){
+      div.style.borderLeft = '3px solid #ef5350';
+      div.innerHTML =
+        '<div class="det-item-main">' +
+          '<div class="det-item-color" style="background:#e53935;font-size:9px;font-weight:800;">%</div>' +
+          '<div class="det-item-name" style="color:#ef9a9a;">' + item.name + '</div>' +
+          '<div class="det-item-subtotal" style="color:#ef5350;">-' + gs(item.montoDesc) + '</div>' +
+        '</div>' +
+        '<div class="det-item-controls">' +
+          '<button class="det-qbtn del" onclick="detChgQty(' + item.lineId + ',-1)">' + delIcon + '</button>' +
+        '</div>';
+      list.appendChild(div);
+      return;
+    }
+
+    div.innerHTML =
+      '<div class="det-item-main">' +
+        '<div class="det-item-color" style="background:' + item.color + '"></div>' +
+        '<div class="det-item-name">' + item.name + '</div>' +
+        '<div class="det-item-subtotal">' + gs(item.price * item.qty) + '</div>' +
+      '</div>' +
+      '<div class="det-item-controls">' +
+        '<div class="det-qty-row">' +
+          '<button class="det-qbtn del" onclick="detChgQty(' + item.lineId + ',-1)">' + (item.qty===1 ? delIcon : '−') + '</button>' +
+          '<span class="det-qnum">' + item.qty + '</span>' +
+          '<button class="det-qbtn" onclick="detChgQty(' + item.lineId + ',1)">+</button>' +
+        '</div>' +
+        '<span class="det-unit-price">' + gs(item.price) + ' c/u</span>' +
+        '<button class="det-obs-toggle" onclick="toggleDetObs(' + item.lineId + ')">' +
+          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+          (item.obs ? 'Obs: ' + item.obs.substring(0,20) : 'Observación') +
+        '</button>' +
+        '<button class="det-obs-toggle" style="color:' + (item.desc>0?'var(--orange)':'var(--muted)') + '" onclick="toggleDetDesc(' + item.lineId + ')">' +
+          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>' +
+          (item.desc>0 ? 'Desc: ' + item.desc + '%' : 'Descuento') +
+        '</button>' +
+      '</div>' +
+      '<div class="det-obs-box' + (item.obs?' open':'') + '" id="detObs_' + item.lineId + '">' +
+        '<input class="det-obs-input" type="text" placeholder="Ej: Sin cebolla, bien cocido..." maxlength="60" value="' + (item.obs||'') + '" oninput="saveDetObs(' + item.lineId + ', this.value)">' +
+      '</div>' +
+      '<div class="det-obs-box' + (item.desc>0?' open':'') + '" id="detDesc_' + item.lineId + '" style="display:' + (item.desc>0?'block':'none') + ';">' +
+        '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;">' +
+          '<span style="font-size:12px;color:var(--muted);flex-shrink:0;">Descuento %</span>' +
+          '<input class="det-obs-input" type="number" min="0" max="100" placeholder="0" value="' + (item.desc||'') + '" style="width:70px;text-align:center;" oninput="saveDetDesc(' + item.lineId + ', this.value)">' +
+          '<span style="font-size:12px;color:var(--orange);flex-shrink:0;">= ' + gs(calcItemTotal(item)) + '</span>' +
+        '</div>' +
+      '</div>';
+
+    list.appendChild(div);
+  });
+}
+
+function detChgQty(lineId, delta){
+  const idx = cart.findIndex(l=>l.lineId===lineId);
+  if(idx<0) return;
+  cart[idx].qty += delta;
+  if(cart[idx].qty <= 0) cart.splice(idx,1);
+  updUI();
+  updBtnGuardar();
+  if(calcTotal() === 0){ goTo('scSale'); return; }
+  renderDetalle();
+}
+
+function toggleDetObs(lineId){
+  const box = document.getElementById('detObs_' + lineId);
+  if(!box) return;
+  box.classList.toggle('open');
+  if(box.classList.contains('open')) box.querySelector('input').focus();
+}
+
+function saveDetObs(lineId, val){
+  const item = cart.find(l=>l.lineId===lineId);
+  if(item) item.obs = val;
+  const btn = document.querySelector('#detItem_'+lineId+' .det-obs-toggle');
+  if(btn) btn.lastChild.textContent = val ? ' Obs: '+val.substring(0,20) : ' Observación';
+}
+
+function toggleDetDesc(lineId){
+  const el = document.getElementById('detDesc_'+lineId);
+  if(!el) return;
+  const open = el.style.display === 'block';
+  el.style.display = open ? 'none' : 'block';
+  if(!open) setTimeout(()=>el.querySelector('input')?.focus(), 50);
+}
+
+function saveDetDesc(lineId, val){
+  const item = cart.find(i=>i.lineId===lineId);
+  if(!item) return;
+  item.desc = Math.min(100, Math.max(0, parseFloat(val)||0));
+  updUI();
+  // Update subtotal in row
+  const sub = document.querySelector('#detItem_'+lineId+' .det-item-subtotal');
+  if(sub) sub.textContent = gs(calcItemTotal(item));
+  // Update desc button label
+  const btns = document.querySelectorAll('#detItem_'+lineId+' .det-obs-toggle');
+  if(btns[1]) btns[1].style.color = item.desc>0 ? 'var(--orange)' : 'var(--muted)';
+  // Update desc amount in box
+  const span = document.querySelector('#detDesc_'+lineId+' span:last-child');
+  if(span) span.textContent = '= '+gs(calcItemTotal(item));
+}
+
+function imprimirComandaPreCobro(){
+  if(!cart.length){ toast('Sin productos'); return; }
+  const d = new Date();
+  imprimirComanda({
+    items:     cart,
+    fecha:     d,
+    nroTicket: nroTicket || ticketCounter,
+    tipoPedido: tipoPedido||'llevar',
+    mesa:      mesaActual ? mesaActual.nombre : null,
+    factura:   null
+  });
+}
+
+function abrirDescTicket(){
+  const actual = ticketDescuento > 0 ? ticketDescuento : '';
+  const val = prompt('Descuento en ticket total (%) — Ingresá 0 para quitar:', actual);
+  if(val === null) return;
+  const pct = Math.min(100, Math.max(0, parseFloat(val)||0));
+  ticketDescuento = pct;
+  updUI();
+  // Update cobrar screen
+  const t     = calcTotal();
+  const monto = calcDescuentoMonto();
+  const row   = document.getElementById('descTicketRow');
+  const montoEl = document.getElementById('descTicketMonto');
+  const btn   = document.getElementById('btnDescTicket');
+  if(row){
+    row.style.display = pct > 0 ? 'flex' : 'none';
+  }
+  if(montoEl) montoEl.textContent = '-'+gs(monto);
+  if(btn){
+    btn.textContent = pct > 0 ? pct+'% DESC' : '% DESC';
+    btn.style.background = pct > 0 ? 'var(--orange)' : 'var(--orange)';
+  }
+  document.getElementById('ctotal').textContent = gs(t);
+  document.getElementById('efecVal').textContent = gs(t);
+  if(pct > 0) toast('Descuento '+pct+'% aplicado — '+gs(monto)+' de descuento');
+  else toast('Descuento eliminado');
+}
+
+function vaciarTicket(){
+  if(!cart.length) return;
+  cart = [];
+  currentTicketNro = null;
+  mesaActual = null;
+  tipoPedido = 'llevar';
+  setTipoPedido('llevar');
+  updTabTicketHeader();
+  updMesaBtn();
+  var dBar = document.getElementById('tabDeliveryBar');
+  if(dBar) dBar.classList.remove('visible');
+  updUI();
+  updBtnGuardar();
+  goTo('scSale');
+  toast('Ticket vaciado');
+}
+
+// ── GUARDAR / TICKETS PENDIENTES ────────────────────────────────────────────
+let ticketCounter = parseInt(localStorage.getItem('pos_ticket_counter')||'1');   // autonumérico creciente
+let tipoPedido = 'llevar'; // 'local' | 'llevar' | 'delivery'
+let pendientes = [];     // [{nro, obs, cart, total, fecha}]
+let currentTicketNro = null; // nro del ticket cargado actualmente (null = nuevo)
+
+function setTipoPedido(tipo){
+  tipoPedido = tipo;
+  // Tablet/PC panel derecho
+  ['local','llevar','delivery'].forEach(function(t){
+    var btn = document.getElementById('tipoBtn'+t.charAt(0).toUpperCase()+t.slice(1));
+    if(btn) btn.classList.toggle('sel', t===tipo);
+  });
+  // Móvil barra inferior
+  ['local','llevar','delivery'].forEach(function(t){
+    var btn = document.getElementById('mobTipoBtn'+t.charAt(0).toUpperCase()+t.slice(1));
+    if(btn) btn.classList.toggle('sel', t===tipo);
+  });
+  // Mostrar/ocultar panel delivery — PC/Tablet (dentro del panel derecho)
+  var bar = document.getElementById('tabDeliveryBar');
+  if(bar) bar.classList.toggle('visible', tipo==='delivery');
+  // Mostrar/ocultar panel delivery — Móvil (fuera del tablet-right)
+  var mobBar = document.getElementById('mobDeliveryBar');
+  if(mobBar) mobBar.style.display = tipo==='delivery' ? 'flex' : 'none';
+
+  // Si cambia de delivery, quitar ítem delivery del cart
+  if(tipo !== 'delivery') quitarItemDelivery();
+}
+
+function openNpTexto(ctx, inputEl){
+  // Solo abrir en móvil (pantalla < 700px)
+  if(window.innerWidth >= 700) return;
+  inputEl.blur();
+  setTimeout(function(){ inputEl.blur(); }, 10);
+  npCtx = 'texto_' + ctx;
+  npVal = inputEl.value || '';
+  var labels = { ruc: 'RUC / C.I.', nombre: 'Razón Social / Nombre' };
+  document.getElementById('npLbl').textContent = labels[ctx] || ctx;
+  document.getElementById('npDisp').style.display = 'none';
+  document.getElementById('billetesRow').classList.remove('show');
+  var grid = document.getElementById('npGrid');
+  if(grid) grid.style.display = 'none';
+  var ti = document.getElementById('npTextInput');
+  ti.style.display = 'block';
+  ti.value = npVal;
+  ti.autocapitalize = ctx === 'nombre' ? 'words' : 'off';
+  document.getElementById('npOverlay').classList.add('open');
+  setTimeout(function(){ ti.focus(); }, 300);
+}
+
+function openNpRuc(){
+  npCtx = 'ruc';
+  npVal = document.getElementById('factRuc').value.trim() || '';
+  document.getElementById('npLbl').textContent = 'RUC / C.I.';
+  document.getElementById('npDisp').textContent = npVal || '—';
+  document.getElementById('billetesRow').classList.remove('show');
+  document.getElementById('npOverlay').classList.add('open');
+}
+
+function cerrarNpTexto(){
+  document.getElementById('npDisp').style.display = '';
+  var ng = document.getElementById('npGrid');
+  if(ng) ng.style.display = '';
+  var ti = document.getElementById('npTextInput');
+  if(ti){ ti.style.display = 'none'; ti.value = ''; }
+  npCtx = '';
+}
+
+function quitarItemDelivery(){
+  var idx = cart.findIndex(function(i){ return i.esDelivery; });
+  if(idx >= 0){ cart.splice(idx,1); updUI(); updBtnGuardar(); }
+}
+
+function openNpDelivery(){
+  var existing = cart.find(function(i){ return i.esDelivery; });
+  npCtx = 'delivery';
+  npVal = existing ? String(existing.price) : '';
+  document.getElementById('npLbl').textContent = 'Monto del envío (Delivery)';
+  document.getElementById('npDisp').textContent = existing ? gs(existing.price) : '₲0';
+  document.getElementById('billetesRow').classList.remove('show');
+  document.getElementById('npOverlay').classList.add('open');
+}
+
+
+
+function agregarMontoDelivery(){
+  var inp = document.getElementById('tabDeliveryMonto');
+  var monto = parseInt((inp||{}).value||0)||0;
+  if(!monto || monto <= 0){ toast('Ingresá el monto del envío'); inp && inp.focus(); return; }
+
+  // Quitar delivery anterior si existía
+  quitarItemDelivery();
+
+  // Agregar como ítem especial al cart
+  cart.push({
+    lineId: Date.now()*1000 + 999,
+    id: 'delivery_item',
+    name: 'Envío delivery',
+    price: monto,
+    qty: 1,
+    obs: '',
+    iva: '10',
+    esDelivery: true,
+    color: '#e65100',
+    colorPropio: true
+  });
+
+  updUI(); updBtnGuardar();
+  toast('✓ Envío ₲'+monto.toLocaleString('es-PY')+' agregado');
+  if(inp) inp.value='';
+}
+
+function updTabTicketHeader(){
+  updMesaBtn();
+  var nro = currentTicketNro !== null
+    ? String(currentTicketNro).padStart(4,'0')
+    : String(ticketCounter).padStart(4,'0');
+  var nroEl = document.getElementById('tabTicketNro');
+  if(nroEl) nroEl.textContent = '#' + nro + (mesaActual ? '  '+mesaActual.nombre : '');
+  var mobNroEl = document.getElementById('mobTicketNro');
+  if(mobNroEl) mobNroEl.textContent = '#' + nro;
+}
+
+function onBtnGuardar(){
+  // Si hay mesa asignada, usar flujo de mesas
+  if(mesaActual){
+    guardarConMesa();
+    return;
+  }
+  const tieneProductos = calcTotal() > 0;
+  if(tieneProductos){
+    // siempre guardar si hay productos, sin importar si hay pendientes
+    goGuardar();
+  } else if(pendientes.length > 0){
+    // carrito vacío pero hay pendientes → ver lista
+    goPendientes();
+  } else {
+    toast('Agregá productos primero');
+  }
+}
+
+function goGuardar(){
+  const total = calcTotal();
+  if(total === 0){ toast('Agregá productos primero'); return; }
+  // si es ticket existente mostrar su nro, si no el próximo
+  const nro = currentTicketNro !== null
+    ? String(currentTicketNro).padStart(4,'0')
+    : String(ticketCounter).padStart(4,'0');
+  document.getElementById('guardNro').textContent = '#' + nro;
+  // prellenar obs si es ticket existente
+  const existente = currentTicketNro !== null
+    ? pendientes.find(t => t.nro === currentTicketNro)
+    : null;
+  document.getElementById('guardObs').value = existente ? existente.obs : '';
+  // preview de items
+  const items = cart;
+  document.getElementById('guardItemsList').innerHTML = cart.map(i =>
+    `<div class="guard-item-row">
+      <span class="gin">${i.qty}× ${i.name}${i.obs ? ' <span style="color:#777;font-weight:400;font-size:11px;">('+i.obs+')</span>' : ''}</span>
+      <span class="gip">${gs(i.price * i.qty)}</span>
+    </div>`
+  ).join('');
+  goTo('scGuardar');
+  setTimeout(()=>document.getElementById('guardObs').focus(), 300);
+}
+
+function guardarPendientesLocal(){
+  try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){}
+}
+
+function doGuardar(){
+  const obs = document.getElementById('guardObs').value.trim();
+
+  if(currentTicketNro !== null){
+    // Actualizar ticket existente — preservar esPresupuesto
+    const idx = pendientes.findIndex(t => t.nro === currentTicketNro);
+    if(idx >= 0){
+      pendientes[idx].cart  = JSON.parse(JSON.stringify(cart));
+      pendientes[idx].total = calcTotal();
+      pendientes[idx].obs   = obs || pendientes[idx].obs;
+      pendientes[idx].fecha = new Date().toISOString();
+      // NO tocar esPresupuesto — se preserva tal cual estaba
+    }
+    const nro = currentTicketNro;
+    currentTicketNro = null;
+    cart = [];
+    updUI(); updBtnGuardar();
+    guardarPendientesLocal();
+    goTo('scSale');
+    toast('✓ Ticket #'+String(nro).padStart(4,'0')+' actualizado');
+  } else {
+    // Ticket nuevo — siempre pendiente (nunca presupuesto por defecto)
+    const nro = ticketCounter++; localStorage.setItem('pos_ticket_counter', ticketCounter);
+    pendientes.push({
+      nro,
+      obs:           obs || '',
+      cart:          JSON.parse(JSON.stringify(cart)),
+      total:         calcTotal(),
+      fecha:         new Date().toISOString(),
+      esPresupuesto: false,   // siempre pendiente al crear
+    });
+    currentTicketNro = null;
+    cart = [];
+    updUI(); updBtnGuardar();
+    guardarPendientesLocal();
+    goTo('scSale');
+    toast('✓ Ticket #'+String(nro).padStart(4,'0')+' guardado');
+  }
+}
+
+function goPendientes(){
+  renderPendientes();
+  goTo('scPendientes');
+}
+
+function renderPendientes(){
+  const list = document.getElementById('pendList');
+  if(!pendientes.length){
+    list.innerHTML = `<div class="pend-empty">
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      <p>No hay tickets pendientes</p>
+    </div>`;
+    return;
+  }
+  list.innerHTML = pendientes.map((t,i) => `
+    <div class="pend-item" style="display:flex;align-items:center;gap:0;">
+      <div style="flex:1;display:flex;align-items:center;gap:10px;padding:14px 0 14px 14px;cursor:pointer;" onclick="cargarTicket(${i})">
+        <div class="pend-item-num">#${String(t.nro).padStart(4,'0')}</div>
+        <div class="pend-item-info">
+          <div class="pend-item-title">Ticket #${String(t.nro).padStart(4,'0')}${t.esPresupuesto?' 📋':''}</div>
+          <div class="pend-item-obs">${t.obs || 'Sin observación'} · ${t.cart.reduce((s,i)=>s+i.qty,0)} art.</div>
+        </div>
+        <div class="pend-item-total">${gs(t.total)}</div>
+      </div>
+      <button onclick="event.stopPropagation();imprimirTicketPendiente(${i})" title="Imprimir"
+        style="background:none;border:none;cursor:pointer;color:var(--muted);padding:14px 12px;display:flex;align-items:center;flex-shrink:0;border-left:1px solid var(--border);">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      </button>
+    </div>`
+  ).join('');
+}
+
+function cargarTicket(i){
+  const t = pendientes[i];
+  // si hay venta activa, guardarla automáticamente antes de cargar otra
+  const totalActual = calcTotal();
+  if(totalActual > 0){
+    if(currentTicketNro !== null){
+      // actualizar el ticket activo en la lista
+      const idx = pendientes.findIndex(p => p.nro === currentTicketNro);
+      if(idx >= 0){
+        pendientes[idx].cart  = JSON.parse(JSON.stringify(cart));
+        pendientes[idx].total = totalActual;
+        pendientes[idx].fecha = new Date();
+      }
+    } else {
+      // era venta nueva, guardar como nuevo pendiente
+      pendientes.push({
+        nro: ticketCounter,
+        obs: 'Auto-guardado',
+        cart: JSON.parse(JSON.stringify(cart)),
+        total: totalActual,
+        fecha: new Date(),
+        esPresupuesto: false,
+      });
+      ticketCounter++;
+    }
+  }
+  // cargar el ticket seleccionado SIN eliminarlo de la lista todavía
+  cart = JSON.parse(JSON.stringify(t.cart));
+  currentTicketNro = t.nro;
+  updUI();
+  updBtnGuardar();
+  goTo('scSale');
+  toast('Ticket #' + String(t.nro).padStart(4,'0') + ' cargado');
+}
+
+function nuevaVenta(){
+  try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){}
+  const totalActual = calcTotal();
+  if(totalActual > 0){
+    // guardar la venta actual automáticamente
+    pendientes.push({
+      nro: ticketCounter,
+      obs: 'Auto-guardado',
+      cart: JSON.parse(JSON.stringify(cart)),
+      total: totalActual,
+      fecha: new Date(),
+      esPresupuesto: false,
+    });
+    ticketCounter++; localStorage.setItem('pos_ticket_counter', ticketCounter);
+  }
+  cart=[];
+  currentTicketNro = null;
+  mesaActual = null;
+  updUI();
+  updBtnGuardar();
+  updMesaBtn();
+  goTo('scSale');
+}
+
+function updBtnGuardar(){
+  const n = pendientes.length;
+  const tieneProductos = calcTotal() > 0;
+  const badge = document.getElementById('pendingBadge');
+  const txt = document.getElementById('btnGuardarTxt');
+  const icon = document.getElementById('btnGuardarIcon');
+  // sync tablet badge too
+  const tabBadge = document.getElementById('tabPendingBadge');
+  const tabTxt = document.getElementById('tabBtnTxt');
+
+  if(tieneProductos){
+    txt.textContent = 'GUARDAR';
+    if(tabTxt) tabTxt.textContent = 'GUARDAR';
+    icon.innerHTML = '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>';
+    if(n > 0){
+      badge.textContent = n > 9 ? '9+' : n; badge.classList.add('show');
+      if(tabBadge){ tabBadge.textContent = badge.textContent; tabBadge.style.display='flex'; }
+    } else {
+      badge.classList.remove('show');
+      if(tabBadge) tabBadge.style.display='none';
+    }
+  } else if(n > 0){
+    badge.textContent = n > 9 ? '9+' : n; badge.classList.add('show');
+    txt.textContent = 'PENDIENTES';
+    icon.innerHTML = '<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>';
+    if(tabBadge){ tabBadge.textContent = badge.textContent; tabBadge.style.display='flex'; }
+    if(tabTxt) tabTxt.textContent = 'PENDIENTES';
+  } else {
+    badge.classList.remove('show');
+    txt.textContent = 'GUARDAR';
+    icon.innerHTML = '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>';
+    if(tabBadge) tabBadge.style.display='none';
+    if(tabTxt) tabTxt.textContent = 'GUARDAR';
+  }
+}
+
+// ── DIVIDIR ──────────────────────────────────────────────────────────────────
+let divPagos = [];   // [{metodo, monto, comprobante, cobrado}]
+let divNpIdx = -1;   // índice del pago que está editando el numpad
+
+const PAY_METHODS = ['Efectivo','POS','Transferencia'];
+
+function goDividir(){
+  const total = calcTotal();
+  if(!total){ toast('Agregá productos primero'); return; }
+  divPagos = [];
+  divChgCount(0, 2); // init con 2 pagos
+  goTo('scDividir');
+}
+
+function divChgCount(delta, forceN){
+  const total = calcTotal();
+  let n = forceN !== undefined ? forceN : (divPagos.length + delta);
+  if(n < 1) n = 1;
+  if(n > 6) n = 6;
+
+  // ajustar array
+  while(divPagos.length < n){
+    const base = Math.floor(total / n);
+    divPagos.push({metodo:'Efectivo', monto: base, comprobante:'', cobrado:false});
+  }
+  while(divPagos.length > n) divPagos.pop();
+
+  // redistribuir montos equitativos
+  const base = Math.floor(total / n);
+  const resto = total - base * n;
+  divPagos.forEach((p,i)=>{ if(!p.cobrado){ p.monto = base + (i===0 ? resto : 0); } });
+
+  document.getElementById('divCount').textContent = n;
+  document.getElementById('divMinus').disabled = (n <= 1);
+  renderDivList();
+  updDivRestante();
+}
+
+function renderDivList(){
+  const container = document.getElementById('divList');
+  container.innerHTML = divPagos.map((p,i) => {
+    const needsComp = p.metodo==='POS' || p.metodo==='Transferencia';
+    return `
+    <div class="div-pago-item" id="divItem${i}">
+      <div class="div-pago-row1">
+        <button class="div-trash" onclick="divRemove(${i})">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        </button>
+        <div class="div-method-sel" onclick="openDivMethodSheet(${i})">
+          <span>${p.metodo}</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+      </div>
+      <div class="div-pago-row2">
+        <input class="div-monto" id="divMonto${i}" type="text" readonly
+          value="${gs(p.monto)}"
+          onclick="openDivNumpad(${i})"
+          ${p.cobrado ? 'disabled style="opacity:.5"' : ''}>
+        <button class="div-cobrar-btn ${p.cobrado?'cobrado':''}"
+          onclick="${p.cobrado ? '' : 'divCobrar('+i+')'}"
+          ${p.cobrado ? 'disabled' : ''}>
+          ${p.cobrado ? '✓ COBRADO' : 'COBRAR'}
+        </button>
+      </div>
+      <div class="div-comp ${needsComp?'open':''}" id="divComp${i}">
+        <label>Nro. Comprobante / Observación</label>
+        <div class="efec-row" style="margin-top:4px;${p.cobrado?'opacity:.5;pointer-events:none':''}" onclick="openDivNPComp(${i})">
+          <span class="efec-val" id="divCompDisp${i}" style="font-size:16px;color:${p.comprobante?'#fff':'#666'}">${p.comprobante||'—'}</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#777" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updDivRestante(){
+  const total = calcTotal();
+  const cobrado = divPagos.filter(p=>p.cobrado).reduce((s,p)=>s+p.monto, 0);
+  const restante = total - cobrado;
+  document.getElementById('divRestante').textContent =
+    restante <= 0 ? 'Pagado ✓' : 'Restante ' + gs(restante);
+}
+
+function divRemove(i){
+  if(divPagos.length <= 1){ toast('Mínimo 1 pago'); return; }
+  if(divPagos[i].cobrado){ toast('Ya fue cobrado'); return; }
+  divPagos.splice(i,1);
+  document.getElementById('divCount').textContent = divPagos.length;
+  document.getElementById('divMinus').disabled = (divPagos.length <= 1);
+  renderDivList();
+  updDivRestante();
+}
+
+function divCobrar(i){
+  const p = divPagos[i];
+  if(p.monto <= 0){ toast('El monto debe ser mayor a 0'); return; }
+  p.cobrado = true;
+  renderDivList();
+  updDivRestante();
+  toast('✓ Pago cobrado');
+  // si todos cobrados, habilitar HECHO visualmente
+  if(divPagos.every(p=>p.cobrado)){
+    toast('✓ Todos los pagos cobrados — presioná HECHO');
+  }
+}
+
+function dividirHecho(){
+  const allDone = divPagos.every(p=>p.cobrado);
+  if(!allDone){ toast('Faltan cobrar algunos pagos'); return; }
+  confirmarPago();
+}
+
+// Sheet selector de método por pago
+let divMethodIdx = -1;
+function openDivMethodSheet(i){
+  divMethodIdx = i;
+  const sheet = document.getElementById('catSheetContent');
+  let html = '';
+  PAY_METHODS.forEach(m => {
+    const sel = divPagos[i].metodo===m ? 'sel' : '';
+    html += '<div class="cat-item ' + sel + '" onclick="pickDivMethod(this)">' + m + '</div>';
+  });
+  sheet.innerHTML = html;
+  document.getElementById('catOv').classList.add('open');
+}
+function pickDivMethod(el){
+  if(divMethodIdx < 0) return;
+  const m = typeof el === 'string' ? el : el.textContent.trim();
+  divPagos[divMethodIdx].metodo = m;
+  divPagos[divMethodIdx].comprobante = '';
+  document.getElementById('catOv').classList.remove('open');
+  renderDivList();
+}
+
+// Numpad para monto de pago dividido
+function openDivNumpad(i){
+  if(divPagos[i].cobrado) return;
+  divNpIdx = i;
+  npCtx = 'div';
+  npVal = String(divPagos[i].monto);
+  document.getElementById('npLbl').textContent = 'Monto pago ' + (i+1);
+  document.getElementById('npDisp').textContent = gs(divPagos[i].monto);
+  document.getElementById('billetesRow').classList.remove('show');
+  document.getElementById('npOverlay').classList.add('open');
+}
+
+// Numpad para comprobante de pago dividido
+function openDivNPComp(i){
+  if(divPagos[i].cobrado) return;
+  divNpIdx = i;
+  npCtx = 'divComp';
+  npVal = divPagos[i].comprobante || '';
+  document.getElementById('npLbl').textContent = 'Nro. Comprobante - Pago ' + (i+1);
+  document.getElementById('npDisp').textContent = npVal || '—';
+  document.getElementById('billetesRow').classList.remove('show');
+  document.getElementById('npOverlay').classList.add('open');
 }
 
 // CONFIRM PAYMENT
@@ -7673,7 +8436,16 @@ async function supaUpsertCategoria(cat){
   } catch(e){ console.warn('[Supabase] Error guardando categoría:', e.message); }
 }
 
-// UTILS — gs y toast vienen de ui.js (importados arriba)
+// UTILS
+function gs(n){ return '₲'+Math.round(n).toLocaleString('es-PY'); }
+
+let _tt;
+function toast(m){
+  const t=document.getElementById('toast');
+  if(!t) return;
+  t.textContent=m; t.classList.add('show');
+  clearTimeout(_tt); _tt=setTimeout(()=>t.classList.remove('show'),1800);
+}
 
 // ══════════════════════════════════════════════════════════
 // DEXIE.JS — BASE DE DATOS LOCAL (IndexedDB)
@@ -9155,6 +9927,8 @@ function editarMesa(id){
   const m = mesasMesas.find(x => x.id === id);
   if(m) abrirFormMesa(m.salon_id, id);
 }
+
+function gs(n){ return '₲'+Math.round(n||0).toLocaleString('es-PY'); }
 
 async function renderVentasList(){
   const list  = document.getElementById('ventasList');
