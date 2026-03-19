@@ -1,4 +1,4 @@
-const CACHE = 'ampersand-pos-v4';
+const CACHE = 'ampersand-pos-v1773929758';
 const ASSETS = ['/', '/index.html', '/manifest.json', '/icon.png', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
