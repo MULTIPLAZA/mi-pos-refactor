@@ -1619,6 +1619,54 @@
     .pname { font-size:11px; }
   }
 
+
+  /* ── MESAS ─────────────────────────────────────────── */
+  #scMesas { display:flex; flex-direction:column; }
+  .mesas-header { background:var(--bg-header); display:flex; align-items:center; padding:0 12px; height:56px; gap:10px; flex-shrink:0; }
+  .mesas-title  { flex:1; font-size:17px; font-weight:700; color:#fff; }
+  .mesas-salones-bar { display:flex; gap:0; overflow-x:auto; flex-shrink:0; background:var(--bg-dark); border-bottom:1px solid var(--border); scrollbar-width:none; }
+  .mesas-salones-bar::-webkit-scrollbar { display:none; }
+  .salon-tab { padding:10px 18px; font-size:12px; font-weight:700; font-family:'Barlow',sans-serif; text-transform:uppercase; letter-spacing:.5px; cursor:pointer; white-space:nowrap; border-bottom:3px solid transparent; color:var(--muted); background:none; border-left:none; border-right:none; border-top:none; transition:all .15s; }
+  .salon-tab.sel { color:#fff; }
+  .mesas-body { flex:1; overflow-y:auto; padding:14px; }
+  .mesas-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:10px; }
+  .mesa-tile {
+    aspect-ratio:1; border-radius:10px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:4px; cursor:pointer;
+    border:2px solid transparent; transition:all .15s; position:relative;
+    padding:8px 4px;
+  }
+  .mesa-tile.libre  { border-color:var(--green); background:rgba(76,175,80,.1); }
+  .mesa-tile.ocupada { border-color:#e53935; background:rgba(229,57,53,.12); }
+  .mesa-tile-nombre { font-size:13px; font-weight:800; font-family:'Barlow',sans-serif; text-transform:uppercase; text-align:center; color:var(--text); line-height:1.2; }
+  .mesa-tile-info   { font-size:10px; font-weight:600; color:var(--muted); text-align:center; }
+  .mesa-tile.ocupada .mesa-tile-nombre { color:#ef9a9a; }
+  .mesa-tile.ocupada .mesa-tile-info   { color:#ef9a9a; }
+  .mesa-dot { width:8px; height:8px; border-radius:50%; position:absolute; top:6px; right:6px; }
+  .mesa-dot.libre   { background:var(--green); }
+  .mesa-dot.ocupada { background:#e53935; }
+  .mesas-empty { text-align:center; color:var(--muted); padding:60px 20px; font-size:14px; }
+  .mesas-fab { position:fixed; bottom:20px; right:20px; width:52px; height:52px; border-radius:50%; background:var(--green); border:none; color:#fff; font-size:26px; cursor:pointer; box-shadow:0 4px 16px rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; z-index:10; }
+
+  /* Modal gestión mesas */
+  .mesas-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; display:none; align-items:flex-end; justify-content:center; }
+  .mesas-modal-overlay.open { display:flex; }
+  .mesas-modal { background:var(--bg-card); border-radius:16px 16px 0 0; padding:20px 16px; width:100%; max-width:500px; max-height:80vh; overflow-y:auto; }
+  .mesas-modal-title { font-size:16px; font-weight:800; color:var(--text); margin-bottom:14px; }
+  .mesas-form-row { margin-bottom:12px; }
+  .mesas-form-label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; display:block; }
+  .mesas-form-input { width:100%; background:var(--bg); border:1.5px solid var(--border2); border-radius:6px; color:var(--text); font-family:'Barlow',sans-serif; font-size:15px; font-weight:600; padding:10px 12px; box-sizing:border-box; outline:none; }
+  .mesas-color-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+  .mesas-color-swatch { width:30px; height:30px; border-radius:6px; cursor:pointer; border:3px solid transparent; transition:all .15s; }
+  .mesas-color-swatch.sel { border-color:#fff; transform:scale(1.15); }
+  .mesas-salon-list { display:flex; flex-direction:column; gap:6px; margin-bottom:12px; }
+  .mesas-salon-item { display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--bg); border-radius:8px; border:1px solid var(--border); }
+  .mesas-salon-color { width:14px; height:14px; border-radius:50%; flex-shrink:0; }
+  .mesas-salon-name  { flex:1; font-size:14px; font-weight:700; color:var(--text); }
+  .mesas-btn-sm { background:var(--border2); border:none; border-radius:4px; color:var(--text); font-size:11px; font-weight:700; padding:5px 10px; cursor:pointer; font-family:'Barlow',sans-serif; }
+  .mesas-btn-sm.danger { background:rgba(229,57,53,.2); color:#ef9a9a; }
+  .mesas-btn-primary { width:100%; background:var(--green); border:none; border-radius:8px; color:#fff; font-family:'Barlow',sans-serif; font-size:14px; font-weight:800; padding:14px; cursor:pointer; margin-top:8px; }
+  .mesas-section-title { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; margin:14px 0 8px; }
   ::-webkit-scrollbar { width:2px; }
   ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
 
@@ -2403,6 +2451,13 @@
       Configuración
     </div>
 
+    <div class="drawer-item" onclick="drawerGo('mesas')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      Mesas
+    </div>
     <div class="drawer-separator"></div>
 
     <div class="drawer-item" onclick="drawerGo('backoffice')">
@@ -2578,6 +2633,34 @@
 </div>
 
 <!-- ======== SCREEN: TURNO CERRADO ======== -->
+
+<!-- ======== SCREEN: MESAS ======== -->
+<div id="scMesas" class="screen">
+  <div class="mesas-header">
+    <button class="hbtn" onclick="goTo('scSale')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <span class="mesas-title">Mesas</span>
+    <button class="hbtn" onclick="abrirGestionMesas()" title="Gestionar salones y mesas">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M16.24 7.76a6 6 0 0 1 0 8.49M6.34 17.66a6 6 0 0 1 0-8.49M4.93 19.07a10 10 0 0 1 0-14.14"/></svg>
+    </button>
+  </div>
+  <!-- Tabs de salones -->
+  <div class="mesas-salones-bar" id="mesasSalonesBar"></div>
+  <!-- Grid de mesas -->
+  <div class="mesas-body">
+    <div class="mesas-grid" id="mesasGrid"></div>
+    <div class="mesas-empty" id="mesasEmpty" style="display:none;">
+      Sin mesas configuradas.<br>Tocá ⚙ para crear salones y mesas.
+    </div>
+  </div>
+</div>
+
+<!-- Modal gestión salones/mesas -->
+<div class="mesas-modal-overlay" id="mesasModal" onclick="if(event.target===this)cerrarModalMesas()">
+  <div class="mesas-modal" id="mesasModalContent"></div>
+</div>
+
 <div id="scClosed" class="screen active">
   <header class="header">
     <button class="hbtn" onclick="openDrawer()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
@@ -2646,7 +2729,7 @@
 
   <!-- Barra tipo pedido móvil -->
   <div class="mob-tipo-bar">
-    <button class="mob-tipo-btn sel" id="mobTipoBtnLocal"    onclick="setTipoPedido('local')">Local</button>
+    <button class="mob-tipo-btn sel" id="mobTipoBtnLocal"    onclick="onBtnLocal()">Local</button>
     <button class="mob-tipo-btn"     id="mobTipoBtnLlevar"   onclick="setTipoPedido('llevar')">Para llevar</button>
     <button class="mob-tipo-btn"     id="mobTipoBtnDelivery" onclick="setTipoPedido('delivery')">Delivery</button>
   </div>
@@ -2686,7 +2769,7 @@
       <div class="tab-ticket-header">
         <div class="tab-ticket-nro">Nro. Ticket: <span id="tabTicketNro">#—</span></div>
         <div class="tab-tipo-btns">
-          <button class="tab-tipo-btn sel" id="tipoBtnLocal" onclick="setTipoPedido('local')">Local</button>
+          <button class="tab-tipo-btn sel" id="tipoBtnLocal" onclick="onBtnLocal()">Local</button>
           <button class="tab-tipo-btn" id="tipoBtnLlevar" onclick="setTipoPedido('llevar')">Llevar</button>
           <button class="tab-tipo-btn" id="tipoBtnDelivery" onclick="setTipoPedido('delivery')">Delivery</button>
         </div>
@@ -2755,7 +2838,6 @@
       <button class="det-cobrar-btn" onclick="imprimirTicketActual()" style="background:var(--bg-dark);border:1.5px solid var(--border);color:var(--text);margin-right:6px;padding:14px 12px;" title="Imprimir ticket">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       </button>
-      <button class="det-cobrar-btn" onclick="imprimirComandaPreCobro()" style="background:#1565c0;margin-right:6px;padding:14px 12px;" title="Comanda cocina">🍳</button>
       <button class="det-cobrar-btn" onclick="goCobrar()">COBRAR</button>
     </div>
   </div>
@@ -2829,7 +2911,7 @@
           <span class="factura-label">RUC / C.I.</span>
           <div style="display:flex;align-items:center;gap:8px;">
             <input class="factura-input" id="factRuc" type="text" placeholder="Ej: 1234567-8" maxlength="20"
-              oninput="onRucInput()" style="flex:1;">
+              oninput="onRucInput()" onclick="openNpRuc()" readonly style="flex:1;">
             <button onclick="consultarRuc()" id="btnBuscarRuc" style="
               background:var(--green);border:none;border-radius:4px;
               color:#fff;padding:8px 12px;cursor:pointer;
@@ -3518,6 +3600,15 @@ function openNpTexto(ctx, inputEl){
   setTimeout(function(){ ti.focus(); }, 300);
 }
 
+function openNpRuc(){
+  npCtx = 'ruc';
+  npVal = document.getElementById('factRuc').value.trim() || '';
+  document.getElementById('npLbl').textContent = 'RUC / C.I.';
+  document.getElementById('npDisp').textContent = npVal || '—';
+  document.getElementById('billetesRow').classList.remove('show');
+  document.getElementById('npOverlay').classList.add('open');
+}
+
 function cerrarNpTexto(){
   document.getElementById('npDisp').style.display = '';
   var ng = document.getElementById('npGrid');
@@ -3572,11 +3663,13 @@ function agregarMontoDelivery(){
 }
 
 function updTabTicketHeader(){
+  // Mostrar nombre de mesa si hay una asignada
+  var mesaLabel = mesaActual ? ' · '+mesaActual.nombre : '';
   var nro = currentTicketNro !== null
     ? String(currentTicketNro).padStart(4,'0')
     : String(ticketCounter).padStart(4,'0');
   var nroEl = document.getElementById('tabTicketNro');
-  if(nroEl) nroEl.textContent = '#' + nro;
+  if(nroEl) nroEl.textContent = '#' + nro + (mesaActual ? ' · '+mesaActual.nombre : '');
   var mobNroEl = document.getElementById('mobTicketNro');
   if(mobNroEl) mobNroEl.textContent = '#' + nro;
 }
@@ -4020,6 +4113,7 @@ function confirmarPago(){
     comprobante: comprobante==='—'?'':comprobante,
     factura: facturaData, fecha: new Date(), nroTicket
   });
+  mesaLimpiarAlPagar();
   resetFactura();
   generarRecibo({
     items: itemsVenta,
@@ -5252,7 +5346,7 @@ document.addEventListener('keydown', function(e){
   else if(e.key==='Escape'){ e.preventDefault(); cerrarNpTexto(); ov.classList.remove('open'); }
 });
 function npP(d){
-  if(npCtx==='comprobante'||npCtx==='divComp'){
+  if(npCtx==='comprobante'||npCtx==='divComp'||npCtx==='ruc'){
     npVal+=d; if(npVal.length>15)npVal=npVal.slice(0,15);
     document.getElementById('npDisp').textContent = npVal || '—';
   } else {
@@ -5263,7 +5357,7 @@ function npP(d){
 }
 function npD(){
   npVal=npVal.slice(0,-1);
-  if(npCtx==='comprobante'||npCtx==='divComp'){
+  if(npCtx==='comprobante'||npCtx==='divComp'||npCtx==='ruc'){
     document.getElementById('npDisp').textContent = npVal || '—';
   } else {
     document.getElementById('npDisp').textContent=gs(parseInt(npVal)||0);
@@ -6417,6 +6511,8 @@ function drawerGo(section){
   } else if(section === 'turno'){
     goTo('scTurno');
     renderTurno();
+  } else if(section === 'mesas'){
+    abrirPantallaMesas();
   } else {
     if(section === 'configuracion'){
       goToConfig();
@@ -9111,6 +9207,7 @@ async function iniciarApp(){
   setTimeout(sincronizarConfigNegocio, 3000);
   setTimeout(syncConSupabase, 5000);
   setTimeout(syncVentasPendientes, 8000);
+  setTimeout(mesasCargar, 6000); // Cargar mesas en background
 }
 
 // ── ARRANQUE ──────────────────────────────────────────────
@@ -9282,6 +9379,377 @@ function switchVentasTab(tab){
   document.getElementById('tabVendidas').classList.toggle('sel', tab === 'vendidas');
   document.getElementById('tabPendientesV').classList.toggle('sel', tab === 'pendientes');
   renderVentasList();
+}
+
+
+// ════════════════════════════════════════════════════════
+// SISTEMA DE MESAS
+// ════════════════════════════════════════════════════════
+
+let mesasSalones  = [];   // [{id, nombre, color, activo}]
+let mesasMesas    = [];   // [{id, salon_id, nombre, capacidad}]
+let mesaSalonSel  = null; // id del salón activo en la pantalla
+let mesaActual    = null; // {id, salon_id, nombre} — mesa asignada al ticket actual
+
+// ── Cargar desde Supabase ─────────────────────────────
+async function mesasCargar(){
+  const licId = parseInt(localStorage.getItem('ali'))||null;
+  if(!licId || USAR_DEMO) return;
+  try{
+    const rs = await fetch(SUPA_URL+'/rest/v1/pos_salones?licencia_id=eq.'+licId+'&activo=eq.true&order=orden.asc,id.asc',
+      {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
+    mesasSalones = await rs.json();
+
+    const rm = await fetch(SUPA_URL+'/rest/v1/pos_mesas?licencia_id=eq.'+licId+'&activo=eq.true&order=orden.asc,id.asc',
+      {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
+    mesasMesas = await rm.json();
+  }catch(e){ console.warn('[Mesas] Error cargando:', e.message); }
+}
+
+// ── Abrir pantalla mesas ──────────────────────────────
+async function abrirPantallaMesas(){
+  await mesasCargar();
+  if(mesasSalones.length === 0){
+    // Sin salones → preguntar si crear
+    const ok = confirm('No hay salones configurados. ¿Deseas crear uno ahora?');
+    if(ok) { goTo('scMesas'); renderMesasScreen(); abrirGestionMesas(); }
+    return;
+  }
+  if(!mesaSalonSel && mesasSalones.length) mesaSalonSel = mesasSalones[0].id;
+  goTo('scMesas');
+  renderMesasScreen();
+}
+
+// ── Render pantalla principal ─────────────────────────
+function renderMesasScreen(){
+  // Tabs de salones
+  const bar = document.getElementById('mesasSalonesBar');
+  if(!bar) return;
+  bar.innerHTML = mesasSalones.map(s =>
+    '<button class="salon-tab'+(mesaSalonSel===s.id?' sel':'')+
+    '" style="border-bottom-color:'+(mesaSalonSel===s.id?s.color:'transparent')+
+    ';color:'+(mesaSalonSel===s.id?s.color:'var(--muted)')+
+    '" onclick="mesaSelSalon('+s.id+')">'+s.nombre+'</button>'
+  ).join('');
+
+  // Mesas del salón seleccionado
+  const salon = mesasSalones.find(s => s.id === mesaSalonSel);
+  const mesas = mesasMesas.filter(m => m.salon_id === mesaSalonSel);
+  const grid  = document.getElementById('mesasGrid');
+  const empty = document.getElementById('mesasEmpty');
+
+  if(!salon || !mesas.length){
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  grid.innerHTML = mesas.map(m => {
+    const pend   = pendientes.find(p => p.mesa_id === m.id);
+    const ocupada = !!pend;
+    const dot    = ocupada ? 'ocupada' : 'libre';
+    const info   = ocupada
+      ? ('₲'+Math.round(pend.total||0).toLocaleString('es-PY'))
+      : (m.capacidad ? m.capacidad+' pers.' : '');
+    return '<div class="mesa-tile '+dot+'" onclick="onMesaTap('+m.id+')" '+
+      'style="border-color:'+(ocupada?'#e53935':salon.color)+
+      ';background:'+(ocupada?'rgba(229,57,53,.12)':'rgba('+hexToRgb(salon.color)+',.1)')+'">'+
+      '<div class="mesa-dot '+dot+'"></div>'+
+      '<div class="mesa-tile-nombre">'+m.nombre+'</div>'+
+      '<div class="mesa-tile-info">'+info+'</div>'+
+      '</div>';
+  }).join('');
+}
+
+function mesaSelSalon(id){
+  mesaSalonSel = id;
+  renderMesasScreen();
+}
+
+// ── Tap en una mesa ───────────────────────────────────
+function onMesaTap(mesaId){
+  const mesa  = mesasMesas.find(m => m.id === mesaId);
+  if(!mesa) return;
+  const pend  = pendientes.find(p => p.mesa_id === mesaId);
+
+  if(pend){
+    // Mesa OCUPADA → cargar ese ticket
+    mesaActual = mesa;
+    cargarPendiente(pendientes.indexOf(pend));
+    goTo('scSale');
+    toast('Mesa '+mesa.nombre+' — ticket #'+String(pend.nro).padStart(4,'0'));
+  } else {
+    // Mesa LIBRE → asignar al ticket actual
+    mesaActual = mesa;
+    setTipoPedido('local');
+    goTo('scSale');
+    toast('Mesa '+mesa.nombre+' seleccionada');
+    // Si hay items en el carrito, guardar como pendiente automáticamente
+    if(cart.length > 0){
+      setTimeout(function(){ guardarConMesa(); }, 200);
+    }
+  }
+}
+
+// ── Guardar ticket con mesa asignada ──────────────────
+function guardarConMesa(){
+  if(!mesaActual) return;
+  const obs = mesaActual.nombre;
+  // Guardar como pendiente igual que onBtnGuardar pero con mesa_id
+  if(currentTicketNro !== null){
+    const idx = pendientes.findIndex(t => t.nro === currentTicketNro);
+    if(idx >= 0){
+      pendientes[idx].cart    = JSON.parse(JSON.stringify(cart));
+      pendientes[idx].total   = calcTotal();
+      pendientes[idx].obs     = obs;
+      pendientes[idx].mesa_id = mesaActual.id;
+      pendientes[idx].fecha   = new Date().toISOString();
+      guardarPendientesLocal();
+      updBtnGuardar();
+      return;
+    }
+  }
+  const nro = ticketCounter++;
+  pendientes.push({
+    nro,
+    obs:     obs,
+    cart:    JSON.parse(JSON.stringify(cart)),
+    total:   calcTotal(),
+    fecha:   new Date().toISOString(),
+    mesa_id: mesaActual.id,
+    esPresupuesto: false,
+  });
+  currentTicketNro = null;
+  cart = [];
+  updUI(); updBtnGuardar();
+  guardarPendientesLocal();
+  // Mostrar nro en header
+  updTabTicketHeader();
+  toast('Mesa '+mesaActual.nombre+' — Ticket guardado');
+}
+
+// ── onBtnLocal: abrir pantalla mesas ──────────────────
+function onBtnLocal(){
+  if(mesasSalones.length > 0){
+    abrirPantallaMesas();
+  } else {
+    // Sin mesas configuradas → comportamiento normal
+    setTipoPedido('local');
+  }
+}
+
+// ── Limpiar mesa al confirmar pago ────────────────────
+function mesaLimpiarAlPagar(){
+  mesaActual = null;
+}
+
+// ── Helpers ───────────────────────────────────────────
+function hexToRgb(hex){
+  hex = hex.replace('#','');
+  if(hex.length===3) hex = hex.split('').map(x=>x+x).join('');
+  const n = parseInt(hex,16);
+  return ((n>>16)&255)+','+(((n>>8)&255))+','+(n&255);
+}
+
+// ══════════════════════════════════════════════════════
+// GESTIÓN SALONES Y MESAS (modal)
+// ══════════════════════════════════════════════════════
+const MESA_COLORES = [
+  '#e53935','#e91e63','#9c27b0','#673ab7','#3f51b5',
+  '#1565c0','#0288d1','#00838f','#2e7d32','#558b2f',
+  '#f57f17','#e65100','#4e342e','#546e7a','#37474f',
+];
+
+let mesaEditSalonId = null;  // salón en edición
+let mesaEditMesaId  = null;  // mesa en edición
+let mesaColorSel    = '#1565c0';
+
+function cerrarModalMesas(){
+  document.getElementById('mesasModal').classList.remove('open');
+}
+
+function abrirGestionMesas(){
+  mesaEditSalonId = null;
+  mesaEditMesaId  = null;
+  renderModalGestion();
+  document.getElementById('mesasModal').classList.add('open');
+}
+
+function renderModalGestion(){
+  const mc = document.getElementById('mesasModalContent');
+  const salonItems = mesasSalones.map(s =>
+    '<div class="mesas-salon-item">'+
+    '<div class="mesas-salon-color" style="background:'+s.color+'"></div>'+
+    '<span class="mesas-salon-name">'+s.nombre+'</span>'+
+    '<button class="mesas-btn-sm" onclick="editarSalon('+s.id+')">Editar</button>'+
+    '<button class="mesas-btn-sm danger" onclick="eliminarSalon('+s.id+')">Borrar</button>'+
+    '</div>'
+  ).join('') || '<p style="color:var(--muted);font-size:13px;">Sin salones aún.</p>';
+
+  mc.innerHTML =
+    '<div class="mesas-modal-title">Gestión de Salones y Mesas</div>'+
+
+    '<div class="mesas-section-title">Salones</div>'+
+    '<div class="mesas-salon-list">'+salonItems+'</div>'+
+    '<button class="mesas-btn-primary" onclick="abrirFormSalon(null)">+ Nuevo Salón</button>'+
+
+    (mesasSalones.length > 0 ?
+      '<div class="mesas-section-title" style="margin-top:20px;">Mesas por Salón</div>'+
+      mesasSalones.map(s => {
+        const mm = mesasMesas.filter(m => m.salon_id === s.id);
+        return '<div style="margin-bottom:12px;">'+
+          '<div style="font-size:12px;font-weight:700;color:'+s.color+';margin-bottom:6px;text-transform:uppercase;">'+s.nombre+'</div>'+
+          '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">'+
+          mm.map(m =>
+            '<div style="display:flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 8px;">'+
+            '<span style="font-size:13px;font-weight:700;color:var(--text);">'+m.nombre+'</span>'+
+            '<button class="mesas-btn-sm" style="padding:3px 7px;" onclick="editarMesa('+m.id+')">✎</button>'+
+            '<button class="mesas-btn-sm danger" style="padding:3px 7px;" onclick="eliminarMesa('+m.id+')">✕</button>'+
+            '</div>'
+          ).join('')+
+          '</div>'+
+          '<button class="mesas-btn-sm" onclick="abrirFormMesa('+s.id+')">+ Agregar mesa a '+s.nombre+'</button>'+
+          '</div>';
+      }).join('') : '')+
+
+    '<div style="height:12px;"></div>'+
+    '<button class="mesas-btn-sm" style="width:100%;padding:12px;" onclick="cerrarModalMesas()">Cerrar</button>';
+}
+
+function abrirFormSalon(salonId){
+  const s = salonId ? mesasSalones.find(x => x.id === salonId) : null;
+  mesaColorSel = s ? s.color : '#1565c0';
+  const mc = document.getElementById('mesasModalContent');
+  mc.innerHTML =
+    '<div class="mesas-modal-title">'+(s?'Editar':'Nuevo')+' Salón</div>'+
+    '<div class="mesas-form-row">'+
+      '<label class="mesas-form-label">Nombre del salón</label>'+
+      '<input class="mesas-form-input" id="formSalonNombre" placeholder="Ej: Terraza, Salón Principal" value="'+(s?s.nombre:'')+'" maxlength="40">'+
+    '</div>'+
+    '<div class="mesas-form-row">'+
+      '<label class="mesas-form-label">Color</label>'+
+      '<div class="mesas-color-row" id="mesasColorRow">'+
+      MESA_COLORES.map(c =>
+        '<div class="mesas-color-swatch'+(c===mesaColorSel?' sel':'')+'" style="background:'+c+'" onclick="selMesaColor(this)" data-color="'+c+'"></div>'
+      ).join('')+
+      '</div>'+
+    '</div>'+
+    '<button class="mesas-btn-primary" onclick="guardarSalon('+(salonId||'null')+')">'+
+      (s ? 'Guardar cambios' : 'Crear Salón')+'</button>'+
+    '<button class="mesas-btn-sm" style="width:100%;margin-top:8px;padding:12px;" onclick="abrirGestionMesas()">← Volver</button>';
+}
+
+function selMesaColor(el){
+  mesaColorSel = el.dataset.color || el.style.backgroundColor;
+  document.querySelectorAll('.mesas-color-swatch').forEach(s => s.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+async function guardarSalon(salonId){
+  const nombre = document.getElementById('formSalonNombre').value.trim();
+  if(!nombre){ toast('Ingresá un nombre'); return; }
+  const licId = parseInt(localStorage.getItem('ali'))||null;
+  const sucId = parseInt(localStorage.getItem('pos_sucursal_id'))||null;
+  if(!licId) return;
+  try{
+    if(salonId){
+      await fetch(SUPA_URL+'/rest/v1/pos_salones?id=eq.'+salonId,{
+        method:'PATCH',
+        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({nombre, color:mesaColorSel})
+      });
+    } else {
+      await fetch(SUPA_URL+'/rest/v1/pos_salones',{
+        method:'POST',
+        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({licencia_id:licId, sucursal_id:sucId, nombre, color:mesaColorSel})
+      });
+    }
+    await mesasCargar();
+    if(!mesaSalonSel && mesasSalones.length) mesaSalonSel = mesasSalones[0].id;
+    toast('✓ Salón guardado');
+    abrirGestionMesas();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+async function eliminarSalon(id){
+  if(!confirm('¿Borrar este salón y todas sus mesas?')) return;
+  try{
+    await fetch(SUPA_URL+'/rest/v1/pos_salones?id=eq.'+id,{
+      method:'DELETE',
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}
+    });
+    await mesasCargar();
+    if(mesaSalonSel===id) mesaSalonSel = mesasSalones[0]?.id||null;
+    toast('✓ Salón eliminado');
+    abrirGestionMesas();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+function editarSalon(id){ abrirFormSalon(id); }
+
+function abrirFormMesa(salonId, mesaId){
+  const m = mesaId ? mesasMesas.find(x => x.id === mesaId) : null;
+  const s = mesasSalones.find(x => x.id === (salonId || (m?m.salon_id:null)));
+  const mc = document.getElementById('mesasModalContent');
+  mc.innerHTML =
+    '<div class="mesas-modal-title">'+(m?'Editar':'Nueva')+' Mesa — '+(s?s.nombre:'')+' </div>'+
+    '<div class="mesas-form-row">'+
+      '<label class="mesas-form-label">Nombre de la mesa</label>'+
+      '<input class="mesas-form-input" id="formMesaNombre" placeholder="Ej: Mesa 1, Barra 2, VIP..." value="'+(m?m.nombre:'')+'" maxlength="30">'+
+    '</div>'+
+    '<div class="mesas-form-row">'+
+      '<label class="mesas-form-label">Capacidad (personas)</label>'+
+      '<input class="mesas-form-input" id="formMesaCap" type="number" min="1" max="50" value="'+(m?m.capacidad:4)+'">'+
+    '</div>'+
+    '<button class="mesas-btn-primary" onclick="guardarMesa('+(salonId||s.id)+','+(mesaId||'null')+')">'+
+      (m?'Guardar cambios':'Crear Mesa')+'</button>'+
+    '<button class="mesas-btn-sm" style="width:100%;margin-top:8px;padding:12px;" onclick="abrirGestionMesas()">← Volver</button>';
+}
+
+async function guardarMesa(salonId, mesaId){
+  const nombre = document.getElementById('formMesaNombre').value.trim();
+  const cap    = parseInt(document.getElementById('formMesaCap').value)||4;
+  if(!nombre){ toast('Ingresá un nombre'); return; }
+  const licId = parseInt(localStorage.getItem('ali'))||null;
+  const sucId = parseInt(localStorage.getItem('pos_sucursal_id'))||null;
+  try{
+    if(mesaId){
+      await fetch(SUPA_URL+'/rest/v1/pos_mesas?id=eq.'+mesaId,{
+        method:'PATCH',
+        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({nombre, capacidad:cap})
+      });
+    } else {
+      await fetch(SUPA_URL+'/rest/v1/pos_mesas',{
+        method:'POST',
+        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({salon_id:salonId, licencia_id:licId, sucursal_id:sucId, nombre, capacidad:cap})
+      });
+    }
+    await mesasCargar();
+    toast('✓ Mesa guardada');
+    abrirGestionMesas();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+async function eliminarMesa(id){
+  if(!confirm('¿Borrar esta mesa?')) return;
+  try{
+    await fetch(SUPA_URL+'/rest/v1/pos_mesas?id=eq.'+id,{
+      method:'DELETE',
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}
+    });
+    await mesasCargar();
+    toast('✓ Mesa eliminada');
+    abrirGestionMesas();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+function editarMesa(id){
+  const m = mesasMesas.find(x => x.id === id);
+  if(m) abrirFormMesa(m.salon_id, id);
 }
 
 function gs(n){ return '₲'+Math.round(n||0).toLocaleString('es-PY'); }
