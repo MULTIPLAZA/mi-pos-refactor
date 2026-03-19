@@ -4930,48 +4930,75 @@ function abrirVentanaImpresion(html, size){
   const mmW = size==='58' ? '58mm' : '80mm';
   const pxW = size==='58' ? 230 : 310;
 
-  // En PWA instalada window.open no funciona — usar iframe oculto
-  const isPWA = window.matchMedia('(display-mode: standalone)').matches
-             || window.navigator.standalone === true;
-
-  if(isPWA){
-    // Método PWA: iframe oculto que imprime directo
-    let iframe = document.getElementById('printFrame');
-    if(!iframe){
-      iframe = document.createElement('iframe');
-      iframe.id = 'printFrame';
-      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;';
-      document.body.appendChild(iframe);
+  // Método 1: Blob URL — funciona en PWA Android, Chrome, cualquier contexto
+  try{
+    const blob = new Blob([html], {type:'text/html'});
+    const url  = URL.createObjectURL(blob);
+    const win  = window.open(url, '_blank');
+    if(win){
+      win.onload = function(){
+        setTimeout(function(){
+          win.focus();
+          win.print();
+          setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+        }, 400);
+      };
+      // Fallback si onload no dispara (algunos Android)
+      setTimeout(function(){
+        try{ win.focus(); win.print(); }catch(e){}
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+      }, 1500);
+      return;
     }
+  }catch(e){ console.warn('[Print] Blob falló:', e.message); }
+
+  // Método 2: iframe visible temporalmente — funciona cuando window.open bloqueado
+  try{
+    let iframe = document.getElementById('printFrame');
+    if(iframe) iframe.remove();
+    iframe = document.createElement('iframe');
+    iframe.id = 'printFrame';
+    iframe.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;border:none;z-index:99999;background:#fff;';
+    document.body.appendChild(iframe);
     const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write(html);
-    doc.close();
+    doc.open(); doc.write(html); doc.close();
     setTimeout(function(){
       try{
         iframe.contentWindow.focus();
         iframe.contentWindow.print();
-      }catch(e){
-        // Fallback: abrir en misma ventana
-        const w = window.open('','_blank');
-        if(w){ w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(),300); }
+        setTimeout(function(){ iframe.remove(); }, 3000);
+      }catch(e2){
+        iframe.remove();
+        // Método 3: window.print con CSS @media
+        _imprimirConCSSMedia(html, mmW);
       }
-    }, 600);
+    }, 800);
     return;
-  }
+  }catch(e){ console.warn('[Print] iframe falló:', e.message); }
 
-  // Navegador normal — ventana nueva
-  const instruccion = `<div id="printInfo" style="font-family:Arial,sans-serif;font-size:11px;color:#666;background:#fff3cd;border:1px solid #ffc107;padding:8px 10px;margin-bottom:8px;border-radius:4px;"><b>⚠️ Configurar impresión:</b><br>1. Más opciones → <b>Tamaño del papel: ${mmW}</b><br>2. Márgenes: <b>Ninguno / Sin márgenes</b><br>3. Desactivar "Encabezados y pies de página"</div>`;
-  const htmlFinal = html.replace('<body>', '<body>'+instruccion);
-  const win = window.open('','_blank','width='+pxW+',height=700,menubar=no,toolbar=no,location=no');
-  if(!win){ alert('Permitir ventanas emergentes para imprimir'); return; }
-  win.document.write(htmlFinal);
-  win.document.close();
-  win.focus();
-  const style = win.document.createElement('style');
-  style.textContent = '@media print { #printInfo { display:none !important; } }';
-  win.document.head.appendChild(style);
-  setTimeout(()=>{ win.print(); win.close(); }, 500);
+  // Método 3 directo si todo falla
+  _imprimirConCSSMedia(html, mmW);
+}
+
+function _imprimirConCSSMedia(html, mmW){
+  // Inyectar contenido en página actual con @media print
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  const content = bodyMatch ? bodyMatch[1] : html;
+  const ticketCss = styleMatch ? styleMatch[1] : '';
+  
+  let pd = document.getElementById('_printDiv');
+  if(!pd){ pd = document.createElement('div'); pd.id = '_printDiv'; document.body.appendChild(pd); }
+  pd.innerHTML = content;
+  
+  let ps = document.getElementById('_printStyle');
+  if(!ps){ ps = document.createElement('style'); ps.id = '_printStyle'; document.head.appendChild(ps); }
+  ps.textContent = '@media print{body>*:not(#_printDiv){display:none!important}#_printDiv{display:block!important}@page{size:'+mmW+' auto;margin:0}}@media screen{#_printDiv{display:none}}' + ticketCss;
+  
+  setTimeout(function(){
+    window.print();
+    setTimeout(function(){ pd.innerHTML=''; ps.textContent=''; }, 3000);
+  }, 300);
 }
 
 // Formatear número guaraní sin símbolo (para ticket)
