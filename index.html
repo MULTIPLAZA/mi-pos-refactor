@@ -4937,49 +4937,48 @@ function getCSSTermico(size){
 
 // Abrir ventana e imprimir
 function abrirVentanaImpresion(html, size){
-  const mmW = size==='58' ? '58mm' : '80mm';
-  const pxW = size==='58' ? 230 : 310;
+  const pxW = size==='58' ? '58mm' : '80mm';
 
-  // En PWA instalada window.open no funciona — usar iframe oculto
-  const isPWA = window.matchMedia('(display-mode: standalone)').matches
-             || window.navigator.standalone === true;
+  // Extraer solo el body del HTML del ticket
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  const bodyContent = bodyMatch ? bodyMatch[1] : html;
 
-  if(isPWA){
-    let iframe = document.getElementById('printFrame');
-    if(!iframe){
-      iframe = document.createElement('iframe');
-      iframe.id = 'printFrame';
-      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;';
-      document.body.appendChild(iframe);
-    }
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write(html);
-    doc.close();
-    setTimeout(function(){
-      try{
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-      }catch(e){
-        const w = window.open('','_blank');
-        if(w){ w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(),300); }
-      }
-    }, 600);
-    return;
+  // Extraer CSS del ticket
+  const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  const ticketCSS = styleMatch ? styleMatch[1] : '';
+
+  // Crear/reutilizar div de impresión
+  let printDiv = document.getElementById('printContent');
+  if(!printDiv){
+    printDiv = document.createElement('div');
+    printDiv.id = 'printContent';
+    document.body.appendChild(printDiv);
   }
+  printDiv.innerHTML = bodyContent;
 
-  // Navegador normal — ventana nueva
-  const instruccion = `<div id="printInfo" style="font-family:Arial,sans-serif;font-size:11px;color:#666;background:#fff3cd;border:1px solid #ffc107;padding:8px 10px;margin-bottom:8px;border-radius:4px;"><b>⚠️ Configurar impresión:</b><br>1. Más opciones → <b>Tamaño del papel: ${mmW}</b><br>2. Márgenes: <b>Ninguno / Sin márgenes</b><br>3. Desactivar "Encabezados y pies de página"</div>`;
-  const htmlFinal = html.replace('<body>', '<body>'+instruccion);
-  const win = window.open('','_blank','width='+pxW+',height=700,menubar=no,toolbar=no,location=no');
-  if(!win){ alert('Permitir ventanas emergentes para imprimir'); return; }
-  win.document.write(htmlFinal);
-  win.document.close();
-  win.focus();
-  const style = win.document.createElement('style');
-  style.textContent = '@media print { #printInfo { display:none !important; } }';
-  win.document.head.appendChild(style);
-  setTimeout(()=>{ win.print(); win.close(); }, 500);
+  // CSS: ocultar todo excepto printContent al imprimir
+  let printStyle = document.getElementById('printStyle');
+  if(!printStyle){
+    printStyle = document.createElement('style');
+    printStyle.id = 'printStyle';
+    document.head.appendChild(printStyle);
+  }
+  printStyle.textContent =
+    '@media print {'+
+    '  body > *:not(#printContent) { display:none !important; }'+
+    '  #printContent { display:block !important; }'+
+    '  @page { size: '+pxW+' auto; margin:0; }'+
+    '}'+
+    '@media screen { #printContent { display:none; } }'+
+    ticketCSS;
+
+  setTimeout(function(){
+    window.print();
+    // Limpiar después de imprimir
+    setTimeout(function(){
+      if(printDiv) printDiv.innerHTML = '';
+    }, 2000);
+  }, 300);
 }
 
 // Formatear número guaraní sin símbolo (para ticket)
