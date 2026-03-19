@@ -950,6 +950,7 @@
 
   /* SCREEN: COBRAR */
   #scCobrar { background:var(--bg); }
+  #scCobrar.active { display:flex; flex-direction:column; }
   .cobrar-hdr {
     background:var(--bg-header); display:flex; align-items:center;
     padding:0 14px; height:56px; border-bottom:1px solid rgba(0,0,0,.2); flex-shrink:0;
@@ -960,7 +961,7 @@
     margin-left:auto; background:none; border:none; color:#fff;
     font-family:'Barlow',sans-serif; font-size:14px; font-weight:700; letter-spacing:.8px; cursor:pointer; padding:8px;
   }
-  .cbody { flex:1; overflow-y:auto; padding:32px 20px 24px; display:flex; flex-direction:column; background:var(--bg); }
+  .cbody { flex:1; overflow-y:auto; padding:24px 20px 8px; display:flex; flex-direction:column; background:var(--bg); }
   .ctotal { font-size:44px; font-weight:800; text-align:center; letter-spacing:-1px; line-height:1; color:var(--text); }
   .ctotal-lbl { font-size:14px; color:var(--muted); text-align:center; margin-top:6px; margin-bottom:32px; }
   .efec-sec { margin-bottom:28px; }
@@ -1094,7 +1095,7 @@
 
   /* CONFIRM PAYMENT BUTTON */
   .cobrar-footer {
-    padding:16px 20px;
+    padding:12px 20px 20px;
     background:var(--bg);
     border-top:1px solid var(--border);
     flex-shrink:0;
@@ -1465,10 +1466,13 @@
     flex-shrink: 0;
   }
   .tab-ticket-nro {
-    font-size: 13px; font-weight: 800; color: var(--text);
-    letter-spacing: .5px;
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    letter-spacing: .4px; text-transform: uppercase;
   }
-  .tab-ticket-nro span { color: var(--green); }
+  .tab-ticket-nro span {
+    font-size: 18px; font-weight: 800; color: var(--green);
+    display: block; line-height: 1.1; margin-top: 1px;
+  }
   .tab-tipo-btns { display: flex; gap: 4px; }
   .tab-tipo-btn {
     background: var(--bg-card); border: 1.5px solid var(--border2);
@@ -1605,6 +1609,7 @@
   }
   @media (min-width: 700px) {
     .mob-tipo-bar { display: none !important; }
+    #mobDeliveryBar { display: none !important; }
   }
 
   /* PC: 5 columnas fijas */
@@ -1615,6 +1620,54 @@
     .pname { font-size:11px; }
   }
 
+
+  /* ── MESAS ─────────────────────────────────────────── */
+  #scMesas.active { display:flex; flex-direction:column; }
+  .mesas-header { background:var(--bg-header); display:flex; align-items:center; padding:0 12px; height:56px; gap:10px; flex-shrink:0; }
+  .mesas-title  { flex:1; font-size:17px; font-weight:700; color:#fff; }
+  .mesas-salones-bar { display:flex; gap:0; overflow-x:auto; flex-shrink:0; background:var(--bg-dark); border-bottom:1px solid var(--border); scrollbar-width:none; }
+  .mesas-salones-bar::-webkit-scrollbar { display:none; }
+  .salon-tab { padding:10px 18px; font-size:12px; font-weight:700; font-family:'Barlow',sans-serif; text-transform:uppercase; letter-spacing:.5px; cursor:pointer; white-space:nowrap; border-bottom:3px solid transparent; color:var(--muted); background:none; border-left:none; border-right:none; border-top:none; transition:all .15s; }
+  .salon-tab.sel { color:#fff; }
+  .mesas-body { flex:1; overflow-y:auto; padding:14px; }
+  .mesas-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:10px; }
+  .mesa-tile {
+    aspect-ratio:1; border-radius:10px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:4px; cursor:pointer;
+    border:2px solid transparent; transition:all .15s; position:relative;
+    padding:8px 4px;
+  }
+  .mesa-tile.libre  { border-color:var(--green); background:rgba(76,175,80,.1); }
+  .mesa-tile.ocupada { border-color:#e53935; background:rgba(229,57,53,.12); }
+  .mesa-tile-nombre { font-size:13px; font-weight:800; font-family:'Barlow',sans-serif; text-transform:uppercase; text-align:center; color:var(--text); line-height:1.2; }
+  .mesa-tile-info   { font-size:10px; font-weight:600; color:var(--muted); text-align:center; }
+  .mesa-tile.ocupada .mesa-tile-nombre { color:#ef9a9a; }
+  .mesa-tile.ocupada .mesa-tile-info   { color:#ef9a9a; }
+  .mesa-dot { width:8px; height:8px; border-radius:50%; position:absolute; top:6px; right:6px; }
+  .mesa-dot.libre   { background:var(--green); }
+  .mesa-dot.ocupada { background:#e53935; }
+  .mesas-empty { text-align:center; color:var(--muted); padding:60px 20px; font-size:14px; }
+  .mesas-fab { position:fixed; bottom:20px; right:20px; width:52px; height:52px; border-radius:50%; background:var(--green); border:none; color:#fff; font-size:26px; cursor:pointer; box-shadow:0 4px 16px rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; z-index:10; }
+
+  /* Modal gestión mesas */
+  .mesas-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; display:none; align-items:flex-end; justify-content:center; }
+  .mesas-modal-overlay.open { display:flex; }
+  .mesas-modal { background:var(--bg-card); border-radius:16px 16px 0 0; padding:20px 16px; width:100%; max-width:500px; max-height:80vh; overflow-y:auto; }
+  .mesas-modal-title { font-size:16px; font-weight:800; color:var(--text); margin-bottom:14px; }
+  .mesas-form-row { margin-bottom:12px; }
+  .mesas-form-label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; display:block; }
+  .mesas-form-input { width:100%; background:var(--bg); border:1.5px solid var(--border2); border-radius:6px; color:var(--text); font-family:'Barlow',sans-serif; font-size:15px; font-weight:600; padding:10px 12px; box-sizing:border-box; outline:none; }
+  .mesas-color-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+  .mesas-color-swatch { width:30px; height:30px; border-radius:6px; cursor:pointer; border:3px solid transparent; transition:all .15s; }
+  .mesas-color-swatch.sel { border-color:#fff; transform:scale(1.15); }
+  .mesas-salon-list { display:flex; flex-direction:column; gap:6px; margin-bottom:12px; }
+  .mesas-salon-item { display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--bg); border-radius:8px; border:1px solid var(--border); }
+  .mesas-salon-color { width:14px; height:14px; border-radius:50%; flex-shrink:0; }
+  .mesas-salon-name  { flex:1; font-size:14px; font-weight:700; color:var(--text); }
+  .mesas-btn-sm { background:var(--border2); border:none; border-radius:4px; color:var(--text); font-size:11px; font-weight:700; padding:5px 10px; cursor:pointer; font-family:'Barlow',sans-serif; }
+  .mesas-btn-sm.danger { background:rgba(229,57,53,.2); color:#ef9a9a; }
+  .mesas-btn-primary { width:100%; background:var(--green); border:none; border-radius:8px; color:#fff; font-family:'Barlow',sans-serif; font-size:14px; font-weight:800; padding:14px; cursor:pointer; margin-top:8px; }
+  .mesas-section-title { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; margin:14px 0 8px; }
   ::-webkit-scrollbar { width:2px; }
   ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
 
@@ -2399,6 +2452,13 @@
       Configuración
     </div>
 
+    <div class="drawer-item" onclick="drawerGo('mesas')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      Mesas
+    </div>
     <div class="drawer-separator"></div>
 
     <div class="drawer-item" onclick="drawerGo('backoffice')">
@@ -2574,6 +2634,34 @@
 </div>
 
 <!-- ======== SCREEN: TURNO CERRADO ======== -->
+
+<!-- ======== SCREEN: MESAS ======== -->
+<div id="scMesas" class="screen">
+  <div class="mesas-header">
+    <button class="hbtn" onclick="goTo('scSale')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <span class="mesas-title">Mesas</span>
+    <button class="hbtn" onclick="abrirGestionMesas()" title="Gestionar salones y mesas">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M16.24 7.76a6 6 0 0 1 0 8.49M6.34 17.66a6 6 0 0 1 0-8.49M4.93 19.07a10 10 0 0 1 0-14.14"/></svg>
+    </button>
+  </div>
+  <!-- Tabs de salones -->
+  <div class="mesas-salones-bar" id="mesasSalonesBar"></div>
+  <!-- Grid de mesas -->
+  <div class="mesas-body">
+    <div class="mesas-grid" id="mesasGrid"></div>
+    <div class="mesas-empty" id="mesasEmpty" style="display:none;">
+      Sin mesas configuradas.<br>Tocá ⚙ para crear salones y mesas.
+    </div>
+  </div>
+</div>
+
+<!-- Modal gestión salones/mesas -->
+<div class="mesas-modal-overlay" id="mesasModal" onclick="if(event.target===this)cerrarModalMesas()">
+  <div class="mesas-modal" id="mesasModalContent"></div>
+</div>
+
 <div id="scClosed" class="screen active">
   <header class="header">
     <button class="hbtn" onclick="openDrawer()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
@@ -2642,11 +2730,15 @@
 
   <!-- Barra tipo pedido móvil -->
   <div class="mob-tipo-bar">
-    <button class="mob-tipo-btn sel" id="mobTipoBtnLocal"    onclick="setTipoPedido('local')">🍽 Local</button>
-    <button class="mob-tipo-btn"     id="mobTipoBtnLlevar"   onclick="setTipoPedido('llevar')">📦 Para llevar</button>
-    <button class="mob-tipo-btn"     id="mobTipoBtnDelivery" onclick="setTipoPedido('delivery')">🛵 Delivery</button>
+    <button class="mob-tipo-btn" id="mobTipoBtnLocal"    onclick="onBtnLocal()">Local</button>
+    <button class="mob-tipo-btn sel" id="mobTipoBtnLlevar"   onclick="setTipoPedido('llevar')">Para llevar</button>
+    <button class="mob-tipo-btn"     id="mobTipoBtnDelivery" onclick="setTipoPedido('delivery')">Delivery</button>
   </div>
-
+  <!-- Barra delivery móvil — solo visible en celular al seleccionar Delivery -->
+  <div id="mobDeliveryBar" style="display:none;align-items:center;gap:8px;padding:7px 12px;background:rgba(255,152,0,.1);border-bottom:1px solid rgba(255,152,0,.3);flex-shrink:0;">
+    <span style="font-size:11px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;">Monto envío</span>
+    <button onclick="openNpDelivery()" style="flex:1;background:var(--orange);border:none;border-radius:5px;color:#fff;font-family:'Barlow',sans-serif;font-size:12px;font-weight:800;padding:7px 10px;cursor:pointer;">+ Ingresar monto</button>
+  </div>
   <!-- SPLIT WRAPPER (flex en tablet, contents en móvil) -->
   <div class="tablet-split">
 
@@ -2676,20 +2768,19 @@
     <div class="tablet-right" id="tabletRight">
       <!-- Header: Nro ticket + tipo pedido -->
       <div class="tab-ticket-header">
-        <div class="tab-ticket-nro">🎫 Ticket <span id="tabTicketNro">#—</span></div>
+        <div class="tab-ticket-nro">Nro. Ticket: <span id="tabTicketNro">#—</span></div>
         <div class="tab-tipo-btns">
-          <button class="tab-tipo-btn sel" id="tipoBtnLocal" onclick="setTipoPedido('local')">🍽 Local</button>
-          <button class="tab-tipo-btn" id="tipoBtnLlevar" onclick="setTipoPedido('llevar')">📦 Llevar</button>
-          <button class="tab-tipo-btn" id="tipoBtnDelivery" onclick="setTipoPedido('delivery')">🛵 Delivery</button>
+          <button class="tab-tipo-btn" id="tipoBtnLocal" onclick="onBtnLocal()">Local</button>
+          <button class="tab-tipo-btn sel" id="tipoBtnLlevar" onclick="setTipoPedido('llevar')">Llevar</button>
+          <button class="tab-tipo-btn" id="tipoBtnDelivery" onclick="setTipoPedido('delivery')">Delivery</button>
         </div>
       </div>
       <!-- Panel monto delivery -->
       <div class="tab-delivery-bar" id="tabDeliveryBar">
-        <span class="tab-delivery-label">🛵 Envío</span>
+        <span class="tab-delivery-label">Monto envío</span>
         <input type="number" class="tab-delivery-input" id="tabDeliveryMonto"
-          placeholder="Monto..." min="0" step="1000"
-          onkeydown="if(event.key==='Enter') agregarMontoDelivery()">
-        <button class="tab-delivery-btn" onclick="agregarMontoDelivery()">+ Agregar</button>
+          placeholder="0" style="display:none">
+        <button class="tab-delivery-btn" onclick="openNpDelivery()">+ Ingresar monto</button>
       </div>
       <div class="tab-action-bar">
         <button class="tab-btn-left" onclick="onBtnGuardar()">
@@ -2748,7 +2839,6 @@
       <button class="det-cobrar-btn" onclick="imprimirTicketActual()" style="background:var(--bg-dark);border:1.5px solid var(--border);color:var(--text);margin-right:6px;padding:14px 12px;" title="Imprimir ticket">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       </button>
-      <button class="det-cobrar-btn" onclick="imprimirComandaPreCobro()" style="background:#1565c0;margin-right:6px;padding:14px 12px;" title="Comanda cocina">🍳</button>
       <button class="det-cobrar-btn" onclick="goCobrar()">COBRAR</button>
     </div>
   </div>
@@ -2766,7 +2856,7 @@
     <div class="ctotal" id="ctotal">₲0</div>
     <p class="ctotal-lbl">Importe total adeudado</p>
     <!-- Descuento en ticket -->
-    <div id="descTicketRow" style="display:none;background:rgba(255,152,0,.1);border:1px solid rgba(255,152,0,.3);border-radius:8px;padding:8px 14px;margin:0 16px 8px;display:flex;align-items:center;justify-content:space-between;">
+    <div id="descTicketRow" style="display:none;background:rgba(255,152,0,.1);border:1px solid rgba(255,152,0,.3);border-radius:8px;padding:8px 14px;margin:0 0 8px;align-items:center;justify-content:space-between;">
       <span style="font-size:12px;color:var(--orange);">Descuento aplicado</span>
       <span style="font-size:13px;font-weight:700;color:var(--orange);" id="descTicketMonto">-₲0</span>
     </div>
@@ -2822,7 +2912,7 @@
           <span class="factura-label">RUC / C.I.</span>
           <div style="display:flex;align-items:center;gap:8px;">
             <input class="factura-input" id="factRuc" type="text" placeholder="Ej: 1234567-8" maxlength="20"
-              oninput="onRucInput()" style="flex:1;">
+              oninput="onRucInput()" onclick="openNpRuc()" readonly style="flex:1;">
             <button onclick="consultarRuc()" id="btnBuscarRuc" style="
               background:var(--green);border:none;border-radius:4px;
               color:#fff;padding:8px 12px;cursor:pointer;
@@ -2938,7 +3028,14 @@
       <button class="billete-btn" onclick="npBillete(50000)">50 mil</button>
       <button class="billete-btn" onclick="npBillete(100000)">100 mil</button>
     </div>
-    <div class="np-grid">
+    <!-- Modo texto: input nativo del teclado del sistema -->
+    <input type="text" id="npTextInput" autocomplete="off" autocorrect="off"
+      style="display:none;width:100%;background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;
+        color:var(--text);font-family:'Barlow',sans-serif;font-size:18px;font-weight:700;
+        padding:10px 12px;box-sizing:border-box;margin-bottom:12px;outline:none;"
+      oninput="npVal=this.value"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();npOK();}else if(event.key==='Escape'){cerrarNpTexto();document.getElementById('npOverlay').classList.remove('open');}">
+    <div class="np-grid" id="npGrid">
       <button class="npb" onclick="npP('1')">1</button><button class="npb" onclick="npP('2')">2</button><button class="npb" onclick="npP('3')">3</button>
       <button class="npb" onclick="npP('4')">4</button><button class="npb" onclick="npP('5')">5</button><button class="npb" onclick="npP('6')">6</button>
       <button class="npb" onclick="npP('7')">7</button><button class="npb" onclick="npP('8')">8</button><button class="npb" onclick="npP('9')">9</button>
@@ -3407,7 +3504,8 @@ function imprimirComandaPreCobro(){
     items:     cart,
     fecha:     d,
     nroTicket: nroTicket || ticketCounter,
-    tipoPedido: tipoPedido||'local',
+    tipoPedido: tipoPedido||'llevar',
+    mesa:      mesaActual ? mesaActual.nombre : null,
     factura:   null
   });
 }
@@ -3443,9 +3541,11 @@ function vaciarTicket(){
   if(!cart.length) return;
   cart = [];
   currentTicketNro = null;
-  tipoPedido = 'local';
-  setTipoPedido('local');
+  mesaActual = null;
+  tipoPedido = 'llevar';
+  setTipoPedido('llevar');
   updTabTicketHeader();
+  updMesaBtn();
   var dBar = document.getElementById('tabDeliveryBar');
   if(dBar) dBar.classList.remove('visible');
   updUI();
@@ -3455,8 +3555,8 @@ function vaciarTicket(){
 }
 
 // ── GUARDAR / TICKETS PENDIENTES ────────────────────────────────────────────
-let ticketCounter = 1;   // autonumérico creciente
-let tipoPedido = 'local'; // 'local' | 'llevar' | 'delivery'
+let ticketCounter = parseInt(localStorage.getItem('pos_ticket_counter')||'1');   // autonumérico creciente
+let tipoPedido = 'llevar'; // 'local' | 'llevar' | 'delivery'
 let pendientes = [];     // [{nro, obs, cart, total, fecha}]
 let currentTicketNro = null; // nro del ticket cargado actualmente (null = nuevo)
 
@@ -3472,23 +3572,72 @@ function setTipoPedido(tipo){
     var btn = document.getElementById('mobTipoBtn'+t.charAt(0).toUpperCase()+t.slice(1));
     if(btn) btn.classList.toggle('sel', t===tipo);
   });
-  // Mostrar/ocultar panel de monto delivery
+  // Mostrar/ocultar panel delivery — PC/Tablet (dentro del panel derecho)
   var bar = document.getElementById('tabDeliveryBar');
-  if(bar){
-    bar.classList.toggle('visible', tipo==='delivery');
-    if(tipo==='delivery'){
-      var inp = document.getElementById('tabDeliveryMonto');
-      if(inp){ inp.value=''; inp.focus(); }
-    }
-  }
+  if(bar) bar.classList.toggle('visible', tipo==='delivery');
+  // Mostrar/ocultar panel delivery — Móvil (fuera del tablet-right)
+  var mobBar = document.getElementById('mobDeliveryBar');
+  if(mobBar) mobBar.style.display = tipo==='delivery' ? 'flex' : 'none';
+
   // Si cambia de delivery, quitar ítem delivery del cart
   if(tipo !== 'delivery') quitarItemDelivery();
+}
+
+function openNpTexto(ctx, inputEl){
+  // Solo abrir en móvil (pantalla < 700px)
+  if(window.innerWidth >= 700) return;
+  inputEl.blur();
+  setTimeout(function(){ inputEl.blur(); }, 10);
+  npCtx = 'texto_' + ctx;
+  npVal = inputEl.value || '';
+  var labels = { ruc: 'RUC / C.I.', nombre: 'Razón Social / Nombre' };
+  document.getElementById('npLbl').textContent = labels[ctx] || ctx;
+  document.getElementById('npDisp').style.display = 'none';
+  document.getElementById('billetesRow').classList.remove('show');
+  var grid = document.getElementById('npGrid');
+  if(grid) grid.style.display = 'none';
+  var ti = document.getElementById('npTextInput');
+  ti.style.display = 'block';
+  ti.value = npVal;
+  ti.autocapitalize = ctx === 'nombre' ? 'words' : 'off';
+  document.getElementById('npOverlay').classList.add('open');
+  setTimeout(function(){ ti.focus(); }, 300);
+}
+
+function openNpRuc(){
+  npCtx = 'ruc';
+  npVal = document.getElementById('factRuc').value.trim() || '';
+  document.getElementById('npLbl').textContent = 'RUC / C.I.';
+  document.getElementById('npDisp').textContent = npVal || '—';
+  document.getElementById('billetesRow').classList.remove('show');
+  document.getElementById('npOverlay').classList.add('open');
+}
+
+function cerrarNpTexto(){
+  document.getElementById('npDisp').style.display = '';
+  var ng = document.getElementById('npGrid');
+  if(ng) ng.style.display = '';
+  var ti = document.getElementById('npTextInput');
+  if(ti){ ti.style.display = 'none'; ti.value = ''; }
+  npCtx = '';
 }
 
 function quitarItemDelivery(){
   var idx = cart.findIndex(function(i){ return i.esDelivery; });
   if(idx >= 0){ cart.splice(idx,1); updUI(); updBtnGuardar(); }
 }
+
+function openNpDelivery(){
+  var existing = cart.find(function(i){ return i.esDelivery; });
+  npCtx = 'delivery';
+  npVal = existing ? String(existing.price) : '';
+  document.getElementById('npLbl').textContent = 'Monto del envío (Delivery)';
+  document.getElementById('npDisp').textContent = existing ? gs(existing.price) : '₲0';
+  document.getElementById('billetesRow').classList.remove('show');
+  document.getElementById('npOverlay').classList.add('open');
+}
+
+
 
 function agregarMontoDelivery(){
   var inp = document.getElementById('tabDeliveryMonto');
@@ -3502,7 +3651,7 @@ function agregarMontoDelivery(){
   cart.push({
     lineId: Date.now()*1000 + 999,
     id: 'delivery_item',
-    name: '🛵 Envío delivery',
+    name: 'Envío delivery',
     price: monto,
     qty: 1,
     obs: '',
@@ -3518,16 +3667,22 @@ function agregarMontoDelivery(){
 }
 
 function updTabTicketHeader(){
+  updMesaBtn();
   var nro = currentTicketNro !== null
     ? String(currentTicketNro).padStart(4,'0')
     : String(ticketCounter).padStart(4,'0');
   var nroEl = document.getElementById('tabTicketNro');
-  if(nroEl) nroEl.textContent = '#' + nro;
+  if(nroEl) nroEl.textContent = '#' + nro + (mesaActual ? '  '+mesaActual.nombre : '');
   var mobNroEl = document.getElementById('mobTicketNro');
   if(mobNroEl) mobNroEl.textContent = '#' + nro;
 }
 
 function onBtnGuardar(){
+  // Si hay mesa asignada, usar flujo de mesas
+  if(mesaActual){
+    guardarConMesa();
+    return;
+  }
   const tieneProductos = calcTotal() > 0;
   if(tieneProductos){
     // siempre guardar si hay productos, sin importar si hay pendientes
@@ -3591,7 +3746,7 @@ function doGuardar(){
     toast('✓ Ticket #'+String(nro).padStart(4,'0')+' actualizado');
   } else {
     // Ticket nuevo — siempre pendiente (nunca presupuesto por defecto)
-    const nro = ticketCounter++;
+    const nro = ticketCounter++; localStorage.setItem('pos_ticket_counter', ticketCounter);
     pendientes.push({
       nro,
       obs:           obs || '',
@@ -3689,12 +3844,14 @@ function nuevaVenta(){
       fecha: new Date(),
       esPresupuesto: false,
     });
-    ticketCounter++;
+    ticketCounter++; localStorage.setItem('pos_ticket_counter', ticketCounter);
   }
   cart=[];
   currentTicketNro = null;
+  mesaActual = null;
   updUI();
   updBtnGuardar();
+  updMesaBtn();
   goTo('scSale');
 }
 
@@ -3901,7 +4058,8 @@ function confirmarPago(){
   const comprobante = document.getElementById('compDisplay')?.textContent || '';
   const efectivoEntregado = document.getElementById('efecVal')?.textContent || '';
   const vuelto = document.getElementById('vueltoAmt')?.textContent || '';
-  const nroTicket = currentTicketNro;
+  // Capturar nro ANTES de limpiar — si es ticket nuevo usar ticketCounter y avanzarlo
+  const nroTicket = currentTicketNro !== null ? currentTicketNro : ticketCounter++; localStorage.setItem('pos_ticket_counter', ticketCounter);
 
   // ── Validaciones de factura ──────────────────────────────
   if(facturaActiva){
@@ -3965,6 +4123,7 @@ function confirmarPago(){
     comprobante: comprobante==='—'?'':comprobante,
     factura: facturaData, fecha: new Date(), nroTicket
   });
+  mesaLimpiarAlPagar();
   resetFactura();
   generarRecibo({
     items: itemsVenta,
@@ -3976,7 +4135,8 @@ function confirmarPago(){
     efectivo: efectivoEntregado,
     vuelto: document.getElementById('vueltoRow').classList.contains('show') ? vuelto : '',
     nroTicket,
-    tipoPedido: tipoPedido||'local',
+    tipoPedido: tipoPedido||'llevar',
+    mesa: mesaActual ? mesaActual.nombre : null,
     fecha: new Date(),
     factura: facturaData
   });
@@ -4067,8 +4227,9 @@ function renderGeneralInfo(){
   const el = document.getElementById('generalInfoPanel');
   if(!el) return;
 
-  const terminal = localStorage.getItem('pos_terminal') || 'Terminal 1';
-  const sucursal = localStorage.getItem('pos_sucursal') || '—';
+  const terminal   = localStorage.getItem('pos_terminal') || 'Terminal 1';
+  const sucursal   = localStorage.getItem('pos_sucursal') || '—';
+  const depId      = localStorage.getItem('pos_deposito_id') || null;
   const tim = getTimbradoActivo();
   const pad3 = n => String(n||0).padStart(3,'0');
   const padN = n => String(n||0).padStart(7,'0');
@@ -4085,10 +4246,36 @@ function renderGeneralInfo(){
           <span style="font-size:12px;color:#777;">Nombre</span>
           <span style="font-size:16px;font-weight:800;color:#fff;">${terminal}</span>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
           <span style="font-size:12px;color:#777;">Sucursal</span>
           <span style="font-size:13px;font-weight:600;color:#ccc;">${sucursal}</span>
         </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:#777;">Depósito ID (stock)</span>
+          ${depId
+            ? '<span style="font-size:13px;font-weight:800;color:var(--green);">ID: '+depId+'</span>'
+            : '<span style="font-size:12px;color:var(--red);font-weight:700;">⚠️ No configurado</span>'
+          }
+        </div>
+        ${!depId ? `
+        <div style="margin-top:8px;padding:10px;background:rgba(239,83,80,.08);border:1px solid rgba(239,83,80,.3);border-radius:8px;">
+          <div style="font-size:11px;color:var(--red);margin-bottom:8px;font-weight:700;">Sin depósito — el stock no se descuenta al vender</div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <input id="cfgDepId" type="number" placeholder="ID depósito (ej: 19)"
+              style="flex:1;min-width:100px;background:#1a1a1a;border:1px solid #444;border-radius:6px;color:#fff;font-family:Barlow,sans-serif;font-size:13px;padding:8px 10px;outline:none;">
+            <input id="cfgSucId" type="number" placeholder="ID sucursal"
+              style="width:100px;background:#1a1a1a;border:1px solid #444;border-radius:6px;color:#fff;font-family:Barlow,sans-serif;font-size:13px;padding:8px 10px;outline:none;">
+            <button onclick="guardarDepositoId()"
+              style="background:var(--green);border:none;border-radius:6px;color:#fff;font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:8px 14px;cursor:pointer;">
+              Guardar
+            </button>
+          </div>
+          <div style="font-size:10px;color:#666;margin-top:6px;">Consultá el ID en Admin → Inventarios. SAN ANTONIO = 19, ASUNCION = 6</div>
+        </div>` : `
+        <button onclick="resetDepositoId()"
+          style="margin-top:6px;background:none;border:1px solid #333;border-radius:6px;color:#666;font-family:Barlow,sans-serif;font-size:11px;padding:5px 10px;cursor:pointer;width:100%;">
+          Cambiar depósito (ID actual: ${depId})
+        </button>`}
       </div>
     </div>
 
@@ -4743,29 +4930,75 @@ function abrirVentanaImpresion(html, size){
   const mmW = size==='58' ? '58mm' : '80mm';
   const pxW = size==='58' ? 230 : 310;
 
-  // Inject print instructions into HTML
-  const instruccion = `
-    <div id="printInfo" style="font-family:Arial,sans-serif;font-size:11px;color:#666;
-      background:#fff3cd;border:1px solid #ffc107;padding:8px 10px;margin-bottom:8px;
-      border-radius:4px;">
-      <b>⚠️ Configurar impresión:</b><br>
-      1. Más opciones → <b>Tamaño del papel: ${mmW}</b><br>
-      2. Márgenes: <b>Ninguno / Sin márgenes</b><br>
-      3. Desactivar "Encabezados y pies de página"
-    </div>`;
+  // Método 1: Blob URL — funciona en PWA Android, Chrome, cualquier contexto
+  try{
+    const blob = new Blob([html], {type:'text/html'});
+    const url  = URL.createObjectURL(blob);
+    const win  = window.open(url, '_blank');
+    if(win){
+      win.onload = function(){
+        setTimeout(function(){
+          win.focus();
+          win.print();
+          setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+        }, 400);
+      };
+      // Fallback si onload no dispara (algunos Android)
+      setTimeout(function(){
+        try{ win.focus(); win.print(); }catch(e){}
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+      }, 1500);
+      return;
+    }
+  }catch(e){ console.warn('[Print] Blob falló:', e.message); }
 
-  const htmlFinal = html.replace('<body>', '<body>'+instruccion);
+  // Método 2: iframe visible temporalmente — funciona cuando window.open bloqueado
+  try{
+    let iframe = document.getElementById('printFrame');
+    if(iframe) iframe.remove();
+    iframe = document.createElement('iframe');
+    iframe.id = 'printFrame';
+    iframe.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;border:none;z-index:99999;background:#fff;';
+    document.body.appendChild(iframe);
+    const doc = iframe.contentWindow.document;
+    doc.open(); doc.write(html); doc.close();
+    setTimeout(function(){
+      try{
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+        setTimeout(function(){ iframe.remove(); }, 3000);
+      }catch(e2){
+        iframe.remove();
+        // Método 3: window.print con CSS @media
+        _imprimirConCSSMedia(html, mmW);
+      }
+    }, 800);
+    return;
+  }catch(e){ console.warn('[Print] iframe falló:', e.message); }
 
-  const win = window.open('','_blank',
-    'width='+pxW+',height=700,menubar=no,toolbar=no,location=no');
-  win.document.write(htmlFinal);
-  win.document.close();
-  win.focus();
-  // Hide instructions when printing
-  const style = win.document.createElement('style');
-  style.textContent = '@media print { #printInfo { display:none !important; } }';
-  win.document.head.appendChild(style);
-  setTimeout(()=>{ win.print(); }, 500);
+  // Método 3 directo si todo falla
+  _imprimirConCSSMedia(html, mmW);
+}
+
+function _imprimirConCSSMedia(html, mmW){
+  // Inyectar contenido en página actual con @media print
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  const content = bodyMatch ? bodyMatch[1] : html;
+  const ticketCss = styleMatch ? styleMatch[1] : '';
+  
+  let pd = document.getElementById('_printDiv');
+  if(!pd){ pd = document.createElement('div'); pd.id = '_printDiv'; document.body.appendChild(pd); }
+  pd.innerHTML = content;
+  
+  let ps = document.getElementById('_printStyle');
+  if(!ps){ ps = document.createElement('style'); ps.id = '_printStyle'; document.head.appendChild(ps); }
+  ps.textContent = '@media print{body>*:not(#_printDiv){display:none!important}#_printDiv{display:block!important}@page{size:'+mmW+' auto;margin:0}}@media screen{#_printDiv{display:none}}' + ticketCss;
+  
+  setTimeout(function(){
+    window.print();
+    setTimeout(function(){ pd.innerHTML=''; ps.textContent=''; }, 3000);
+  }, 300);
 }
 
 // Formatear número guaraní sin símbolo (para ticket)
@@ -4991,15 +5224,21 @@ function generarHTMLComanda(data, size){
 
   let lineas = '';
 
-  lineas += '<p class="c b">Orden #: '+String(data.nroTicket||0)+'</p>';
-  lineas += '<p class="c s">Fecha: '+fecha+'</p>';
-  lineas += '<p class="c l">'+hora+'</p>';
-  lineas += '<p class="c s">TICKET: #'+String(data.nroTicket||0).padStart(4,'0')+'</p>';
-  if(data.tipoPedido && data.tipoPedido!=='local'){
-    const tipos={'llevar':'📦 PARA LLEVAR','delivery':'🛵 DELIVERY'};
-    lineas += '<p class="c b" style="font-size:14px;border:1px solid #000;padding:2px 0;margin:2px 0">'+( tipos[data.tipoPedido]||data.tipoPedido.toUpperCase())+'</p>';
+  // Mesa: mostrar MUY GRANDE si aplica
+  if(data.mesa){
+    lineas += '<p class="hr"></p>';
+    lineas += '<p class="c" style="font-size:28px;font-weight:900;letter-spacing:2px;margin:4px 0;">'+data.mesa.toUpperCase()+'</p>';
+    lineas += '<p class="hr"></p>';
   }
-  lineas += '<p class="c s">CLIENTE: '+(data.factura?.nombre||'SIN NOMBRE')+'</p>';
+  lineas += '<p class="c b">Orden #: '+String(data.nroTicket||0).padStart(4,'0')+'</p>';
+  lineas += '<p class="c s">'+fecha+' '+hora+'</p>';
+  if(data.tipoPedido && data.tipoPedido!=='local'){
+    const tipos={'llevar':'PARA LLEVAR','delivery':'DELIVERY'};
+    lineas += '<p class="c b" style="font-size:13px;border:1px solid #000;padding:2px 0;margin:2px 0">'+(tipos[data.tipoPedido]||data.tipoPedido.toUpperCase())+'</p>';
+  }
+  if(data.factura && data.factura.nombre){
+    lineas += '<p class="c s">CLIENTE: '+data.factura.nombre+'</p>';
+  }
   lineas += '<p class="hr"></p>';
 
   lineas += '<p class="row s"><span class="l1">Canc.</span><span class="l2">Descripcion</span></p>';
@@ -5071,7 +5310,13 @@ function imprimirRecibo(){
   const html = esFactura
     ? generarHTMLFactura(ultimoReciboData, size)
     : generarHTMLTicket(ultimoReciboData, size);
-  abrirVentanaImpresion(html, size);
+  // Si hay impresora BT configurada, usar ESC/POS; si no, ventana de impresión
+  const p = printers['ticket'];
+  if(p && p.type==='bt' && p.device){
+    imprimirBluetooth(p.device, html, size);
+  } else {
+    abrirVentanaImpresion(html, size);
+  }
 }
 
 // ── IMPRIMIR COMANDA ──────────────────────────────────────
@@ -5082,6 +5327,10 @@ function imprimirComanda(data){
 }
 
 function finalizarRecibo(){
+  mesaActual = null;
+  updMesaBtn();
+  tipoPedido = 'llevar';
+  setTipoPedido('llevar');
   goTo('scSale');
 }
 
@@ -5119,9 +5368,23 @@ function openNP(ctx){
   document.getElementById('billetesRow').classList.toggle('show', showBilletes);
   document.getElementById('npOverlay').classList.add('open');
 }
-function npOutside(e){ if(e.target===document.getElementById('npOverlay'))document.getElementById('npOverlay').classList.remove('open'); }
+function npOutside(e){
+  if(e.target===document.getElementById('npOverlay')){
+    if(npCtx && npCtx.startsWith('texto_')) cerrarNpTexto();
+    document.getElementById('npOverlay').classList.remove('open');
+  }
+}
+document.addEventListener('keydown', function(e){
+  var ov = document.getElementById('npOverlay');
+  if(!ov || !ov.classList.contains('open')) return;
+  if(npCtx && npCtx.startsWith('texto_')) return; // input nativo maneja texto
+  if(e.key>='0' && e.key<='9'){ e.preventDefault(); npP(e.key); }
+  else if(e.key==='Backspace'){ e.preventDefault(); npD(); }
+  else if(e.key==='Enter'){ e.preventDefault(); npOK(); }
+  else if(e.key==='Escape'){ e.preventDefault(); cerrarNpTexto(); ov.classList.remove('open'); }
+});
 function npP(d){
-  if(npCtx==='comprobante'||npCtx==='divComp'){
+  if(npCtx==='comprobante'||npCtx==='divComp'||npCtx==='ruc'){
     npVal+=d; if(npVal.length>15)npVal=npVal.slice(0,15);
     document.getElementById('npDisp').textContent = npVal || '—';
   } else {
@@ -5132,7 +5395,7 @@ function npP(d){
 }
 function npD(){
   npVal=npVal.slice(0,-1);
-  if(npCtx==='comprobante'||npCtx==='divComp'){
+  if(npCtx==='comprobante'||npCtx==='divComp'||npCtx==='ruc'){
     document.getElementById('npDisp').textContent = npVal || '—';
   } else {
     document.getElementById('npDisp').textContent=gs(parseInt(npVal)||0);
@@ -5177,6 +5440,41 @@ function npOK(){
     }
     updCierreDiff();
     document.getElementById('npOverlay').classList.remove('open');
+    return;
+  } else if(npCtx==='delivery'){
+    const monto = parseInt(npVal)||0;
+    if(monto > 0){
+      const tabInp = document.getElementById('tabDeliveryMonto');
+      if(tabInp) tabInp.value = monto;
+      agregarMontoDelivery();
+    }
+    document.getElementById('npOverlay').classList.remove('open');
+    return;
+  } else if(npCtx.startsWith('texto_')){
+    const campo = npCtx.replace('texto_','');
+    const ti = document.getElementById('npTextInput');
+    const val = (ti ? ti.value : npVal).trim();
+    if(campo==='ruc'){
+      const el = document.getElementById('factRuc');
+      if(el){ el.value = val; onRucInput(); }
+    } else if(campo==='nombre'){
+      const el = document.getElementById('factNombre');
+      if(el) el.value = val;
+    }
+    cerrarNpTexto();
+    document.getElementById('npOverlay').classList.remove('open');
+    return;
+  } else if(npCtx==='ruc'){
+    const elRuc = document.getElementById('factRuc');
+    if(elRuc){
+      elRuc.value = npVal;
+      document.getElementById('npOverlay').classList.remove('open');
+      if(npVal.replace(/-/g,'').length >= 5){
+        setTimeout(consultarRuc, 200);
+      }
+    } else {
+      document.getElementById('npOverlay').classList.remove('open');
+    }
     return;
   } else if(npCtx==='comprobante'){
     const display = document.getElementById('compDisplay');
@@ -5448,11 +5746,110 @@ function supaInsertVenta(data){
   .then(r => {
     if(!r.ok) return r.text().then(t => { throw new Error(t); });
     console.log('[Venta] Guardada en Supabase OK');
+    // Descontar stock en background
+    stockDescontarVenta(data.items, data.comprobante || ('VENTA-'+Date.now()));
   })
   .catch(e => {
     console.warn('[Venta] Error Supabase, encolando:', e.message);
     if(db) dbQueueSync('ventas','insert', venta);
   });
+}
+
+// ── DESCUENTO DE STOCK POR VENTA ─────────────────────────────────────────
+async function stockDescontarVenta(items, comprobante){
+  const depId    = parseInt(localStorage.getItem('pos_deposito_id'))||null;
+  const sucId    = parseInt(localStorage.getItem('pos_sucursal_id'))||null;
+  const email    = localStorage.getItem(SK.email);
+  if(!depId || !email) return; // terminal sin depósito configurado
+
+  // Filtrar solo items con inventario=true
+  const prods = PRODS || [];
+  const itemsInv = (items||[]).filter(function(it){
+    if(it.esDelivery || it.esDescuento) return false;
+    const p = prods.find(function(p){ return p.id===it.id; });
+    return p && p.inventario;
+  });
+  if(!itemsInv.length) return;
+
+  try{
+    // Leer licencia_id
+    const licId = parseInt(localStorage.getItem('ali')) || null;
+    if(!licId) return;
+
+    // Leer stock actual
+    const prodIds = itemsInv.map(function(i){ return i.id; }).join(',');
+    const stockR = await fetch(
+      SUPA_URL+'/rest/v1/stock?deposito_id=eq.'+depId+'&producto_id=in.('+prodIds+')&select=producto_id,cantidad',
+      { headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'} }
+    );
+    const stockData = await stockR.json();
+    const stockMap = {};
+    (stockData||[]).forEach(function(s){ stockMap[s.producto_id] = parseFloat(s.cantidad)||0; });
+
+    // Crear comprobante de venta
+    const compR = await fetch(SUPA_URL+'/rest/v1/stock_comprobantes', {
+      method: 'POST',
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=representation'},
+      body: JSON.stringify({
+        licencia_id: licId,
+        deposito_id: depId,
+        sucursal_id: sucId,
+        tipo: 'venta',
+        referencia: comprobante || ('VENTA-'+Date.now()),
+        observacion: 'Venta registrada desde POS',
+        terminal: localStorage.getItem('pos_terminal')||'Terminal',
+        usuario: email,
+        fecha: new Date().toISOString()
+      })
+    });
+    const compData = await compR.json();
+    const compId = Array.isArray(compData) ? compData[0].id : compData.id;
+
+    // Items del comprobante + upsert stock
+    const compItems = itemsInv.map(function(it){
+      const qty   = parseFloat(it.qty)||1;
+      const antes = stockMap[it.id]||0;
+      const desp  = antes - qty;
+      return {
+        comprobante_id: compId,
+        producto_id:    it.id,
+        nombre_producto: it.name||it.nombre||'',
+        cantidad:       -qty,
+        cantidad_antes: antes,
+        cantidad_despues: desp,
+        costo_unitario: 0
+      };
+    });
+
+    await fetch(SUPA_URL+'/rest/v1/stock_comprobante_items', {
+      method: 'POST',
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify(compItems)
+    });
+
+    // Upsert stock (actualizar cantidades)
+    for(const it of itemsInv){
+      const qty   = parseFloat(it.qty)||1;
+      const antes = stockMap[it.id]||0;
+      const desp  = antes - qty;
+      fetch(SUPA_URL+'/rest/v1/stock?on_conflict=deposito_id,producto_id', {
+        method: 'POST',
+        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+        body: JSON.stringify({
+          deposito_id: depId,
+          sucursal_id: sucId,
+          licencia_id: licId,
+          producto_id: it.id,
+          nombre_producto: it.name||it.nombre||'',
+          cantidad: desp,
+          updated_at: new Date().toISOString()
+        })
+      }).catch(function(e){ console.warn('[Stock] upsert error:', e.message); });
+    }
+    console.log('[Stock] Descontado — '+itemsInv.length+' productos | depósito:', depId);
+  }catch(e){
+    console.warn('[Stock] Error descontando:', e.message);
+  }
 }
 
 // Sincronizar ventas pendientes de la cola
@@ -6164,6 +6561,8 @@ function drawerGo(section){
   } else if(section === 'turno'){
     goTo('scTurno');
     renderTurno();
+  } else if(section === 'mesas'){
+    abrirPantallaMesas();
   } else {
     if(section === 'configuracion'){
       goToConfig();
@@ -7189,21 +7588,33 @@ function crearArticuloDesdeCategoria(){
 var cierreTicketHTML = '';
 var cierreTextoPlano = '';
 
-function buildCierreTicket(){
+function buildCierreTicket(size){
+  size = size || getPaperSize('ticket') || '58';
+  var cols = size==='80' ? 48 : 32;
   var saldoEsperado = calcSaldoEsperado();
   var totalContado = Object.values(cierreMetodos).reduce(function(s,d){return s+d.contado;},0);
   var diff = totalContado > 0 ? totalContado - saldoEsperado : null;
   var ahora = new Date();
-  var pad = function(n){ return String(n).padStart(2,'0'); };
-  var fmt = function(d){ return d ? pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+' '+pad(d.getHours())+':'+pad(d.getMinutes()) : '-'; };
+  var pad2 = function(n){ return String(n).padStart(2,'0'); };
+  var fmtDT = function(d){ return d ? pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+'/'+d.getFullYear()+' '+pad2(d.getHours())+':'+pad2(d.getMinutes())+':'+pad2(d.getSeconds()) : '-'; };
+  var gn2 = function(n){ return Math.round(n||0).toLocaleString('es-PY'); };
 
-  var totalVentas = turnoData.ventas.reduce(function(s,v){return s+v.total;},0);
+  var negocio  = configData.negocio   || localStorage.getItem('an') || 'MI NEGOCIO';
+  var ruc      = configData.ruc       || localStorage.getItem('ar') || '';
+  var dir      = configData.direccion || localStorage.getItem('ad') || '';
+  var terminal = configData.terminal  || localStorage.getItem('pos_terminal') || 'CAJA1';
+  var usuario  = 'admin';
+  var compNro  = turnoData.comprobante || '001-001-001';
+
+  var totalVentas  = turnoData.ventas.reduce(function(s,v){return s+v.total;},0);
   var totalEgresos = turnoData.egresos.filter(function(e){return !e.anulada;}).reduce(function(s,e){return s+e.monto;},0);
-  var cantVentas = turnoData.ventas.length;
-  var ticketProm = cantVentas > 0 ? Math.round(totalVentas/cantVentas) : 0;
-  var ventasFacturadas = turnoData.ventas.filter(function(v){return v.factura;}).length;
-  var montoFacturado = turnoData.ventas.filter(function(v){return v.factura;}).reduce(function(s,v){return s+v.total;},0);
+  var totalIngresos = (turnoData.ingresos||[]).reduce(function(s,i){return s+i.monto;},0);
+  var cantVentas   = turnoData.ventas.length;
+  var saldoCaja    = turnoData.efectivoInicial + totalVentas + totalIngresos - totalEgresos;
+  var rendicion    = 0; // monto rendido/retirado
+  var diferencia   = rendicion - saldoCaja;
 
+  // Formas de pago
   var metodos = {};
   turnoData.ventas.forEach(function(v){
     var m=(v.metodo||'EFECTIVO').toUpperCase();
@@ -7211,99 +7622,161 @@ function buildCierreTicket(){
     metodos[m].total+=v.total; metodos[m].ops++;
   });
 
-  var SEP = '<hr style="border:none;border-top:1px dashed #999;margin:8px 0;">';
+  // Helper: línea separadora
+  var SEP_CHAR = '-'.repeat(cols);
+  var sep = function(){ return '<p style="margin:0;letter-spacing:0;">'+SEP_CHAR+'</p>'; };
 
-  var metodosRows = '';
-  Object.entries(metodos).forEach(function(e){
-    metodosRows += '<div style="display:flex;justify-content:space-between;margin:3px 0;"><span>'+e[0]+' ('+e[1].ops+' op.)</span><span>'+gs(e[1].total)+'</span></div>';
+  // Helper: fila izq/der alineada
+  var row = function(l, r, bold){
+    l=String(l); r=String(r);
+    var sp=Math.max(1,cols-l.length-r.length);
+    var line=l+' '.repeat(sp)+r;
+    return bold
+      ? '<p style="margin:0;font-weight:bold;">'+line+'</p>'
+      : '<p style="margin:0;">'+line+'</p>';
+  };
+  var rowLabel = function(label){
+    return '<p style="margin:4px 0 2px;font-weight:bold;letter-spacing:1px;">'+label+'</p>';
+  };
+  var center = function(text, bold){
+    var s=String(text); var sp=Math.max(0,Math.floor((cols-s.length)/2));
+    var line=' '.repeat(sp)+s;
+    return bold
+      ? '<p style="margin:0;font-weight:bold;text-align:center;">'+line+'</p>'
+      : '<p style="margin:0;text-align:center;">'+line+'</p>';
+  };
+
+  var css = 'body{font-family:"Courier New",Courier,monospace;font-size:'+(size==='80'?'11':'9')+'pt;'
+    +'width:'+(size==='80'?'80':'58')+'mm;margin:0;padding:2mm 0;background:#fff;color:#000;}'
+    +'p{margin:0;padding:0;line-height:1.3;white-space:pre;}';
+
+  var lines = '';
+  // Cabecera
+  lines += center(negocio, true);
+  if(ruc)  lines += center('RUC: '+ruc);
+  if(dir)  lines += center(dir);
+  lines += sep();
+  lines += center('CIERRE DE CAJA', true);
+  lines += sep();
+  lines += row('Comprobante:', compNro);
+  lines += row('Apertura:', fmtDT(turnoData.fechaApertura));
+  lines += row('Usuario:', usuario);
+  lines += row('Local:', terminal);
+  lines += row('Cierre:', fmtDT(ahora));
+  lines += sep();
+  // RESUMEN
+  lines += rowLabel('RESUMEN');
+  lines += sep();
+  lines += row('Importe Inicial', gn2(turnoData.efectivoInicial));
+  lines += row('Total Entrada', gn2(totalVentas));
+  lines += row('', gn2(totalVentas));
+  lines += row('Total Salida', gn2(totalEgresos));
+  lines += row('Saldo En Caja', gn2(saldoCaja), true);
+  lines += row('Rendicion', gn2(rendicion));
+  lines += row('Diferencia', (diferencia>0?'+':'')+gn2(diferencia));
+  lines += sep();
+  // FORMAS DE PAGO
+  lines += rowLabel('FORMAS DE PAGO');
+  lines += sep();
+  Object.entries(metodos).sort(function(a,b){return b[1].total-a[1].total;}).forEach(function(e){
+    var label = e[0];
+    var ops   = e[1].ops;
+    var monto = gn2(e[1].total);
+    // label + ops (alineado) + monto
+    var mid   = String(ops);
+    var sp    = Math.max(1, cols - label.length - mid.length - monto.length - 2);
+    lines += '<p style="margin:0;white-space:pre;">'+label+' '.repeat(sp)+mid+'  '+monto+'</p>';
   });
-
-  var egresosSection = '';
-  if(totalEgresos > 0){
-    var eRows = '';
-    turnoData.egresos.forEach(function(e){
-      eRows += '<div style="display:flex;justify-content:space-between;margin:3px 0;"><span>'+e.desc+'</span><span style="color:red;">-'+gs(e.monto)+'</span></div>';
+  lines += row('TOTAL:', gn2(totalVentas), true);
+  lines += sep();
+  // MOVIMIENTOS DE CAJA
+  lines += rowLabel('MOVIMIENTOS DE CAJA');
+  lines += sep();
+  var totalEntMovs = (turnoData.ingresos||[]).reduce(function(s,i){return s+i.monto;},0);
+  lines += row('Total Entrada:', gn2(totalEntMovs));
+  lines += row('Total Salida :', gn2(totalEgresos));
+  if(turnoData.egresos && turnoData.egresos.length){
+    turnoData.egresos.filter(function(e){return !e.anulada;}).forEach(function(e){
+      lines += row('  '+e.desc.substring(0,cols-14), gn2(e.monto));
     });
-    egresosSection = '<div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin:6px 0 3px;font-weight:700;">Egresos de Caja</div>'+eRows+
-      '<div style="display:flex;justify-content:space-between;margin:3px 0;font-weight:700;"><span>Total egresos:</span><span style="color:red;">-'+gs(totalEgresos)+'</span></div>'+SEP;
   }
-
-  var conteoSection = '';
+  lines += sep();
+  // Conteo si existe
   if(totalContado > 0){
-    var cRows = '';
+    lines += rowLabel('CONTEO DE VALORES');
+    lines += sep();
     Object.entries(cierreMetodos).forEach(function(e){
       var m=e[0], d=e[1];
-      if(d.contado > 0){
+      if(d.contado>0){
         var dif=d.contado-d.esperado;
-        var difStr=dif===0?'OK':dif>0?'+'+gs(dif):'-'+gs(Math.abs(dif));
-        var difC=dif===0?'green':dif>0?'orange':'red';
-        cRows += '<div style="display:flex;justify-content:space-between;margin:3px 0;"><span>'+m+'</span><span>'+gs(d.contado)+'</span></div>'+
-          '<div style="display:flex;justify-content:space-between;font-size:10px;padding:0 0 3px 10px;"><span style="color:#777;">Esperado: '+gs(d.esperado)+'</span><span style="color:'+difC+';font-weight:700;">'+difStr+'</span></div>';
+        var difStr=dif===0?' OK':dif>0?' +'+gn2(dif):' -'+gn2(Math.abs(dif));
+        lines += row(m.substring(0,cols-gn2(d.contado).length-1), gn2(d.contado));
+        lines += '<p style="margin:0;padding-left:8px;font-size:9pt;">Esp: '+gn2(d.esperado)+'  '+difStr+'</p>';
       }
     });
-    conteoSection = '<div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin:6px 0 3px;font-weight:700;">Conteo de Valores</div>'+cRows+
-      '<div style="display:flex;justify-content:space-between;margin:3px 0;font-weight:700;"><span>Total contado:</span><span>'+gs(totalContado)+'</span></div>'+
-      '<div style="display:flex;justify-content:space-between;margin:3px 0;font-weight:700;"><span>Saldo esperado:</span><span>'+gs(saldoEsperado)+'</span></div>'+SEP;
+    if(diff!==null){
+      var dLabel = diff===0 ? 'CUADRE EXACTO' : diff>0 ? 'SOBRANTE: +'+gn2(diff) : 'FALTANTE: -'+gn2(Math.abs(diff));
+      lines += '<p style="margin:4px 0;font-weight:bold;text-align:center;">'+dLabel+'</p>';
+    }
+    lines += sep();
   }
+  // Firma
+  lines += '<p style="margin:0;white-space:pre;">OBS:</p>';
+  lines += sep();
+  lines += '<p style="margin:20px 0 0;">&nbsp;</p>';
+  lines += '<p style="margin:0;border-top:1px solid #000;">&nbsp;</p>';
+  lines += center('Firma - Aclaracion - CI');
+  lines += '<p style="margin:8px 0 0;">&nbsp;</p>';
+  lines += center(usuario+' '+fmtDT(ahora));
+  lines += sep();
+  lines += '<p style="margin:0 0 16px;">&nbsp;</p>';
 
-  var diffSection = '';
-  if(diff !== null){
-    var dLabel, dColor;
-    if(diff===0){ dLabel='CUADRE EXACTO'; dColor='green'; }
-    else if(diff>0){ dLabel='SOBRANTE: +'+gs(diff); dColor='orange'; }
-    else { dLabel='FALTANTE: -'+gs(Math.abs(diff)); dColor='red'; }
-    diffSection = '<div style="text-align:center;font-size:13px;font-weight:700;color:'+dColor+';padding:6px;border:2px solid '+dColor+';margin:4px 0;">'+dLabel+'</div>'+SEP;
-  }
-
-  var factSection = '';
-  if(ventasFacturadas > 0){
-    factSection = '<div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin:6px 0 3px;font-weight:700;">Facturacion</div>'+
-      '<div style="display:flex;justify-content:space-between;margin:3px 0;"><span>Ventas facturadas ('+ventasFacturadas+'):</span><span>'+gs(montoFacturado)+'</span></div>'+SEP;
-  }
-
-  var firmas =
-    '<div style="margin-top:16px;border-bottom:1px solid #000;height:24px;"></div>'+
-    '<div style="text-align:center;font-size:11px;color:#555;margin-top:2px;">Firma del cajero</div>'+
-    '<div style="margin-top:14px;border-bottom:1px solid #000;height:24px;"></div>'+
-    '<div style="text-align:center;font-size:11px;color:#555;margin-top:2px;">Firma del supervisor</div>';
-
-  cierreTicketHTML =
-    '<div style="text-align:center;font-size:15px;font-weight:700;">MI NEGOCIO</div>'+
-    '<div style="text-align:center;font-size:11px;color:#555;">ASUNCION</div>'+
-    '<div style="text-align:center;font-size:12px;font-weight:700;letter-spacing:1px;margin-top:4px;">RENDICION DE CAJA</div>'+
-    SEP+
-    '<div style="display:flex;justify-content:space-between;margin:3px 0;"><span>Apertura:</span><span>'+fmt(turnoData.fechaApertura)+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between;margin:3px 0;"><span>Cierre:</span><span>'+fmt(ahora)+'</span></div>'+
-    SEP+
-    '<div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin:6px 0 3px;font-weight:700;">Resumen de Ventas</div>'+
-    '<div style="display:flex;justify-content:space-between;margin:3px 0;"><span>Ef. inicial:</span><span>'+gs(turnoData.efectivoInicial)+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between;margin:3px 0;font-weight:700;"><span>Total ventas ('+cantVentas+'):</span><span style="color:green;">'+gs(totalVentas)+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between;margin:3px 0;font-size:11px;color:#555;"><span>Ticket promedio:</span><span>'+gs(ticketProm)+'</span></div>'+
-    SEP+
-    '<div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin:6px 0 3px;font-weight:700;">Formas de Pago</div>'+
-    metodosRows+SEP+
-    egresosSection+conteoSection+diffSection+factSection+firmas+
-    '<div style="text-align:center;font-size:11px;color:#888;margin-top:12px;">'+fmt(ahora)+'</div>';
+  cierreTicketHTML = '<html><head><style>'+css+'</style></head><body>'+lines+'</body></html>';
 
   // Texto plano para WhatsApp
-  var wa = '*RENDICION DE CAJA - MI NEGOCIO*\n';
-  wa += 'Apertura: '+fmt(turnoData.fechaApertura)+'\nCierre: '+fmt(ahora)+'\n\n';
-  wa += '*VENTAS*\nTotal ('+cantVentas+'): '+gs(totalVentas)+'\nEf. inicial: '+gs(turnoData.efectivoInicial)+'\n\n';
-  wa += '*FORMAS DE PAGO*\n';
-  Object.entries(metodos).forEach(function(e){ wa += e[0]+' ('+e[1].ops+' op): '+gs(e[1].total)+'\n'; });
-  if(totalEgresos>0){ wa += '\n*EGRESOS*\nTotal: -'+gs(totalEgresos)+'\n'; }
-  if(totalContado>0){ wa += '\n*CONTEO*\nTotal contado: '+gs(totalContado)+'\nSaldo esperado: '+gs(saldoEsperado)+'\n'; }
+  var wa = '*CIERRE DE CAJA - '+negocio+'*\n';
+  wa += 'Apertura: '+fmtDT(turnoData.fechaApertura)+'\nCierre: '+fmtDT(ahora)+'\n';
+  wa += '\n*RESUMEN*\n';
+  wa += 'Ef. Inicial: '+gn2(turnoData.efectivoInicial)+'\n';
+  wa += 'Total Entrada: '+gn2(totalVentas)+'\n';
+  wa += 'Total Salida: '+gn2(totalEgresos)+'\n';
+  wa += 'Saldo en Caja: '+gn2(saldoCaja)+'\n';
+  wa += 'Diferencia: '+gn2(diferencia)+'\n';
+  wa += '\n*FORMAS DE PAGO*\n';
+  Object.entries(metodos).forEach(function(e){ wa += e[0]+' ('+e[1].ops+'): '+gn2(e[1].total)+'\n'; });
+  wa += 'TOTAL: '+gn2(totalVentas)+'\n';
+  if(totalContado>0){ wa += '\n*CONTEO*\nTotal contado: '+gn2(totalContado)+'\nSaldo esperado: '+gn2(saldoEsperado)+'\n'; }
   if(diff!==null){
     if(diff===0) wa += '\nCUADRE EXACTO';
-    else if(diff>0) wa += '\nSOBRANTE: +'+gs(diff);
-    else wa += '\nFALTANTE: -'+gs(Math.abs(diff));
+    else if(diff>0) wa += '\nSOBRANTE: +'+gn2(diff);
+    else wa += '\nFALTANTE: -'+gn2(Math.abs(diff));
   }
   cierreTextoPlano = wa;
 }
 
 function confirmarCierre(){
-  buildCierreTicket();
-  document.getElementById('previewPapel').innerHTML = cierreTicketHTML;
+  var size = getPaperSize('ticket') || '58';
+  buildCierreTicket(size);
+  // Preview en iframe para fidelidad
+  var papel = document.getElementById('previewPapel');
+  var pxW = size==='80' ? 320 : 220;
+  papel.style.width = pxW+'px';
+  papel.style.padding = '0';
+  papel.style.background = 'transparent';
+  papel.style.boxShadow = 'none';
+  var iframeCierre = document.getElementById('cierreIframe');
+  if(iframeCierre) iframeCierre.remove();
+  iframeCierre = document.createElement('iframe');
+  iframeCierre.id = 'cierreIframe';
+  iframeCierre.style.cssText = 'width:'+pxW+'px;border:none;background:#fff;display:block;';
+  papel.innerHTML = '';
+  papel.appendChild(iframeCierre);
+  var doc = iframeCierre.contentWindow.document;
+  doc.open(); doc.write(cierreTicketHTML); doc.close();
+  // Ajustar altura al contenido
+  setTimeout(function(){
+    try{ iframeCierre.style.height = (iframeCierre.contentWindow.document.body.scrollHeight+20)+'px'; }catch(e){}
+  }, 200);
   turnoBorrar();
   turnoData = { fechaApertura: null, efectivoInicial: 0, ventas: [], egresos: [], ingresos: [] };
   cierreMetodos = {};
@@ -7311,13 +7784,33 @@ function confirmarCierre(){
 }
 
 function imprimirCierre(){
-  var css = 'body{font-family:"Courier New",monospace;font-size:12px;padding:16px;max-width:320px;margin:0 auto;}@media print{body{padding:0;}}';
-  var w = window.open('','_blank','width=420,height=800');
-  w.document.open();
-  w.document.write('<!DOCTYPE html><html><head><title>Rendicion</title><style>'+css+'<\/style><\/head><body>'+cierreTicketHTML+'<\/body><\/html>');
-  w.document.close();
-  w.focus();
-  setTimeout(function(){ w.print(); }, 500);
+  // NO regenerar — turnoData ya fue borrado en confirmarCierre
+  // Usar cierreTicketHTML generado con datos correctos
+  if(!cierreTicketHTML){ toast('Sin datos de cierre'); return; }
+  var isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true;
+  if(isPWA){
+    var iframe = document.getElementById('printFrame');
+    if(!iframe){
+      iframe = document.createElement('iframe');
+      iframe.id = 'printFrame';
+      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;';
+      document.body.appendChild(iframe);
+    }
+    var doc = iframe.contentWindow.document;
+    doc.open(); doc.write(cierreTicketHTML); doc.close();
+    setTimeout(function(){
+      try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }
+      catch(e){ window.print(); }
+    }, 600);
+  } else {
+    var w = window.open('','_blank','width=420,height=800');
+    if(!w){ alert('Permitir ventanas emergentes para imprimir'); return; }
+    w.document.open();
+    w.document.write(cierreTicketHTML);
+    w.document.close();
+    w.focus();
+    setTimeout(function(){ w.print(); w.close(); }, 500);
+  }
 }
 
 function compartirWhatsApp(){
@@ -7411,6 +7904,14 @@ function updPrinterUI(tipo){
   }
 }
 
+// UUIDs de servicios conocidos de impresoras térmicas BT
+const BT_SERVICES = [
+  '000018f0-0000-1000-8000-00805f9b34fb', // ESC/POS genérico
+  'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Xprinter / Zjiang
+  '49535343-fe7d-4ae5-8fa9-9fafd205e455', // Microprinter / innprinter
+  '0000ff00-0000-1000-8000-00805f9b34fb', // Alternativo genérico
+];
+
 async function conectarBluetooth(tipo){
   if(!navigator.bluetooth){
     toast('Web Bluetooth no disponible en este dispositivo/browser');
@@ -7418,18 +7919,20 @@ async function conectarBluetooth(tipo){
   }
   try {
     toast('Buscando impresoras...');
-    const device = await navigator.bluetooth.requestDevice({
-      filters: [
-        { services: ['000018f0-0000-1000-8000-00805f9b34fb'] }, // ESC/POS común
-      ],
-      optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
-    }).catch(async () => {
-      // Fallback: mostrar todas las impresoras
-      return await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+    let device;
+    try {
+      // Intento 1: filtrar por servicio ESC/POS conocido
+      device = await navigator.bluetooth.requestDevice({
+        filters: BT_SERVICES.map(s => ({ services: [s] })),
+        optionalServices: BT_SERVICES
       });
-    });
+    } catch(e1) {
+      // Intento 2: mostrar todos los dispositivos BT
+      device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: BT_SERVICES
+      });
+    }
     printers[tipo].device = device;
     printers[tipo].name   = device.name || 'Impresora BT';
     printers[tipo].type   = 'bt';
@@ -7613,33 +8116,73 @@ async function imprimirBluetooth(device, htmlContent, size){
 
   bytes.push(...CMD.feed,...CMD.cut);
 
-  // Enviar en chunks de 512 bytes (límite BLE)
-  const CHUNK=512;
+  // Enviar en chunks conservadores para mayor compatibilidad
+  const CHUNK=200;
   try{
-    const server=await device.gatt.connect();
-    // Intentar con varios servicios conocidos de impresoras BT
-    let service, char;
+    // Reconectar si se desconectó
+    let server;
+    if(device.gatt.connected){
+      server=device.gatt;
+    } else {
+      server=await device.gatt.connect();
+    }
+
+    // Intentar servicios conocidos de impresoras BT
+    let char=null;
     const SERVICES=[
       {svc:'000018f0-0000-1000-8000-00805f9b34fb', chr:'00002af1-0000-1000-8000-00805f9b34fb'},
       {svc:'e7810a71-73ae-499d-8c15-faa9aef0c3f2', chr:'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f'},
       {svc:'49535343-fe7d-4ae5-8fa9-9fafd205e455', chr:'49535343-8841-43f4-a8d4-ecbe34729bb3'},
     ];
+    let lastErr='';
     for(const s of SERVICES){
       try{
-        service=await server.getPrimaryService(s.svc);
-        char=await service.getCharacteristic(s.chr);
+        const svc=await server.getPrimaryService(s.svc);
+        char=await svc.getCharacteristic(s.chr);
+        console.log('[BT] Servicio:', s.svc);
         break;
-      }catch(e){ continue; }
+      }catch(e){ lastErr=e.message; }
     }
-    if(!char) throw new Error('No se encontró el servicio de impresión');
+
+    // Fallback: escanear todos los servicios disponibles
+    if(!char){
+      try{
+        const svcs=await server.getPrimaryServices();
+        console.log('[BT] Servicios:', svcs.map(s=>s.uuid));
+        for(const svc of svcs){
+          const chars=await svc.getCharacteristics();
+          for(const c of chars){
+            if(c.properties.write||c.properties.writeWithoutResponse){
+              char=c;
+              console.log('[BT] Char:', c.uuid);
+              break;
+            }
+          }
+          if(char) break;
+        }
+      }catch(e2){ console.warn('[BT] Scan error:', e2.message); }
+    }
+
+    if(!char) throw new Error('Impresora no soportada. '+lastErr);
 
     const data=new Uint8Array(bytes);
     for(let i=0;i<data.length;i+=CHUNK){
-      await char.writeValueWithoutResponse(data.slice(i,i+CHUNK));
-      await new Promise(r=>setTimeout(r,20)); // pequeña pausa entre chunks
+      const chunk=data.slice(i,i+CHUNK);
+      try{
+        if(char.properties.writeWithoutResponse){
+          await char.writeValueWithoutResponse(chunk);
+        } else {
+          await char.writeValue(chunk);
+        }
+      }catch(e){
+        try{ await char.writeValue(chunk); }
+        catch(e2){ throw new Error('Error enviando datos: '+e2.message); }
+      }
+      await new Promise(r=>setTimeout(r,30));
     }
     toast('✓ Impreso por Bluetooth');
   }catch(e){
+    console.error('[BT]', e.message);
     toast('Error BT: '+e.message);
     imprimirTicketConf(htmlContent,'ticket');
   }
@@ -8272,20 +8815,30 @@ const DEMO_KEYS = {
 };
 const USAR_DEMO = (SUPA_URL === 'https://XXXXXXXXXXXXXXXX.supabase.co');
 
+// Cookie helpers para device_id (sobrevive borrar caché en algunos casos)
+function cookieSet(name, val, days){
+  const d = new Date(); d.setTime(d.getTime()+(days*86400000));
+  document.cookie = name+'='+encodeURIComponent(val)+';expires='+d.toUTCString()+';path=/;SameSite=Lax';
+}
+function cookieGet(name){
+  const m = document.cookie.match('(?:^|; )'+name+'=([^;]*)');
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
 function licGetDeviceId(){
-  // Priority: localStorage → sessionStorage → generate NEW unique ID
+  // Priority: localStorage → cookie → sessionStorage → generate NEW
   let id = localStorage.getItem(SK.deviceId)
+         || cookieGet('pos_device_id')
          || sessionStorage.getItem(SK.deviceId);
   if(!id){
-    // Generate cryptographically random ID — never based on fingerprint alone
-    // so two identical devices ALWAYS get different IDs
     const rand = typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2);
     id = 'dev_' + rand.replace(/-/g,'').slice(0, 20);
   }
-  // Persist in all layers (but NEVER overwrite with someone else's ID)
+  // Persistir en todas las capas
   localStorage.setItem(SK.deviceId, id);
+  cookieSet('pos_device_id', id, 365); // cookie dura 1 año
   sessionStorage.setItem(SK.deviceId, id);
   if(typeof db !== 'undefined' && db){
     try { db.config.put({key:'device_id', value:id}); } catch(e){}
@@ -8298,14 +8851,22 @@ async function licGetDeviceIdAsync(){
   let id = localStorage.getItem(SK.deviceId) || sessionStorage.getItem(SK.deviceId);
   if(id) return id;
 
-  // 2. Try IndexedDB — survives localStorage.clear()
+  // 2. Try cookie — survives localStorage.clear() in most browsers
+  if(!id) id = cookieGet('pos_device_id');
+  if(id){
+    localStorage.setItem(SK.deviceId, id);
+    sessionStorage.setItem(SK.deviceId, id);
+    return id;
+  }
+
+  // 3. Try IndexedDB — survives localStorage.clear()
   try {
     if(typeof db !== 'undefined' && db){
       const row = await db.config.get('device_id');
       if(row && row.value){
         id = row.value;
-        // Restore to localStorage/sessionStorage
         localStorage.setItem(SK.deviceId, id);
+        cookieSet('pos_device_id', id, 365);
         sessionStorage.setItem(SK.deviceId, id);
         return id;
       }
@@ -8523,6 +9084,9 @@ async function doEntrar(){
   localStorage.setItem('pos_terminal', terminal);
   localStorage.setItem('pos_sucursal', sucursal);
   localStorage.setItem('pos_deposito', deposito);
+  cookieSet('pos_terminal', terminal, 365);
+  cookieSet('pos_sucursal', sucursal, 365);
+  cookieSet('pos_deposito', deposito, 365);
   if(db){
     await dbSaveConfig('terminal', terminal);
     await dbSaveConfig('sucursal', sucursal);
@@ -8607,12 +9171,17 @@ function doDesactivar(){
 // ── FUNCIÓN CENTRAL DE INICIO ─────────────────────────────
 async function iniciarApp(){
   // ── PASO 1: Config local (sin red) ───────────────────────
-  const terminal = localStorage.getItem('pos_terminal');
-  const sucursal = localStorage.getItem('pos_sucursal');
-  const deposito = localStorage.getItem('pos_deposito');
-  if(terminal) configData.terminal = terminal;
-  if(sucursal) configData.sucursal = sucursal;
-  if(deposito) configData.deposito = deposito;
+  // Restaurar desde localStorage o cookies (cookies sobreviven al borrar caché)
+  const terminal = localStorage.getItem('pos_terminal') || cookieGet('pos_terminal');
+  const sucursal = localStorage.getItem('pos_sucursal') || cookieGet('pos_sucursal');
+  const deposito = localStorage.getItem('pos_deposito') || cookieGet('pos_deposito');
+  const sucId    = localStorage.getItem('pos_sucursal_id') || cookieGet('pos_suc_id');
+  const depId    = localStorage.getItem('pos_deposito_id') || cookieGet('pos_dep_id');
+  if(terminal) { configData.terminal=terminal; localStorage.setItem('pos_terminal',terminal); }
+  if(sucursal) { configData.sucursal=sucursal; localStorage.setItem('pos_sucursal',sucursal); }
+  if(deposito) { configData.deposito=deposito; localStorage.setItem('pos_deposito',deposito); }
+  if(sucId)    localStorage.setItem('pos_sucursal_id',sucId);
+  if(depId)    localStorage.setItem('pos_deposito_id',depId);
   cargarConfigLocal();
   cargarTimbradoSesion();
 
@@ -8628,13 +9197,24 @@ async function iniciarApp(){
         console.log('[App] Pendientes restaurados:', sp.length);
       }
     }
+    // Asegurar que ticketCounter es siempre mayor que cualquier nro cobrado
+    const savedCounter = parseInt(localStorage.getItem('pos_ticket_counter')||'1');
+    if(savedCounter > ticketCounter) ticketCounter = savedCounter;
+    localStorage.setItem('pos_ticket_counter', ticketCounter);
   } catch(e){ console.warn('[Pendientes]', e.message); }
 
   // ── PASO 3: Restaurar turno ── ANTES de cualquier await ──
   const turnoOk = turnoRestaurar();
   if(turnoOk){
-    goTo('scSale');
-    toast('Sesión restaurada — '+turnoData.ventas.length+' venta'+(turnoData.ventas.length!==1?'s':''));
+    // Si hay mesas configuradas, ir a pantalla mesas; sino, a la venta
+    if(mesasSalones.length > 0){
+      goTo('scMesas');
+      renderMesasScreen();
+      toast('Sesión restaurada');
+    } else {
+      goTo('scSale');
+      toast('Sesión restaurada — '+turnoData.ventas.length+' venta'+(turnoData.ventas.length!==1?'s':''));
+    }
   } else {
     goTo('scClosed');
   }
@@ -8653,9 +9233,42 @@ async function iniciarApp(){
   }
 
   // ── PASO 5: Sync background ───────────────────────────────
+  // Auto-recuperar deposito_id si se perdió con el caché
+  if(!localStorage.getItem('pos_deposito_id') && navigator.onLine && !USAR_DEMO){
+    setTimeout(async function(){
+      try{
+        const email  = localStorage.getItem(SK.email);
+        const sucNom = localStorage.getItem('pos_sucursal');
+        if(!email || !sucNom) return;
+        const lr = await fetch(SUPA_URL+'/rest/v1/licencias?email_cliente=ilike.'+encodeURIComponent(email)+'&activa=eq.true&select=id&limit=1',
+          {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
+        const ld = await lr.json();
+        if(!ld||!ld[0]) return;
+        const licId = ld[0].id;
+        localStorage.setItem('ali', String(licId));
+        cookieSet('ali', String(licId), 365);
+        const sr = await fetch(SUPA_URL+'/rest/v1/sucursales?licencia_id=eq.'+licId+'&nombre=ilike.'+encodeURIComponent(sucNom)+'&select=id&limit=1',
+          {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
+        const sd = await sr.json();
+        if(!sd||!sd[0]) return;
+        localStorage.setItem('pos_sucursal_id', String(sd[0].id));
+        cookieSet('pos_suc_id', String(sd[0].id), 365);
+        const dr = await fetch(SUPA_URL+'/rest/v1/depositos?licencia_id=eq.'+licId+'&sucursal_id=eq.'+sd[0].id+'&activo=eq.true&select=id&order=id.asc&limit=1',
+          {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
+        const dd = await dr.json();
+        if(!dd||!dd[0]) return;
+        localStorage.setItem('pos_deposito_id', String(dd[0].id));
+        cookieSet('pos_dep_id', String(dd[0].id), 365);
+        console.log('[App] Depósito restaurado:', dd[0].id);
+        toast('✓ Depósito listo (ID '+dd[0].id+')');
+      }catch(e){ console.warn('[App] Error recuperando depósito:', e.message); }
+    }, 4000);
+  }
+
   setTimeout(sincronizarConfigNegocio, 3000);
   setTimeout(syncConSupabase, 5000);
   setTimeout(syncVentasPendientes, 8000);
+  setTimeout(mesasCargar, 6000); // Cargar mesas en background
 }
 
 // ── ARRANQUE ──────────────────────────────────────────────
@@ -8700,12 +9313,14 @@ async function guardarConfigTerminalSupabase(cfg){
       body:JSON.stringify({
         clave: 'terminal_config_'+deviceId,
         valor: JSON.stringify({
-          negocio:  cfg.negocio,
-          terminal: cfg.terminal,
-          sucursal: cfg.sucursal,
-          deposito: cfg.deposito,
-          deviceId: deviceId,  // guardamos el deviceId para validar al recuperar
-          savedAt:  new Date().toISOString()
+          negocio:     cfg.negocio,
+          terminal:    cfg.terminal,
+          sucursal:    cfg.sucursal,
+          deposito:    cfg.deposito,
+          sucursal_id: localStorage.getItem('pos_sucursal_id')||null,
+          deposito_id: localStorage.getItem('pos_deposito_id')||null,
+          deviceId:    deviceId,
+          savedAt:     new Date().toISOString()
         }),
         licencia_email: email
       })
@@ -8715,30 +9330,49 @@ async function guardarConfigTerminalSupabase(cfg){
 }
 
 async function recuperarConfigTerminalSupabase(){
-  // IMPORTANTE: solo recupera config del device_id de ESTE dispositivo.
-  // NO usa fallback al último registro — eso causaría que un nuevo dispositivo
-  // adopte la configuración de otro.
   if(USAR_DEMO) return null;
   const email = localStorage.getItem(SK.email);
   if(!email) return null;
   const deviceId = await licGetDeviceIdAsync();
-  if(!deviceId) return null;
+
   try{
-    const r = await fetch(
+    // Intento 1: buscar por device_id específico
+    if(deviceId){
+      const r = await fetch(
+        SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)
+        +'&clave=eq.terminal_config_'+encodeURIComponent(deviceId)+'&select=valor',
+        {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}}
+      );
+      const data = await r.json();
+      if(data && data[0]){
+        const cfg = JSON.parse(data[0].valor);
+        if(!cfg.deviceId || cfg.deviceId === deviceId){
+          console.log('[Terminal] Config recuperada por deviceId');
+          return cfg;
+        }
+      }
+    }
+
+    // Intento 2 (fallback): buscar cualquier config de este email
+    // Útil cuando se borró caché y se perdió el device_id
+    const r2 = await fetch(
       SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)
-      +'&clave=eq.terminal_config_'+encodeURIComponent(deviceId)+'&select=valor',
+      +'&clave=like.terminal_config_*&select=valor,clave&order=id.desc&limit=1',
       {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}}
     );
-    const data = await r.json();
-    if(data && data[0]){
-      const cfg = JSON.parse(data[0].valor);
-      // Verificar que el deviceId guardado coincide con este dispositivo
-      // Si no coincide, ignorar (puede pasar si se copió la DB)
-      if(cfg.deviceId && cfg.deviceId !== deviceId){
-        console.warn('[Terminal] deviceId mismatch — ignoring config from other device');
-        return null;
+    const data2 = await r2.json();
+    if(data2 && data2[0]){
+      const cfg = JSON.parse(data2[0].valor);
+      // Si tiene config válida, restaurar y guardar el device_id que estaba en esa config
+      if(cfg.terminal && cfg.sucursal){
+        console.log('[Terminal] Config recuperada por email (fallback) — terminal:', cfg.terminal);
+        // Restaurar el device_id guardado en esa config para mantener consistencia
+        if(cfg.deviceId && !localStorage.getItem(SK.deviceId)){
+          localStorage.setItem(SK.deviceId, cfg.deviceId);
+          cookieSet('pos_device_id', cfg.deviceId, 365);
+        }
+        return cfg;
       }
-      return cfg;
     }
     return null;
   }catch(e){
@@ -8749,19 +9383,49 @@ async function recuperarConfigTerminalSupabase(){
 
 function aplicarConfigTerminal(cfg){
   if(!cfg) return false;
-  // Aplica negocio, terminal, sucursal, depósito — pero NUNCA el deviceId
-  // El deviceId pertenece a este dispositivo y no debe copiarse de otro
-  if(cfg.negocio)  { localStorage.setItem(SK.negocio,cfg.negocio);   if(typeof configData!=='undefined') configData.negocio=cfg.negocio; }
-  if(cfg.terminal) { localStorage.setItem('pos_terminal',cfg.terminal); if(typeof configData!=='undefined') configData.terminal=cfg.terminal; }
-  if(cfg.sucursal) { localStorage.setItem('pos_sucursal',cfg.sucursal); if(typeof configData!=='undefined') configData.sucursal=cfg.sucursal; }
-  if(cfg.deposito) { localStorage.setItem('pos_deposito',cfg.deposito); if(typeof configData!=='undefined') configData.deposito=cfg.deposito; }
-  // ⚠️ NUNCA copiar cfg.deviceId — cada dispositivo tiene su propio ID único
+  if(cfg.negocio)     { localStorage.setItem(SK.negocio,cfg.negocio);          if(typeof configData!=='undefined') configData.negocio=cfg.negocio; }
+  if(cfg.terminal)    { localStorage.setItem('pos_terminal',cfg.terminal);      if(typeof configData!=='undefined') configData.terminal=cfg.terminal; }
+  if(cfg.sucursal)    { localStorage.setItem('pos_sucursal',cfg.sucursal);      if(typeof configData!=='undefined') configData.sucursal=cfg.sucursal; }
+  if(cfg.deposito)    { localStorage.setItem('pos_deposito',cfg.deposito);      if(typeof configData!=='undefined') configData.deposito=cfg.deposito; }
+  // Restaurar IDs de sucursal y depósito si están en la config
+  if(cfg.sucursal_id) { localStorage.setItem('pos_sucursal_id',String(cfg.sucursal_id)); cookieSet('pos_suc_id',String(cfg.sucursal_id),365); }
+  if(cfg.deposito_id) { localStorage.setItem('pos_deposito_id',String(cfg.deposito_id)); cookieSet('pos_dep_id',String(cfg.deposito_id),365); }
   return true;
 }
 
 // ── VENTAS (reporte) ─────────────────────────────────────────────────────────
 
 let ventasTabActual = 'vendidas';
+
+function guardarDepositoId(){
+  const depId = parseInt(document.getElementById('cfgDepId')?.value)||0;
+  const sucId = parseInt(document.getElementById('cfgSucId')?.value)||0;
+  if(!depId){ toast('Ingresá el ID del depósito'); return; }
+  localStorage.setItem('pos_deposito_id', String(depId));
+  cookieSet('pos_dep_id', String(depId), 365);
+  if(sucId){
+    localStorage.setItem('pos_sucursal_id', String(sucId));
+    cookieSet('pos_suc_id', String(sucId), 365);
+  }
+  // Guardar en Supabase para recuperar en futuro
+  guardarConfigTerminalSupabase({
+    negocio:     localStorage.getItem(SK.negocio)||configData.negocio||'',
+    terminal:    localStorage.getItem('pos_terminal')||'Terminal 1',
+    sucursal:    localStorage.getItem('pos_sucursal')||'',
+    deposito:    localStorage.getItem('pos_deposito')||'',
+    sucursal_id: sucId || localStorage.getItem('pos_sucursal_id'),
+    deposito_id: depId,
+  }).catch(()=>{});
+  toast('✓ Depósito ID '+depId+' guardado');
+  renderGeneralInfo();
+}
+
+function resetDepositoId(){
+  if(!confirm('¿Cambiar el depósito configurado?')) return;
+  localStorage.removeItem('pos_deposito_id');
+  localStorage.removeItem('pos_sucursal_id');
+  renderGeneralInfo();
+}
 
 async function goToVentas(){
   goTo('scVentas');
@@ -8776,6 +9440,492 @@ function switchVentasTab(tab){
   document.getElementById('tabVendidas').classList.toggle('sel', tab === 'vendidas');
   document.getElementById('tabPendientesV').classList.toggle('sel', tab === 'pendientes');
   renderVentasList();
+}
+
+
+// ════════════════════════════════════════════════════════
+// SISTEMA DE MESAS
+// ════════════════════════════════════════════════════════
+
+let mesasSalones  = [];   // [{id, nombre, color, activo}]
+let mesasMesas    = [];   // [{id, salon_id, nombre, capacidad}]
+let mesaSalonSel  = null; // id del salón activo en la pantalla
+let mesaActual    = null; // {id, salon_id, nombre} — mesa asignada al ticket actual
+
+// ── Cargar desde Supabase ─────────────────────────────
+async function mesasCargar(){
+  const licId = parseInt(localStorage.getItem('ali'))||null;
+  if(!licId || USAR_DEMO) return;
+  try{
+    const rs = await fetch(SUPA_URL+'/rest/v1/pos_salones?licencia_id=eq.'+licId+'&activo=eq.true&order=orden.asc,id.asc',
+      {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
+    mesasSalones = await rs.json();
+
+    const rm = await fetch(SUPA_URL+'/rest/v1/pos_mesas?licencia_id=eq.'+licId+'&activo=eq.true&order=orden.asc,id.asc',
+      {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
+    mesasMesas = await rm.json();
+  }catch(e){ console.warn('[Mesas] Error cargando:', e.message); }
+}
+
+// ── Abrir pantalla mesas ──────────────────────────────
+async function abrirPantallaMesas(){
+  await mesasCargar();
+  if(mesasSalones.length === 0){
+    const ok = confirm('No hay salones configurados. ¿Deseas crear uno ahora?');
+    if(ok) { goTo('scMesas'); renderMesasScreen(); abrirGestionMesas(); }
+    return;
+  }
+  // Si hay mesa activa, ir al salón de esa mesa
+  if(mesaActual){
+    const mesa = mesasMesas.find(m => m.id === mesaActual.id);
+    if(mesa) mesaSalonSel = mesa.salon_id;
+  }
+  if(!mesaSalonSel && mesasSalones.length) mesaSalonSel = mesasSalones[0].id;
+  goTo('scMesas');
+  renderMesasScreen();
+}
+
+// ── Render pantalla principal ─────────────────────────
+function renderMesasScreen(){
+  // Tabs de salones
+  const bar = document.getElementById('mesasSalonesBar');
+  if(!bar) return;
+  bar.innerHTML = mesasSalones.map(s =>
+    '<button class="salon-tab'+(mesaSalonSel===s.id?' sel':'')+
+    '" style="border-bottom-color:'+(mesaSalonSel===s.id?s.color:'transparent')+
+    ';color:'+(mesaSalonSel===s.id?s.color:'var(--muted)')+
+    '" onclick="mesaSelSalon('+s.id+')">'+s.nombre+'</button>'
+  ).join('');
+
+  // Mesas del salón seleccionado
+  const salon = mesasSalones.find(s => s.id === mesaSalonSel);
+  const mesas = mesasMesas.filter(m => m.salon_id === mesaSalonSel);
+  const grid  = document.getElementById('mesasGrid');
+  const empty = document.getElementById('mesasEmpty');
+
+  if(!salon || !mesas.length){
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  grid.innerHTML = mesas.map(m => {
+    const pend   = pendientes.find(p => p.mesa_id === m.id);
+    const ocupada = !!pend;
+    const dot    = ocupada ? 'ocupada' : 'libre';
+    const info   = ocupada
+      ? ('₲'+Math.round(pend.total||0).toLocaleString('es-PY'))
+      : (m.capacidad ? m.capacidad+' pers.' : '');
+    const esActiva = mesaActual && mesaActual.id === m.id;
+    var borderColor = ocupada ? '#e53935' : esActiva ? '#fff' : salon.color;
+    var bgColor = ocupada ? 'rgba(229,57,53,.12)' : esActiva ? 'rgba(255,255,255,.08)' : 'rgba('+hexToRgb(salon.color)+',.1)';
+    return '<div class="mesa-tile '+dot+(esActiva?' activa':'')+'" onclick="onMesaTap('+m.id+')" '+
+      'style="border-color:'+borderColor+';background:'+bgColor+(esActiva?';box-shadow:0 0 0 2px #fff3':'')+'">' +
+      '<div class="mesa-dot '+dot+'"></div>'+
+      '<div class="mesa-tile-nombre">'+m.nombre+'</div>'+
+      '<div class="mesa-tile-info">'+info+'</div>'+
+      '</div>';
+  }).join('');
+}
+
+function mesaSelSalon(id){
+  mesaSalonSel = id;
+  renderMesasScreen();
+}
+
+// ── Tap en una mesa ───────────────────────────────────
+function onMesaTap(mesaId){
+  const mesa = mesasMesas.find(m => m.id === mesaId);
+  if(!mesa) return;
+  const pend = pendientes.find(p => p.mesa_id === mesaId);
+
+  if(pend){
+    // Mesa OCUPADA → cargar su ticket y volver al POS
+    mesaActual = mesa;
+    cargarTicket(pendientes.indexOf(pend));  // cargarTicket ya hace goTo('scSale')
+    setTipoPedido('local');
+    updMesaBtn();
+    updTabTicketHeader();
+    toast('Mesa '+mesa.nombre+' — Ticket #'+String(pend.nro).padStart(4,'0'));
+  } else {
+    // Mesa LIBRE → asignar al ticket actual (vaciar si había otro)
+    if(mesaActual && mesaActual.id !== mesa.id){
+      // Había otra mesa asignada sin guardar — limpiar
+      mesaActual = null;
+    }
+    // Si hay carrito activo de otra fuente, preguntar
+    if(cart.length > 0 && currentTicketNro === null){
+      if(!confirm('Hay productos en el ticket actual. ¿Asignar esta mesa y continuar?')){
+        return;
+      }
+    }
+    mesaActual = mesa;
+    tipoPedido = 'local';
+    setTipoPedido('local');
+    updMesaBtn();
+    updTabTicketHeader();
+    goTo('scSale');
+    toast('Mesa '+mesa.nombre+' lista — agregá productos');
+  }
+}
+
+// ── Guardar ticket con mesa asignada ──────────────────
+function guardarConMesa(){
+  if(!mesaActual) return;
+  if(!cart.length){ toast('Agregá productos primero'); return; }
+  const obs = mesaActual.nombre;
+
+  if(currentTicketNro !== null){
+    // Actualizar pendiente existente
+    const idx = pendientes.findIndex(t => t.nro === currentTicketNro);
+    if(idx >= 0){
+      pendientes[idx].cart    = JSON.parse(JSON.stringify(cart));
+      pendientes[idx].total   = calcTotal();
+      pendientes[idx].obs     = obs;
+      pendientes[idx].mesa_id = mesaActual.id;
+      pendientes[idx].fecha   = new Date().toISOString();
+      const mesaNombreUpd = mesaActual.nombre;
+      guardarPendientesLocal();
+      // Limpiar y volver a mesas
+      cart = [];
+      currentTicketNro = null;
+      mesaActual = null;
+      tipoPedido = 'llevar';
+      setTipoPedido('llevar');
+      updMesaBtn();
+      updUI();
+      updBtnGuardar();
+      updTabTicketHeader();
+      toast('Mesa '+mesaNombreUpd+' — actualizada');
+      if(mesasSalones.length > 0){
+        abrirPantallaMesas();
+      } else {
+        goTo('scSale');
+      }
+      return;
+    }
+  }
+  // Crear nuevo pendiente
+  const nro = ticketCounter++; localStorage.setItem('pos_ticket_counter', ticketCounter);
+  const mesaNombre = mesaActual.nombre;
+  pendientes.push({
+    nro,
+    obs:           obs,
+    cart:          JSON.parse(JSON.stringify(cart)),
+    total:         calcTotal(),
+    fecha:         new Date().toISOString(),
+    mesa_id:       mesaActual.id,
+    esPresupuesto: false,
+  });
+  guardarPendientesLocal();
+
+  // Limpiar carrito y mesa para nueva venta
+  cart = [];
+  currentTicketNro = null;
+  mesaActual = null;
+  tipoPedido = 'llevar';
+  setTipoPedido('llevar');
+  updMesaBtn();
+  updUI();
+  updBtnGuardar();
+  updTabTicketHeader();
+
+  toast('Mesa '+mesaNombre+' — Ticket #'+String(nro).padStart(4,'0')+' guardado');
+
+  // Volver a pantalla de mesas para seguir atendiendo
+  if(mesasSalones.length > 0){
+    abrirPantallaMesas();
+  } else {
+    goTo('scSale');
+  }
+}
+
+// ── onBtnLocal: abrir pantalla mesas ──────────────────
+function onBtnLocal(){
+  if(mesasSalones.length > 0){
+    abrirPantallaMesas();
+  } else {
+    setTipoPedido('local');
+  }
+}
+
+// ── updMesaBtn: actualiza texto del botón Local con la mesa actual ──
+function updMesaBtn(){
+  var label = mesaActual ? mesaActual.nombre : 'Local';
+  // Botón móvil
+  var mbtn = document.getElementById('mobTipoBtnLocal');
+  if(mbtn) mbtn.textContent = label;
+  // Botón tablet/PC
+  var tbtn = document.getElementById('tipoBtnLocal');
+  if(tbtn) tbtn.textContent = label;
+}
+
+// ── Limpiar mesa al confirmar pago ────────────────────
+function mesaLimpiarAlPagar(){
+  mesaActual = null;
+  updMesaBtn();
+}
+
+// ── Helpers ───────────────────────────────────────────
+function hexToRgb(hex){
+  hex = hex.replace('#','');
+  if(hex.length===3) hex = hex.split('').map(x=>x+x).join('');
+  const n = parseInt(hex,16);
+  return ((n>>16)&255)+','+(((n>>8)&255))+','+(n&255);
+}
+
+// ══════════════════════════════════════════════════════
+// GESTIÓN SALONES Y MESAS (modal)
+// ══════════════════════════════════════════════════════
+const MESA_COLORES = [
+  '#e53935','#e91e63','#9c27b0','#673ab7','#3f51b5',
+  '#1565c0','#0288d1','#00838f','#2e7d32','#558b2f',
+  '#f57f17','#e65100','#4e342e','#546e7a','#37474f',
+];
+
+let mesaEditSalonId = null;  // salón en edición
+let mesaEditMesaId  = null;  // mesa en edición
+let mesaColorSel    = '#1565c0';
+
+function cerrarModalMesas(){
+  document.getElementById('mesasModal').classList.remove('open');
+}
+
+function abrirGestionMesas(){
+  mesaEditSalonId = null;
+  mesaEditMesaId  = null;
+  renderModalGestion();
+  document.getElementById('mesasModal').classList.add('open');
+}
+
+function renderModalGestion(){
+  const mc = document.getElementById('mesasModalContent');
+  const salonItems = mesasSalones.map(s =>
+    '<div class="mesas-salon-item">'+
+    '<div class="mesas-salon-color" style="background:'+s.color+'"></div>'+
+    '<span class="mesas-salon-name">'+s.nombre+'</span>'+
+    '<button class="mesas-btn-sm" onclick="editarSalon('+s.id+')">Editar</button>'+
+    '<button class="mesas-btn-sm danger" onclick="eliminarSalon('+s.id+')">Borrar</button>'+
+    '</div>'
+  ).join('') || '<p style="color:var(--muted);font-size:13px;">Sin salones aún.</p>';
+
+  mc.innerHTML =
+    '<div class="mesas-modal-title">Gestión de Salones y Mesas</div>'+
+
+    '<div class="mesas-section-title">Salones</div>'+
+    '<div class="mesas-salon-list">'+salonItems+'</div>'+
+    '<button class="mesas-btn-primary" onclick="abrirFormSalon(null)">+ Nuevo Salón</button>'+
+
+    (mesasSalones.length > 0 ?
+      '<div class="mesas-section-title" style="margin-top:20px;">Mesas por Salón</div>'+
+      mesasSalones.map(s => {
+        const mm = mesasMesas.filter(m => m.salon_id === s.id);
+        return '<div style="margin-bottom:12px;">'+
+          '<div style="font-size:12px;font-weight:700;color:'+s.color+';margin-bottom:6px;text-transform:uppercase;">'+s.nombre+'</div>'+
+          '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">'+
+          mm.map(m =>
+            '<div style="display:flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 8px;">'+
+            '<span style="font-size:13px;font-weight:700;color:var(--text);">'+m.nombre+'</span>'+
+            '<button class="mesas-btn-sm" style="padding:3px 7px;" onclick="editarMesa('+m.id+')">✎</button>'+
+            '<button class="mesas-btn-sm danger" style="padding:3px 7px;" onclick="eliminarMesa('+m.id+')">✕</button>'+
+            '</div>'
+          ).join('')+
+          '</div>'+
+          '<button class="mesas-btn-sm" onclick="abrirFormMesa('+s.id+')">+ Agregar mesa a '+s.nombre+'</button>'+
+          '</div>';
+      }).join('') : '')+
+
+    '<div style="height:12px;"></div>'+
+    '<button class="mesas-btn-sm" style="width:100%;padding:12px;" onclick="cerrarModalMesas()">Cerrar</button>';
+}
+
+function abrirFormSalon(salonId){
+  const s = salonId ? mesasSalones.find(x => x.id === salonId) : null;
+  mesaColorSel = s ? s.color : '#1565c0';
+  const mc = document.getElementById('mesasModalContent');
+  const coloresHTML = MESA_COLORES.map(c =>
+    '<div class="mesas-color-swatch'+(c===mesaColorSel?' sel':'')+
+    '" style="background:'+c+'" onclick="selMesaColor(this)" data-color="'+c+'"></div>'
+  ).join('');
+  mc.innerHTML =
+    '<div class="mesas-modal-title">'+(s?'Editar':'Nuevo')+' Salón</div>'+
+    '<div class="mesas-form-row">'+
+      '<label class="mesas-form-label">Nombre del salón</label>'+
+      '<input class="mesas-form-input" id="formSalonNombre" placeholder="Ej: Terraza, Salón Principal" value="'+(s?s.nombre:'')+'" maxlength="40">'+
+    '</div>'+
+    '<div class="mesas-form-row">'+
+      '<label class="mesas-form-label">Color del salón</label>'+
+      '<div class="mesas-color-row" id="mesasColorRow">'+coloresHTML+'</div>'+
+    '</div>'+
+    (!s ?
+      '<div class="mesas-form-row">'+
+        '<label class="mesas-form-label">Cantidad de mesas a crear</label>'+
+        '<input class="mesas-form-input" id="formSalonCantMesas" type="number" min="0" max="50" value="4" placeholder="Ej: 6">'+
+        '<div style="font-size:11px;color:var(--muted);margin-top:3px;">Se crearán automáticamente: Mesa 1, Mesa 2...</div>'+
+      '</div>'
+    : '')+
+    '<button class="mesas-btn-primary" style="margin-top:12px;" onclick="guardarSalon('+(salonId||'null')+')">'+
+      (s ? 'Guardar cambios' : 'Crear Salón')+'</button>'+
+    '<button class="mesas-btn-sm" style="width:100%;margin-top:8px;padding:12px;" onclick="abrirGestionMesas()">← Volver</button>';
+}
+
+function selMesaColor(el){
+  mesaColorSel = el.dataset.color || el.style.backgroundColor;
+  document.querySelectorAll('.mesas-color-swatch').forEach(s => s.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+async function guardarSalon(salonId){
+  const nombre = document.getElementById('formSalonNombre').value.trim();
+  if(!nombre){ toast('Ingresá el nombre del salón'); return; }
+
+  // Obtener licId — intentar varias fuentes
+  let licId = parseInt(localStorage.getItem('ali'))||null;
+  if(!licId){
+    // Intentar recuperar desde Supabase por email
+    const email = localStorage.getItem('lic_email');
+    if(email && !USAR_DEMO){
+      try{
+        const lr = await fetch(SUPA_URL+'/rest/v1/licencias?email_cliente=ilike.'+encodeURIComponent(email)+'&activa=eq.true&select=id&limit=1',
+          {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
+        const ld = await lr.json();
+        if(ld&&ld[0]){ licId=ld[0].id; localStorage.setItem('ali',String(licId)); }
+      }catch(e){}
+    }
+  }
+  if(!licId){ toast('Error: sin licencia configurada'); return; }
+
+  const sucId = parseInt(localStorage.getItem('pos_sucursal_id'))||null;
+  const cantEl = document.getElementById('formSalonCantMesas');
+  const cantMesas = cantEl ? (parseInt(cantEl.value)||0) : 0;
+
+  try{
+    if(salonId){
+      // Solo editar nombre y color
+      const r = await fetch(SUPA_URL+'/rest/v1/pos_salones?id=eq.'+salonId,{
+        method:'PATCH',
+        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({nombre, color:mesaColorSel})
+      });
+      if(!r.ok){ const t=await r.text(); throw new Error(t); }
+    } else {
+      // Crear salón y obtener su id
+      const r = await fetch(SUPA_URL+'/rest/v1/pos_salones',{
+        method:'POST',
+        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=representation'},
+        body:JSON.stringify({licencia_id:licId, sucursal_id:sucId, nombre, color:mesaColorSel})
+      });
+      if(!r.ok){ const t=await r.text(); throw new Error(t); }
+      const data = await r.json();
+      const nuevoSalonId = Array.isArray(data) ? data[0].id : data.id;
+
+      // Crear mesas automáticamente si cantMesas > 0
+      if(cantMesas > 0 && nuevoSalonId){
+        const mesasPayload = [];
+        for(let i=1; i<=cantMesas; i++){
+          mesasPayload.push({
+            salon_id:    nuevoSalonId,
+            licencia_id: licId,
+            sucursal_id: sucId,
+            nombre:      'Mesa '+i,
+            capacidad:   4,
+          });
+        }
+        const rm = await fetch(SUPA_URL+'/rest/v1/pos_mesas',{
+          method:'POST',
+          headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:JSON.stringify(mesasPayload)
+        });
+        if(!rm.ok){ console.warn('[Mesas] Error creando mesas:', await rm.text()); }
+      }
+    }
+    await mesasCargar();
+    if(!mesaSalonSel && mesasSalones.length) mesaSalonSel = mesasSalones[0].id;
+    const msg = salonId ? '✓ Salón actualizado' : '✓ Salón creado'+(cantMesas>0?' con '+cantMesas+' mesas':'');
+    toast(msg);
+    renderMesasScreen();
+    abrirGestionMesas();
+  }catch(e){ console.error('[Mesas]', e); toast('Error: '+e.message); }
+}
+
+async function eliminarSalon(id){
+  if(!confirm('¿Borrar este salón y todas sus mesas?')) return;
+  try{
+    await fetch(SUPA_URL+'/rest/v1/pos_salones?id=eq.'+id,{
+      method:'DELETE',
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}
+    });
+    await mesasCargar();
+    if(mesaSalonSel===id) mesaSalonSel = mesasSalones[0]?.id||null;
+    toast('✓ Salón eliminado');
+    abrirGestionMesas();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+function editarSalon(id){ abrirFormSalon(id); }
+
+function abrirFormMesa(salonId, mesaId){
+  const m = mesaId ? mesasMesas.find(x => x.id === mesaId) : null;
+  const s = mesasSalones.find(x => x.id === (salonId || (m?m.salon_id:null)));
+  const mc = document.getElementById('mesasModalContent');
+  mc.innerHTML =
+    '<div class="mesas-modal-title">'+(m?'Editar':'Nueva')+' Mesa — '+(s?s.nombre:'')+' </div>'+
+    '<div class="mesas-form-row">'+
+      '<label class="mesas-form-label">Nombre de la mesa</label>'+
+      '<input class="mesas-form-input" id="formMesaNombre" placeholder="Ej: Mesa 1, Barra 2, VIP..." value="'+(m?m.nombre:'')+'" maxlength="30">'+
+    '</div>'+
+    '<div class="mesas-form-row">'+
+      '<label class="mesas-form-label">Capacidad (personas)</label>'+
+      '<input class="mesas-form-input" id="formMesaCap" type="number" min="1" max="50" value="'+(m?m.capacidad:4)+'">'+
+    '</div>'+
+    '<button class="mesas-btn-primary" onclick="guardarMesa('+(salonId||s.id)+','+(mesaId||'null')+')">'+
+      (m?'Guardar cambios':'Crear Mesa')+'</button>'+
+    '<button class="mesas-btn-sm" style="width:100%;margin-top:8px;padding:12px;" onclick="abrirGestionMesas()">← Volver</button>';
+}
+
+async function guardarMesa(salonId, mesaId){
+  const nombre = document.getElementById('formMesaNombre').value.trim();
+  const cap    = parseInt(document.getElementById('formMesaCap').value)||4;
+  if(!nombre){ toast('Ingresá un nombre'); return; }
+  const licId = parseInt(localStorage.getItem('ali'))||null;
+  const sucId = parseInt(localStorage.getItem('pos_sucursal_id'))||null;
+  try{
+    if(mesaId){
+      await fetch(SUPA_URL+'/rest/v1/pos_mesas?id=eq.'+mesaId,{
+        method:'PATCH',
+        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({nombre, capacidad:cap})
+      });
+    } else {
+      await fetch(SUPA_URL+'/rest/v1/pos_mesas',{
+        method:'POST',
+        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({salon_id:salonId, licencia_id:licId, sucursal_id:sucId, nombre, capacidad:cap})
+      });
+    }
+    await mesasCargar();
+    toast('✓ Mesa guardada');
+    abrirGestionMesas();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+async function eliminarMesa(id){
+  if(!confirm('¿Borrar esta mesa?')) return;
+  try{
+    await fetch(SUPA_URL+'/rest/v1/pos_mesas?id=eq.'+id,{
+      method:'DELETE',
+      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}
+    });
+    await mesasCargar();
+    toast('✓ Mesa eliminada');
+    abrirGestionMesas();
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+function editarMesa(id){
+  const m = mesasMesas.find(x => x.id === id);
+  if(m) abrirFormMesa(m.salon_id, id);
 }
 
 function gs(n){ return '₲'+Math.round(n||0).toLocaleString('es-PY'); }
