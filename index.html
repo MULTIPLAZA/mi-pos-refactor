@@ -9525,10 +9525,10 @@ function onMesaTap(mesaId){
   if(pend){
     // Mesa OCUPADA → cargar su ticket y volver al POS
     mesaActual = mesa;
-    cargarPendiente(pendientes.indexOf(pend));
+    cargarTicket(pendientes.indexOf(pend));  // cargarTicket ya hace goTo('scSale')
     setTipoPedido('local');
     updMesaBtn();
-    goTo('scSale');
+    updTabTicketHeader();
     toast('Mesa '+mesa.nombre+' — Ticket #'+String(pend.nro).padStart(4,'0'));
   } else {
     // Mesa LIBRE → asignar al ticket actual (vaciar si había otro)
@@ -9567,15 +9567,30 @@ function guardarConMesa(){
       pendientes[idx].obs     = obs;
       pendientes[idx].mesa_id = mesaActual.id;
       pendientes[idx].fecha   = new Date().toISOString();
+      const mesaNombreUpd = mesaActual.nombre;
       guardarPendientesLocal();
+      // Limpiar y volver a mesas
+      cart = [];
+      currentTicketNro = null;
+      mesaActual = null;
+      tipoPedido = 'llevar';
+      setTipoPedido('llevar');
+      updMesaBtn();
+      updUI();
       updBtnGuardar();
-      renderMesasScreen();
-      toast('Mesa '+mesaActual.nombre+' — actualizada');
+      updTabTicketHeader();
+      toast('Mesa '+mesaNombreUpd+' — actualizada');
+      if(mesasSalones.length > 0){
+        abrirPantallaMesas();
+      } else {
+        goTo('scSale');
+      }
       return;
     }
   }
   // Crear nuevo pendiente
   const nro = ticketCounter++;
+  const mesaNombre = mesaActual.nombre;
   pendientes.push({
     nro,
     obs:           obs,
@@ -9585,12 +9600,27 @@ function guardarConMesa(){
     mesa_id:       mesaActual.id,
     esPresupuesto: false,
   });
-  currentTicketNro = nro; // mantener vínculo — la mesa sigue abierta
   guardarPendientesLocal();
+
+  // Limpiar carrito y mesa para nueva venta
+  cart = [];
+  currentTicketNro = null;
+  mesaActual = null;
+  tipoPedido = 'llevar';
+  setTipoPedido('llevar');
+  updMesaBtn();
+  updUI();
   updBtnGuardar();
   updTabTicketHeader();
-  renderMesasScreen();
-  toast('Mesa '+mesaActual.nombre+' — Ticket #'+String(nro).padStart(4,'0')+' guardado');
+
+  toast('Mesa '+mesaNombre+' — Ticket #'+String(nro).padStart(4,'0')+' guardado');
+
+  // Volver a pantalla de mesas para seguir atendiendo
+  if(mesasSalones.length > 0){
+    abrirPantallaMesas();
+  } else {
+    goTo('scSale');
+  }
 }
 
 // ── onBtnLocal: abrir pantalla mesas ──────────────────
