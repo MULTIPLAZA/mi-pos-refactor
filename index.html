@@ -7425,61 +7425,6 @@ async function imprimirBluetooth(device, htmlContent, size){
   }
 }
 
-// ══════════════════════════════════════════════════════════
-// SYNC PRODUCTOS Y CATEGORÍAS CON SUPABASE
-// ══════════════════════════════════════════════════════════
-
-// Guardar producto en Supabase (en background, no bloquea)
-function supaUpsertProducto(prod){
-  if(USAR_DEMO || !navigator.onLine) return;
-  const email = localStorage.getItem(SK.email);
-  if(!email) return;
-  // No guardar descuentos en pos_productos — van en pos_config
-  if(prod.esDescuento) return;
-  const data = {
-    id: prod.id, nombre: prod.name, precio: prod.price||0,
-    precio_variable: prod.precioVariable||false,
-    costo: prod.costo||0, codigo: prod.codigo||'',
-    categoria: prod.cat, iva: prod.iva||'10',
-    color: prod.color, color_propio: prod.colorPropio||false,
-    mitad: prod.mitad||false, inventario: prod.inventario||false,
-    comanda: prod.comanda||false, item_libre: prod.itemLibre||false,
-    activo: prod.activo !== false, licencia_email: email,
-    imagen: prod.imagen || null,
-    updated_at: new Date().toISOString()
-  };
-  fetch(SUPA_URL+'/rest/v1/pos_productos', {
-    method: 'POST',
-    headers:{
-      'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-      'Content-Type':'application/json',
-      'Prefer':'resolution=merge-duplicates'
-    },
-    body: JSON.stringify(data)
-  }).then(r=>{ if(!r.ok) r.text().then(t=>console.warn('[Supa] Prod upsert error:',t)); })
-    .catch(e=>console.warn('[Supa] Prod offline:', e.message));
-}
-
-function supaUpsertCategoria(cat){
-  if(USAR_DEMO || !navigator.onLine) return;
-  const email = localStorage.getItem(SK.email);
-  if(!email) return;
-  const data = {
-    id: cat.id, nombre: cat.nombre, color: cat.color,
-    licencia_email: email, updated_at: new Date().toISOString()
-  };
-  fetch(SUPA_URL+'/rest/v1/pos_categorias', {
-    method: 'POST',
-    headers:{
-      'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-      'Content-Type':'application/json',
-      'Prefer':'resolution=merge-duplicates'
-    },
-    body: JSON.stringify(data)
-  }).then(r=>{ if(!r.ok) r.text().then(t=>console.warn('[Supa] Cat upsert error:',t)); })
-    .catch(e=>console.warn('[Supa] Cat offline:', e.message));
-}
-
 async function supaLoadProductos(){
   if(USAR_DEMO) return;
   const email = localStorage.getItem(SK.email);
