@@ -5312,12 +5312,9 @@ function imprimirComanda(data){
 function finalizarRecibo(){
   mesaActual = null;
   updMesaBtn();
-  // Si hay mesas configuradas, volver a la pantalla de mesas
-  if(mesasSalones.length > 0){
-    abrirPantallaMesas();
-  } else {
-    goTo('scSale');
-  }
+  tipoPedido = 'llevar';
+  setTipoPedido('llevar');
+  goTo('scSale');
 }
 
 // NUMPAD
