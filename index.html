@@ -4945,28 +4945,32 @@ function abrirVentanaImpresion(html, size){
              || window.navigator.standalone === true;
 
   if(isPWA){
-    // Método PWA: iframe oculto que imprime directo
-    let iframe = document.getElementById('printFrame');
-    if(!iframe){
-      iframe = document.createElement('iframe');
-      iframe.id = 'printFrame';
-      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;';
-      document.body.appendChild(iframe);
-    }
+    // Eliminar iframe anterior si existe (para forzar recarga limpia)
+    const old = document.getElementById('printFrame');
+    if(old) old.remove();
+
+    const iframe = document.createElement('iframe');
+    iframe.id = 'printFrame';
+    // Tamaño real del papel para que el layout sea correcto
+    iframe.style.cssText = 'position:fixed;top:0;left:0;width:'+pxW+'px;height:100vh;border:none;opacity:0;pointer-events:none;z-index:-1;';
+    document.body.appendChild(iframe);
+
+    // Escribir y esperar carga completa antes de imprimir
+    iframe.onload = function(){
+      setTimeout(function(){
+        try{
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        }catch(e){
+          console.warn('[Print] iframe.print failed:', e.message);
+          window.print();
+        }
+      }, 300);
+    };
     const doc = iframe.contentWindow.document;
     doc.open();
     doc.write(html);
     doc.close();
-    setTimeout(function(){
-      try{
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-      }catch(e){
-        // Fallback: abrir en misma ventana
-        const w = window.open('','_blank');
-        if(w){ w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(),300); }
-      }
-    }, 600);
     return;
   }
 
