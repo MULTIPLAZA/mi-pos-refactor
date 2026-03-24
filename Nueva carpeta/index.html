@@ -7458,35 +7458,18 @@ let printers = {
 };
 
 // Restaurar configuración de impresoras al iniciar
-function isAndroidAPK() {
-  return typeof window.AndroidPrint !== 'undefined';
-}
-
 function restaurarConfigImpresoras(){
   ['ticket','comanda'].forEach(tipo => {
-    const savedType        = localStorage.getItem('printerType_' + tipo);
-    const savedName        = localStorage.getItem('printerName_' + tipo);
-    const savedSize        = localStorage.getItem('printerSize_' + tipo);
-    const savedAndroidName = localStorage.getItem('printerAndroidName_' + tipo);
-
+    const savedType = localStorage.getItem('printerType_'+tipo);
+    const savedName = localStorage.getItem('printerName_'+tipo);
+    const savedSize = localStorage.getItem('printerSize_'+tipo);
     if(savedSize) printers[tipo].size = savedSize;
     if(savedType && savedName){
       printers[tipo].type = savedType;
       printers[tipo].name = savedName;
-
-      if(savedType === 'bt'){
-        if(isAndroidAPK()){
-          // En el APK: restaurar el nombre y re-registrar en el puente nativo
-          printers[tipo].androidName    = savedAndroidName || savedName;
-          printers[tipo].needsReconnect = false; // el APK maneja la conexión
-          if(savedAndroidName || savedName){
-            window.AndroidPrint.setBluetoothDevice(savedAndroidName || savedName);
-          }
-        } else {
-          // En web: marcar que necesita reconectar (Web Bluetooth no persiste)
-          printers[tipo].needsReconnect = true;
-        }
-      }
+      // device = null siempre al reabrir (BT no persiste entre sesiones)
+      // Si era BT, mostramos el nombre pero marcamos que necesita reconectar
+      if(savedType === 'bt') printers[tipo].needsReconnect = true;
       updPrinterUI(tipo);
     }
   });
@@ -7566,73 +7549,13 @@ const BT_SERVICES = [
 ];
 
 async function conectarBluetooth(tipo){
-
-  // ── MODO APK: usar impresoras emparejadas del sistema Android ──────────────
-  if(isAndroidAPK()){
-    try {
-      const raw = window.AndroidPrint.getPairedBtPrinters();
-      let lista = [];
-      try { lista = JSON.parse(raw); } catch(e) { lista = []; }
-
-      // Verificar si devolvió un error
-      if(lista.length > 0 && lista[0].error){
-        toast('Error Bluetooth: ' + lista[0].error);
-        return;
-      }
-
-      if(!lista.length){
-        toast('No hay impresoras Bluetooth emparejadas. Emparejá tu impresora en Ajustes → Bluetooth');
-        return;
-      }
-
-      // Si hay una sola impresora, usarla directamente sin preguntar
-      if(lista.length === 1){
-        const printer = lista[0];
-        window.AndroidPrint.setBluetoothDevice(printer.name);
-        printers[tipo].name           = printer.name;
-        printers[tipo].type           = 'bt';
-        printers[tipo].device         = null;
-        printers[tipo].needsReconnect = false;
-        printers[tipo].androidName    = printer.name;
-        localStorage.setItem('printerType_' + tipo, 'bt');
-        localStorage.setItem('printerName_' + tipo, printer.name);
-        localStorage.setItem('printerAndroidName_' + tipo, printer.name);
-        updPrinterUI(tipo);
-        toast('✓ Conectada: ' + printer.name);
-        return;
-      }
-
-      // Si hay varias, mostrar un selector simple
-      const nombres = lista.map((p, i) => i + ': ' + p.name + ' (' + p.address + ')').join('\n');
-      const input = prompt('Seleccioná el número de impresora:\n' + nombres, '0');
-      if(input === null) return;
-      const idx = parseInt(input) || 0;
-      const printer = lista[Math.min(idx, lista.length - 1)];
-
-      window.AndroidPrint.setBluetoothDevice(printer.name);
-      printers[tipo].name           = printer.name;
-      printers[tipo].type           = 'bt';
-      printers[tipo].device         = null;
-      printers[tipo].needsReconnect = false;
-      printers[tipo].androidName    = printer.name;
-      localStorage.setItem('printerType_' + tipo, 'bt');
-      localStorage.setItem('printerName_' + tipo, printer.name);
-      localStorage.setItem('printerAndroidName_' + tipo, printer.name);
-      updPrinterUI(tipo);
-      toast('✓ Conectada: ' + printer.name);
-
-    } catch(e){
-      toast('Error al obtener impresoras: ' + e.message);
-    }
-    return;
-  }
-
-  // ── MODO WEB: Web Bluetooth API (Chrome/Edge en PC) ─────────────────────────
   if(!navigator.bluetooth){
-    toast('Web Bluetooth no disponible — usá Chrome o Edge en PC, o instalá la app Android');
+    toast('Web Bluetooth no disponible — usá Chrome o Edge en Android');
     return;
   }
   try {
+    // Filtrar por nombres conocidos de impresoras térmicas BT genéricas
+    // + fallback acceptAllDevices si no matchea ninguno
     const PRINTER_NAMES = [
       'Bluetooth Printer', 'BlueTooth Printer',
       'MTP-II', 'MTP-3', 'RPP02', 'RPP300',
@@ -7642,15 +7565,19 @@ async function conectarBluetooth(tipo){
 
     let device;
     try {
+      // Intento 1: filtrar por nombre exacto (mucho más limpio)
       device = await navigator.bluetooth.requestDevice({
         filters: [
+          // Nombre exacto
           ...PRINTER_NAMES.map(name => ({ name })),
+          // Prefijos comunes
           ...PRINTER_PREFIXES.map(prefix => ({ namePrefix: prefix })),
         ],
         optionalServices: BT_SERVICES
       });
-    } catch(e1){
-      if(e1.name === 'NotFoundError') throw e1;
+    } catch(e1) {
+      if(e1.name === 'NotFoundError') throw e1; // usuario canceló
+      // Si el filtro falla (algunos Android no lo soportan), mostrar todos
       device = await navigator.bluetooth.requestDevice({
         acceptAllDevices: true,
         optionalServices: BT_SERVICES
@@ -7665,7 +7592,7 @@ async function conectarBluetooth(tipo){
     localStorage.setItem('printerName_'+tipo, printers[tipo].name);
     updPrinterUI(tipo);
     toast('\u2713 Conectada: ' + printers[tipo].name);
-  } catch(e){
+  } catch(e) {
     if(e.name !== 'NotFoundError') toast('Error BT: ' + e.message);
   }
 }
@@ -7694,207 +7621,34 @@ function desconectarImpresora(tipo){
 function imprimirTicketConf(htmlContent, tipo){
   const p = printers[tipo] || printers['ticket'];
   const size = p ? p.size : '58';
-  const widthPx = size === '58' ? '200px' : '280px';
+  const widthPx = size==='58' ? '200px' : '280px';
 
-  // ── MODO APK con Bluetooth nativo ──────────────────────────────────────────
-  if(isAndroidAPK() && p && p.type === 'bt'){
-    const androidName = p.androidName
-      || localStorage.getItem('printerAndroidName_' + tipo)
-      || p.name;
-
-    if(!androidName){
-      toast('⚠️ Configurá la impresora Bluetooth primero');
-      return;
-    }
-
-    // Asegurarse de que el puente sabe qué impresora usar
-    window.AndroidPrint.setBluetoothDevice(androidName);
-
-    // Convertir HTML a bytes ESC/POS y enviar al puente nativo
-    imprimirAndroidNativo(htmlContent, size)
-      .then(function(resultado){
-        if(resultado && resultado.startsWith('ok')){
-          toast('✓ Impreso (' + resultado + ')');
-        } else {
-          toast('Error al imprimir: ' + resultado);
-          abrirDialogoImpresion(htmlContent, widthPx);
-        }
-      })
-      .catch(function(e){
-        toast('Error: ' + e.message);
-        abrirDialogoImpresion(htmlContent, widthPx);
-      });
-    return;
-  }
-
-  // ── MODO APK sin impresora configurada ────────────────────────────────────
-  if(isAndroidAPK() && p && p.type === 'bt' && p.needsReconnect){
-    toast('⚠️ Reconectá la impresora Bluetooth primero');
-    goTo('scConfigImpresoras');
-    return;
-  }
-
-  // ── MODO WEB Bluetooth (Chrome/Edge en PC) ────────────────────────────────
   if(p && p.type === 'bt' && p.device){
+    // Bluetooth ESC/POS conectado — enviar comandos
     imprimirBluetooth(p.device, htmlContent, size);
-    return;
-  }
-
-  if(p && p.type === 'bt' && p.needsReconnect){
+  } else if(p && p.type === 'bt' && p.needsReconnect){
+    // Era BT pero se cerró la app — pedir reconectar
     toast('⚠️ Reconectá la impresora Bluetooth primero');
     goTo('scConfigImpresoras');
-    return;
+  } else {
+    // PC/USB o sin impresora — abrir PDF en nueva pestaña
+    const css = [
+      'body{font-family:"Courier New",monospace;font-size:11px;width:'+widthPx+';margin:0 auto;padding:8px;}',
+      '@media print{body{padding:0;}@page{margin:0;size:'+widthPx+' auto;}}'
+    ].join('');
+    // Usar blob URL para evitar bloqueo de popups y abrir sin nueva ventana
+    const fullHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket</title><style>'+css+'</style></head><body>'+htmlContent+'<script>window.onload=function(){window.print();}<\/script></body></html>';
+    const blob = new Blob([fullHtml], {type:'text/html'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=> URL.revokeObjectURL(url), 10000);
   }
-
-  // ── Fallback: PC/USB — abrir diálogo de impresión ─────────────────────────
-  abrirDialogoImpresion(htmlContent, widthPx);
-}
-
-// ── HELPER: abrir diálogo de impresión del sistema ──────────────────────────
-function abrirDialogoImpresion(htmlContent, widthPx){
-  const css = [
-    'body{font-family:"Courier New",monospace;font-size:11px;width:' + widthPx + ';margin:0 auto;padding:8px;}',
-    '@media print{body{padding:0;}@page{margin:0;size:' + widthPx + ' auto;}}'
-  ].join('');
-  const fullHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket</title><style>' + css + '</style></head><body>' + htmlContent + '<script>window.onload=function(){window.print();}<\/script></body></html>';
-  const blob = new Blob([fullHtml], {type:'text/html'});
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url;
-  a.target = '_blank';
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
-}
-
-// ── FUNCIÓN: imprimirAndroidNativo ───────────────────────────────────────────
-// Convierte el HTML a ESC/POS bytes y llama al puente Java
-async function imprimirAndroidNativo(htmlContent, size){
-  const ESC = 0x1B, GS = 0x1D;
-  const CMD = {
-    init:       [ESC, 0x40],
-    left:       [ESC, 0x61, 0x00],
-    center:     [ESC, 0x61, 0x01],
-    boldOn:     [ESC, 0x45, 0x01],
-    boldOff:    [ESC, 0x45, 0x00],
-    dblWideOn:  [ESC, 0x21, 0x20],
-    dblWideOff: [ESC, 0x21, 0x00],
-    smallOn:    [ESC, 0x21, 0x01],
-    smallOff:   [ESC, 0x21, 0x00],
-    cut:        [GS, 0x56, 0x41, 0x10],
-    feed:       [ESC, 0x64, 0x03],
-  };
-
-  const cols = size === '58' ? 32 : 42;
-
-  function enc(str){
-    const out = [];
-    for(let i = 0; i < str.length; i++){
-      const c = str.charCodeAt(i);
-      if(c < 128)                        out.push(c);
-      else if(c === 0xC1 || c === 0xE1)  out.push(0xC1); // Á á
-      else if(c === 0xC9 || c === 0xE9)  out.push(0xC9); // É é
-      else if(c === 0xCD || c === 0xED)  out.push(0xCD); // Í í
-      else if(c === 0xD3 || c === 0xF3)  out.push(0xD3); // Ó ó
-      else if(c === 0xDA || c === 0xFA)  out.push(0xDA); // Ú ú
-      else if(c === 0xD1 || c === 0xF1)  out.push(0xD1); // Ñ ñ
-      else out.push(0x3F); // ?
-    }
-    return out;
-  }
-
-  function line(str)  { return [...enc(str), 0x0A]; }
-  function sep()      { return line('-'.repeat(cols)); }
-  function rline(l, r){
-    const ls = String(l), rs = String(r);
-    const space = Math.max(1, cols - ls.length - rs.length);
-    return line(ls + ' '.repeat(space) + rs);
-  }
-
-  // Parsear HTML — extraer solo el <body>
-  const tmp = document.createElement('div');
-  let htmlParaParsear = htmlContent;
-  const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  if(bodyMatch) htmlParaParsear = bodyMatch[1];
-  tmp.innerHTML = htmlParaParsear;
-
-  const parrafos = Array.from(tmp.querySelectorAll('p'));
-  let bytes = [...CMD.init, ESC, 0x74, 0x02]; // init + página latin-1
-
-  parrafos.forEach(function(p){
-    const cls  = p.className || '';
-    const text = (p.innerText || p.textContent || '').trim();
-    if(!text && !cls.includes('hr')) return;
-
-    if(cls.includes('hr')){ bytes.push(...sep()); return; }
-
-    const isCenter = cls.includes('c');
-    const isBold   = cls.includes('b');
-    const isLarge  = cls.includes('l');
-    const isSmall  = cls.includes('s') && !cls.includes('s b') && !cls.includes('c s');
-
-    if(isCenter) bytes.push(...CMD.center); else bytes.push(...CMD.left);
-    if(isLarge)  bytes.push(...CMD.dblWideOn, ...CMD.boldOn);
-    else if(isBold) bytes.push(...CMD.boldOn);
-    if(isSmall) bytes.push(...CMD.smallOn);
-
-    // Fila con dos columnas
-    if(cls.includes('row')){
-      const spans = p.querySelectorAll('span');
-      if(spans.length >= 2){
-        const l = (spans[0].innerText || spans[0].textContent || '').trim();
-        const r = (spans[spans.length - 1].innerText || spans[spans.length - 1].textContent || '').trim();
-        bytes.push(...CMD.left);
-        if(isBold || isLarge) bytes.push(...CMD.boldOn);
-        if(isLarge) bytes.push(...CMD.dblWideOn);
-        bytes.push(...rline(l, r));
-        bytes.push(...CMD.boldOff, ...CMD.dblWideOff, ...CMD.smallOff);
-        return;
-      }
-    }
-
-    // Items
-    if(cls.includes('it-det') || cls.includes('if-det')){
-      const spans = p.querySelectorAll('span');
-      if(spans.length >= 2){
-        bytes.push(...CMD.left, ...CMD.smallOn);
-        const parts = Array.from(spans).map(s => (s.innerText || s.textContent || '').trim());
-        if(parts.length === 3){
-          bytes.push(...rline('  ' + parts[0], parts[2]));
-        } else {
-          bytes.push(...line('  ' + parts.join('  ')));
-        }
-        bytes.push(...CMD.smallOff);
-        return;
-      }
-    }
-
-    if(cls.includes('it-nom') || cls.includes('if-nom')){
-      bytes.push(...CMD.left, ...CMD.boldOn);
-      bytes.push(...line(text));
-      bytes.push(...CMD.boldOff);
-      return;
-    }
-
-    bytes.push(...line(text));
-    bytes.push(...CMD.boldOff, ...CMD.dblWideOff, ...CMD.smallOff);
-  });
-
-  bytes.push(...CMD.feed, ...CMD.cut);
-
-  // Convertir a Base64 y enviar al puente Java
-  const uint8 = new Uint8Array(bytes);
-  let binary = '';
-  for(let i = 0; i < uint8.length; i++){
-    binary += String.fromCharCode(uint8[i]);
-  }
-  const base64 = btoa(binary);
-
-  // Llamar al puente Java — esto ejecuta la impresión Bluetooth nativa
-  const resultado = window.AndroidPrint.print(base64);
-  return resultado;
 }
 
 async function imprimirBluetooth(device, htmlContent, size){
