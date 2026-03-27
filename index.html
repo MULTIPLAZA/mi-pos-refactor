@@ -4069,16 +4069,19 @@ function imprimirTicketActual(){
 
 function imprimirTicketPendiente(idx){
   const t = pendientes[idx];
-  if(!t || !t.cart?.length){ toast('Ticket vacío'); return; }
+  if(!t){ toast('Ticket no encontrado'); return; }
+  // Compatibilidad: algunos tickets guardados usan 'items' en vez de 'cart'
+  const items = t.cart || t.items || [];
+  if(!items.length){ toast('Ticket sin productos'); return; }
   const size = getPaperSize('ticket');
   const data = {
-    items:     JSON.parse(JSON.stringify(t.cart)),
-    total:     t.total,
-    metodo:    '',
-    fecha:     t.fecha ? new Date(t.fecha) : new Date(),
-    nroTicket: t.nro,
-    obs:       t.obs || '',
-    factura:   null,
+    items:      JSON.parse(JSON.stringify(items)),
+    total:      t.total || items.reduce((s,i)=>s+(i.price*i.qty),0),
+    metodo:     '',
+    fecha:      t.fecha ? new Date(t.fecha) : new Date(),
+    nroTicket:  t.nro,
+    obs:        t.obs || '',
+    factura:    null,
     descTicket: 0,
   };
   const html = generarHTMLTicket(data, size);
@@ -8055,7 +8058,11 @@ async function iniciarApp(){
     if(rp){
       const sp = JSON.parse(rp);
       if(Array.isArray(sp) && sp.length > 0){
-        pendientes = sp;
+        // Normalizar: algunos tickets viejos usan 'items' en vez de 'cart'
+        pendientes = sp.map(p => ({
+          ...p,
+          cart: p.cart || p.items || [],
+        }));
         const mx = sp.reduce((m,p)=>Math.max(m, p.nro||0), 0);
         if(mx >= ticketCounter) ticketCounter = mx + 1;
         console.log('[App] Pendientes restaurados:', sp.length);
@@ -8069,6 +8076,11 @@ async function iniciarApp(){
 
   // ── PASO 3: Restaurar turno ── ANTES de cualquier await ──
   const turnoOk = turnoRestaurar();
+
+  // Actualizar UI con el estado restaurado (nro ticket, badge pendientes)
+  updTabTicketHeader();
+  updBtnGuardar();
+
   if(turnoOk){
     // Si hay mesas configuradas, ir a pantalla mesas; sino, a la venta
     if(mesasSalones.length > 0){
