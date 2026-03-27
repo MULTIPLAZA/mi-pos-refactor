@@ -4110,10 +4110,67 @@ function imprimirTicketPendiente(idx){
 
 // ── IMPRESIÓN DIRECTA ─────────────────────────────────────
 // Imprime sin abrir ventana nueva — funciona en PWA y terminales Android
+// ── QUICKPRINTER (puente para impresoras internas Android) ─
+// Convierte el HTML del ticket a texto plano y lo manda a QuickPrinter
+function imprimirConQuickPrinter(html, size){
+  const cols = size === '58' ? 32 : 42;
+  const sep  = '-'.repeat(cols);
+
+  // Convertir HTML térmico a texto plano compatible con QuickPrinter
+  let texto = html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<hr[^>]*>/gi, '\n' + sep + '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<p[^>]*class="[^"]*row[^"]*"[^>]*>([\s\S]*?)<\/p>/gi, function(m, inner){
+      const spans = inner.match(/<span[^>]*>([\s\S]*?)<\/span>/gi) || [];
+      const texts = spans.map(s => s.replace(/<[^>]+>/g,'').trim());
+      if(texts.length >= 2){
+        const left  = texts[0];
+        const right = texts.slice(1).join(' ');
+        const pad   = Math.max(1, cols - left.length - right.length);
+        return left + ' '.repeat(pad) + right + '\n';
+      }
+      return texts.join(' ') + '\n';
+    })
+    .replace(/<p[^>]*class="[^"]*c[^"]*"[^>]*>([\s\S]*?)<\/p>/gi, function(m, inner){
+      const txt = inner.replace(/<[^>]+>/g,'').trim();
+      const pad = Math.max(0, Math.floor((cols - txt.length) / 2));
+      return ' '.repeat(pad) + txt + '\n';
+    })
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&nbsp;/g,' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  // Agregar corte al final
+  texto += '\n\n\n';
+
+  // Intent de Android para QuickPrinter
+  const encoded = encodeURIComponent(texto);
+  const intent  = 'intent://print?text=' + encoded +
+                  '#Intent;scheme=quickprinter;' +
+                  'package=pe.diegoveloper.printerserviceapp;' +
+                  'end';
+  try {
+    window.location.href = intent;
+    return true;
+  } catch(e){
+    console.warn('[QuickPrinter]', e.message);
+    return false;
+  }
+}
+
 function imprimirDirecto(html, size){
   const mmW = size === '58' ? '58mm' : '80mm';
 
-  // Método 1: Blob URL + ventana nueva (más compatible con Android PWA)
+  // Intentar QuickPrinter primero (para Vizzion y Android con impresora interna)
+  const esAndroid = /android/i.test(navigator.userAgent);
+  if(esAndroid){
+    imprimirConQuickPrinter(html, size);
+    return;
+  }
+
+  // Método 1: Blob URL + ventana nueva (PC / iOS)
   try {
     const fullHtml = html.replace('</style>',
       '@page{size:'+mmW+' auto;margin:0}body{margin:0;padding:0}</style>');
@@ -4121,14 +4178,12 @@ function imprimirDirecto(html, size){
     const url  = URL.createObjectURL(blob);
     const win  = window.open(url, '_blank');
     if(win){
-      // Esperar a que cargue y luego imprimir
       win.onload = function(){
         setTimeout(function(){
           win.print();
           setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
         }, 500);
       };
-      // Fallback si onload no dispara
       setTimeout(function(){
         try{ win.print(); }catch(e){}
         setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
@@ -4142,18 +4197,15 @@ function imprimirDirecto(html, size){
   const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
   const content    = bodyMatch  ? bodyMatch[1]  : html;
   const ticketCss  = styleMatch ? styleMatch[1] : '';
-
   let pd = document.getElementById('_printDiv');
   if(!pd){ pd = document.createElement('div'); pd.id = '_printDiv'; document.body.appendChild(pd); }
   pd.innerHTML = content;
-
   let ps = document.getElementById('_printStyle');
   if(!ps){ ps = document.createElement('style'); ps.id = '_printStyle'; document.head.appendChild(ps); }
   ps.textContent =
     '@media print{body>*:not(#_printDiv){display:none!important}#_printDiv{display:block!important}' +
     '@page{size:'+mmW+' auto;margin:0}}' +
     '@media screen{#_printDiv{display:none}}' + ticketCss;
-
   setTimeout(function(){
     window.print();
     setTimeout(function(){ pd.innerHTML=''; ps.textContent=''; }, 5000);
