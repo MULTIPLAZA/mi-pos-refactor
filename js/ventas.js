@@ -39,24 +39,22 @@ function setNpCtx(v) { npCtx = v; }
 function setNpVal(v) { npVal = v; }
 function setShowTkt(v) { showTkt = v; }
 
-function addCart(id, tileEl, PRODS, animAddToCart, getProductColor, addCartConPrecioVariable, updUI, updBtnGuardar, renderTkt) {
-  const p = PRODS.find(x => x.id === id);
-  if (!p) return;
-  if (p.precioVariable) { addCartConPrecioVariable(id); return; }
-  const existing = cart.find(l => l.id === id && !l.obs);
-  if (existing) { existing.qty++; }
-  else { cart.push({ lineId: Date.now() * 1000 + Math.floor(Math.random() * 1000), ...p, qty: 1, obs: '' }); }
-  updUI(); updBtnGuardar(); toast('+' + p.name.substring(0, 16));
-  if (showTkt) renderTkt();
-  if (tileEl) animAddToCart(tileEl, getProductColor(p));
+function addCart(id, tileEl){
+  const p=PRODS.find(x=>x.id===id); if(!p)return;
+  if(p.precioVariable){ addCartConPrecioVariable(id); return; }
+  const existing = cart.find(l=>l.id===id && !l.obs);
+  if(existing){ existing.qty++; }
+  else { cart.push({lineId: Date.now()*1000+Math.floor(Math.random()*1000), ...p, qty:1, obs:''}); }
+  updUI(); updBtnGuardar(); toast('+'+p.name.substring(0,16));
+  if(showTkt)renderTkt();
+  if(tileEl) animAddToCart(tileEl, getProductColor(p));
 }
-
-function chgQty(lineId, d, updUI, updBtnGuardar, renderTkt) {
-  const idx = cart.findIndex(l => l.lineId === lineId);
-  if (idx < 0) return;
-  if (cart[idx].esDelivery) return;
-  cart[idx].qty += d;
-  if (cart[idx].qty <= 0) cart.splice(idx, 1);
+function chgQty(lineId,d){
+  const idx=cart.findIndex(l=>l.lineId===lineId);
+  if(idx<0)return;
+  if(cart[idx].esDelivery) return;
+  cart[idx].qty+=d;
+  if(cart[idx].qty<=0) cart.splice(idx,1);
   updUI(); updBtnGuardar(); renderTkt();
 }
 
@@ -84,16 +82,12 @@ function calcTotal() {
 
 function calcDescuentoMonto() { return calcSubtotal() - calcTotal(); }
 
-function vaciarTicket(updUI, updBtnGuardar) {
-  cart = [];
-  ticketDescuento = 0;
-  currentTicketNro = null;
-  const dBar = document.getElementById('tabDeliveryBar');
-  if (dBar) dBar.classList.remove('visible');
-  updUI();
-  updBtnGuardar();
-  goTo('scSale');
-  toast('Ticket vaciado');
+function vaciarTicket(){
+  if(!cart.length) return;
+  cart=[]; ticketDescuento=0; currentTicketNro=null; mesaActual=null; tipoPedido='llevar';
+  setTipoPedido('llevar'); updTabTicketHeader(); updMesaBtn?.();
+  const dBar=document.getElementById('tabDeliveryBar'); if(dBar)dBar.classList.remove('visible');
+  updUI(); updBtnGuardar(); goTo('scSale'); toast('Ticket vaciado');
 }
 
 // ── TIPO DE PEDIDO ──────────────────────────────────────────
@@ -115,35 +109,17 @@ function setTipoPedido(tipo) {
   if (tipo !== 'delivery') quitarItemDelivery(null, null);
 }
 
-function quitarItemDelivery(updUI, updBtnGuardar) {
-  const idx = cart.findIndex(i => i.esDelivery);
-  if (idx >= 0) {
-    cart.splice(idx, 1);
-    if (updUI) updUI();
-    if (updBtnGuardar) updBtnGuardar();
-  }
+function quitarItemDelivery(){
+  const idx=cart.findIndex(i=>i.esDelivery); if(idx>=0){cart.splice(idx,1); updUI(); updBtnGuardar();}
 }
 
-function agregarMontoDelivery(updUI, updBtnGuardar) {
-  const inp = document.getElementById('tabDeliveryMonto');
-  const monto = parseInt((inp || {}).value || 0) || 0;
-  if (!monto || monto <= 0) { toast('Ingresá el monto del envío'); inp && inp.focus(); return; }
-  quitarItemDelivery(null, null);
-  cart.push({
-    lineId: Date.now() * 1000 + 999,
-    id: 'delivery_item',
-    name: 'Envío delivery',
-    price: monto,
-    qty: 1,
-    obs: '',
-    iva: '10',
-    esDelivery: true,
-    color: '#e65100',
-    colorPropio: true,
-  });
-  updUI(); updBtnGuardar();
-  toast('✓ Envío ₲' + monto.toLocaleString('es-PY') + ' agregado');
-  if (inp) inp.value = '';
+function agregarMontoDelivery(){
+  const inp=document.getElementById('tabDeliveryMonto');
+  const monto=parseInt((inp||{}).value||0)||0;
+  if(!monto||monto<=0){toast('Ingresá el monto del envío');inp&&inp.focus();return;}
+  quitarItemDelivery();
+  cart.push({lineId:Date.now()*1000+999,id:'delivery_item',name:'Envío delivery',price:monto,qty:1,obs:'',iva:'10',esDelivery:true,color:'#e65100',colorPropio:true});
+  updUI(); updBtnGuardar(); toast('✓ Envío ₲'+monto.toLocaleString('es-PY')+' agregado'); if(inp)inp.value='';
 }
 
 // ── TICKETS PENDIENTES ───────────────────────────────────────
@@ -152,18 +128,19 @@ function guardarPendientesLocal() {
   try { localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); } catch (e) { }
 }
 
-function updTabTicketHeader(mesaActual) {
+function updTabTicketHeader() {
+  updMesaBtn?.();
   const nro = currentTicketNro !== null
     ? String(currentTicketNro).padStart(4, '0')
     : String(ticketCounter).padStart(4, '0');
   const nroEl = document.getElementById('tabTicketNro');
-  if (nroEl) nroEl.textContent = '#' + nro + (mesaActual ? '  ' + mesaActual.nombre : '');
+  if (nroEl) nroEl.textContent = '#' + nro + (typeof mesaActual!=='undefined' && mesaActual ? '  ' + mesaActual.nombre : '');
   const mobNroEl = document.getElementById('mobTicketNro');
   if (mobNroEl) mobNroEl.textContent = '#' + nro;
 }
 
-function onBtnGuardar(mesaActual, guardarConMesa, goGuardar, goPendientes) {
-  if (mesaActual) { guardarConMesa(); return; }
+function onBtnGuardar() {
+  if (typeof mesaActual!=='undefined' && mesaActual) { guardarConMesa(); return; }
   const tieneProductos = calcTotal() > 0;
   if (tieneProductos) {
     goGuardar();
@@ -195,7 +172,7 @@ function goGuardar() {
   setTimeout(() => document.getElementById('guardObs').focus(), 300);
 }
 
-function doGuardar(updUI, updBtnGuardar) {
+function doGuardar() {
   const obs = document.getElementById('guardObs').value.trim();
   if (currentTicketNro !== null) {
     const idx = pendientes.findIndex(t => t.nro === currentTicketNro);
@@ -232,7 +209,7 @@ function doGuardar(updUI, updBtnGuardar) {
   }
 }
 
-function goPendientes(renderPendientes) {
+function goPendientes() {
   renderPendientes();
   goTo('scPendientes');
 }
@@ -264,7 +241,7 @@ function renderPendientes() {
   ).join('');
 }
 
-function cargarTicket(i, updUI, updBtnGuardar) {
+function cargarTicket(i) {
   const t = pendientes[i];
   const totalActual = calcTotal();
   if (totalActual > 0) {
@@ -295,7 +272,7 @@ function cargarTicket(i, updUI, updBtnGuardar) {
   toast('Ticket #' + String(t.nro).padStart(4, '0') + ' cargado');
 }
 
-function nuevaVenta(updUI, updBtnGuardar, updMesaBtn) {
+function nuevaVenta() {
   guardarPendientesLocal();
   const totalActual = calcTotal();
   if (totalActual > 0) {
@@ -448,9 +425,8 @@ function divCobrar(i) {
   }
 }
 
-function dividirHecho(confirmarPago) {
-  const allDone = divPagos.every(p => p.cobrado);
-  if (!allDone) { toast('Faltan cobrar algunos pagos'); return; }
+function dividirHecho() {
+  if (!divPagos.every(p => p.cobrado)) { toast('Faltan cobrar algunos pagos'); return; }
   confirmarPago();
 }
 
