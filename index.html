@@ -3060,6 +3060,7 @@
 
 <script src="js/ui.js"></script>
 <script src="js/ventas.js"></script>
+<script src="js/cobro.js"></script>
 
 <script>
 
@@ -8887,6 +8888,9 @@ function toggleVentaCard(id){
   card.classList.toggle('open');
 }
 
+(async function(){
+  applyTheme();
+  try {
     await initDB();
     await dbLoadCategorias();
     await dbLoadProductos();
@@ -8913,6 +8917,5 @@ if('serviceWorker' in navigator){
 }
 </script>
 
-<script src="js/cobro.js"></script>
 </body>
 </html>
