@@ -9,35 +9,35 @@
 //   - Cálculos de totales
 // ============================================================
 
-import { gs, toast, goTo } from './ui.js';
+// gs, toast, goTo → disponibles globalmente desde js/ui.js
 
 // ── ESTADO ──────────────────────────────────────────────────
-export let cart = [];
-export let curCat = 'Todos los artículos';
-export let showTkt = false;
-export let npCtx = '';
-export let npVal = '';
-export let ticketDescuento = 0;
+let cart = [];
+let curCat = 'Todos los artículos';
+let showTkt = false;
+let npCtx = '';
+let npVal = '';
+let ticketDescuento = 0;
 
-export let ticketCounter = parseInt(localStorage.getItem('pos_ticket_counter') || '1');
-export let tipoPedido = 'llevar'; // 'local' | 'llevar' | 'delivery'
-export let pendientes = [];
-export let currentTicketNro = null;
+let ticketCounter = parseInt(localStorage.getItem('pos_ticket_counter') || '1');
+let tipoPedido = 'llevar'; // 'local' | 'llevar' | 'delivery'
+let pendientes = [];
+let currentTicketNro = null;
 
 // Pago dividido
-export let divPagos = [];
-export let divNpIdx = -1;
-export const PAY_METHODS = ['Efectivo', 'POS', 'Transferencia'];
+let divPagos = [];
+let divNpIdx = -1;
+const PAY_METHODS = ['Efectivo', 'POS', 'Transferencia'];
 let divMethodIdx = -1;
 
 // ── CARRITO ─────────────────────────────────────────────────
 
-export function setCart(newCart) { cart = newCart; }
-export function setNpCtx(v) { npCtx = v; }
-export function setNpVal(v) { npVal = v; }
-export function setShowTkt(v) { showTkt = v; }
+function setCart(newCart) { cart = newCart; }
+function setNpCtx(v) { npCtx = v; }
+function setNpVal(v) { npVal = v; }
+function setShowTkt(v) { showTkt = v; }
 
-export function addCart(id, tileEl, PRODS, animAddToCart, getProductColor, addCartConPrecioVariable, updUI, updBtnGuardar, renderTkt) {
+function addCart(id, tileEl, PRODS, animAddToCart, getProductColor, addCartConPrecioVariable, updUI, updBtnGuardar, renderTkt) {
   const p = PRODS.find(x => x.id === id);
   if (!p) return;
   if (p.precioVariable) { addCartConPrecioVariable(id); return; }
@@ -49,7 +49,7 @@ export function addCart(id, tileEl, PRODS, animAddToCart, getProductColor, addCa
   if (tileEl) animAddToCart(tileEl, getProductColor(p));
 }
 
-export function chgQty(lineId, d, updUI, updBtnGuardar, renderTkt) {
+function chgQty(lineId, d, updUI, updBtnGuardar, renderTkt) {
   const idx = cart.findIndex(l => l.lineId === lineId);
   if (idx < 0) return;
   if (cart[idx].esDelivery) return;
@@ -58,31 +58,31 @@ export function chgQty(lineId, d, updUI, updBtnGuardar, renderTkt) {
   updUI(); updBtnGuardar(); renderTkt();
 }
 
-export function calcItemTotal(item) {
+function calcItemTotal(item) {
   if (item.esDescuento) return item.price;
   const base = item.price * item.qty;
   if (item.desc && item.desc > 0) return Math.round(base * (1 - item.desc / 100));
   return base;
 }
 
-export function calcSubtotal() {
+function calcSubtotal() {
   return cart.filter(i => !i.esDescuento).reduce((s, i) => s + calcItemTotal(i), 0);
 }
 
-export function calcTotalDescuentos() {
+function calcTotalDescuentos() {
   return cart.filter(i => i.esDescuento).reduce((s, i) => s + (i.montoDesc || 0), 0);
 }
 
-export function calcTotal() {
+function calcTotal() {
   const sub = calcSubtotal();
   const desc = calcTotalDescuentos();
   const conTicketDesc = ticketDescuento > 0 ? Math.round(sub * (1 - ticketDescuento / 100)) : sub;
   return conTicketDesc - desc;
 }
 
-export function calcDescuentoMonto() { return calcSubtotal() - calcTotal(); }
+function calcDescuentoMonto() { return calcSubtotal() - calcTotal(); }
 
-export function vaciarTicket(updUI, updBtnGuardar) {
+function vaciarTicket(updUI, updBtnGuardar) {
   cart = [];
   ticketDescuento = 0;
   currentTicketNro = null;
@@ -96,7 +96,7 @@ export function vaciarTicket(updUI, updBtnGuardar) {
 
 // ── TIPO DE PEDIDO ──────────────────────────────────────────
 
-export function setTipoPedido(tipo) {
+function setTipoPedido(tipo) {
   tipoPedido = tipo;
   ['local', 'llevar', 'delivery'].forEach(function (t) {
     const btn = document.getElementById('tipoBtn' + t.charAt(0).toUpperCase() + t.slice(1));
@@ -113,7 +113,7 @@ export function setTipoPedido(tipo) {
   if (tipo !== 'delivery') quitarItemDelivery(null, null);
 }
 
-export function quitarItemDelivery(updUI, updBtnGuardar) {
+function quitarItemDelivery(updUI, updBtnGuardar) {
   const idx = cart.findIndex(i => i.esDelivery);
   if (idx >= 0) {
     cart.splice(idx, 1);
@@ -122,7 +122,7 @@ export function quitarItemDelivery(updUI, updBtnGuardar) {
   }
 }
 
-export function agregarMontoDelivery(updUI, updBtnGuardar) {
+function agregarMontoDelivery(updUI, updBtnGuardar) {
   const inp = document.getElementById('tabDeliveryMonto');
   const monto = parseInt((inp || {}).value || 0) || 0;
   if (!monto || monto <= 0) { toast('Ingresá el monto del envío'); inp && inp.focus(); return; }
@@ -146,11 +146,11 @@ export function agregarMontoDelivery(updUI, updBtnGuardar) {
 
 // ── TICKETS PENDIENTES ───────────────────────────────────────
 
-export function guardarPendientesLocal() {
+function guardarPendientesLocal() {
   try { localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); } catch (e) { }
 }
 
-export function updTabTicketHeader(mesaActual) {
+function updTabTicketHeader(mesaActual) {
   const nro = currentTicketNro !== null
     ? String(currentTicketNro).padStart(4, '0')
     : String(ticketCounter).padStart(4, '0');
@@ -160,7 +160,7 @@ export function updTabTicketHeader(mesaActual) {
   if (mobNroEl) mobNroEl.textContent = '#' + nro;
 }
 
-export function onBtnGuardar(mesaActual, guardarConMesa, goGuardar, goPendientes) {
+function onBtnGuardar(mesaActual, guardarConMesa, goGuardar, goPendientes) {
   if (mesaActual) { guardarConMesa(); return; }
   const tieneProductos = calcTotal() > 0;
   if (tieneProductos) {
@@ -172,7 +172,7 @@ export function onBtnGuardar(mesaActual, guardarConMesa, goGuardar, goPendientes
   }
 }
 
-export function goGuardar() {
+function goGuardar() {
   const total = calcTotal();
   if (total === 0) { toast('Agregá productos primero'); return; }
   const nro = currentTicketNro !== null
@@ -193,7 +193,7 @@ export function goGuardar() {
   setTimeout(() => document.getElementById('guardObs').focus(), 300);
 }
 
-export function doGuardar(updUI, updBtnGuardar) {
+function doGuardar(updUI, updBtnGuardar) {
   const obs = document.getElementById('guardObs').value.trim();
   if (currentTicketNro !== null) {
     const idx = pendientes.findIndex(t => t.nro === currentTicketNro);
@@ -230,12 +230,12 @@ export function doGuardar(updUI, updBtnGuardar) {
   }
 }
 
-export function goPendientes(renderPendientes) {
+function goPendientes(renderPendientes) {
   renderPendientes();
   goTo('scPendientes');
 }
 
-export function renderPendientes() {
+function renderPendientes() {
   const list = document.getElementById('pendList');
   if (!pendientes.length) {
     list.innerHTML = `<div class="pend-empty">
@@ -262,7 +262,7 @@ export function renderPendientes() {
   ).join('');
 }
 
-export function cargarTicket(i, updUI, updBtnGuardar) {
+function cargarTicket(i, updUI, updBtnGuardar) {
   const t = pendientes[i];
   const totalActual = calcTotal();
   if (totalActual > 0) {
@@ -293,7 +293,7 @@ export function cargarTicket(i, updUI, updBtnGuardar) {
   toast('Ticket #' + String(t.nro).padStart(4, '0') + ' cargado');
 }
 
-export function nuevaVenta(updUI, updBtnGuardar, updMesaBtn) {
+function nuevaVenta(updUI, updBtnGuardar, updMesaBtn) {
   guardarPendientesLocal();
   const totalActual = calcTotal();
   if (totalActual > 0) {
@@ -316,7 +316,7 @@ export function nuevaVenta(updUI, updBtnGuardar, updMesaBtn) {
   goTo('scSale');
 }
 
-export function updBtnGuardar() {
+function updBtnGuardar() {
   const n = pendientes.length;
   const tieneProductos = calcTotal() > 0;
   const badge = document.getElementById('pendingBadge');
@@ -352,7 +352,7 @@ export function updBtnGuardar() {
 
 // ── PAGO DIVIDIDO ────────────────────────────────────────────
 
-export function goDividir() {
+function goDividir() {
   const total = calcTotal();
   if (!total) { toast('Agregá productos primero'); return; }
   divPagos = [];
@@ -360,7 +360,7 @@ export function goDividir() {
   goTo('scDividir');
 }
 
-export function divChgCount(delta, forceN) {
+function divChgCount(delta, forceN) {
   const total = calcTotal();
   let n = forceN !== undefined ? forceN : (divPagos.length + delta);
   if (n < 1) n = 1;
@@ -379,7 +379,7 @@ export function divChgCount(delta, forceN) {
   updDivRestante();
 }
 
-export function renderDivList() {
+function renderDivList() {
   const container = document.getElementById('divList');
   container.innerHTML = divPagos.map((p, i) => {
     const needsComp = p.metodo === 'POS' || p.metodo === 'Transferencia';
@@ -416,7 +416,7 @@ export function renderDivList() {
   }).join('');
 }
 
-export function updDivRestante() {
+function updDivRestante() {
   const total = calcTotal();
   const cobrado = divPagos.filter(p => p.cobrado).reduce((s, p) => s + p.monto, 0);
   const restante = total - cobrado;
@@ -424,7 +424,7 @@ export function updDivRestante() {
     restante <= 0 ? 'Pagado ✓' : 'Restante ' + gs(restante);
 }
 
-export function divRemove(i) {
+function divRemove(i) {
   if (divPagos.length <= 1) { toast('Mínimo 1 pago'); return; }
   if (divPagos[i].cobrado) { toast('Ya fue cobrado'); return; }
   divPagos.splice(i, 1);
@@ -434,7 +434,7 @@ export function divRemove(i) {
   updDivRestante();
 }
 
-export function divCobrar(i) {
+function divCobrar(i) {
   const p = divPagos[i];
   if (p.monto <= 0) { toast('El monto debe ser mayor a 0'); return; }
   p.cobrado = true;
@@ -446,13 +446,13 @@ export function divCobrar(i) {
   }
 }
 
-export function dividirHecho(confirmarPago) {
+function dividirHecho(confirmarPago) {
   const allDone = divPagos.every(p => p.cobrado);
   if (!allDone) { toast('Faltan cobrar algunos pagos'); return; }
   confirmarPago();
 }
 
-export function openDivMethodSheet(i) {
+function openDivMethodSheet(i) {
   divMethodIdx = i;
   const sheet = document.getElementById('catSheetContent');
   let html = '';
@@ -464,7 +464,7 @@ export function openDivMethodSheet(i) {
   document.getElementById('catOv').classList.add('open');
 }
 
-export function pickDivMethod(el) {
+function pickDivMethod(el) {
   if (divMethodIdx < 0) return;
   const m = typeof el === 'string' ? el : el.textContent.trim();
   divPagos[divMethodIdx].metodo = m;
@@ -473,7 +473,7 @@ export function pickDivMethod(el) {
   renderDivList();
 }
 
-export function openDivNumpad(i) {
+function openDivNumpad(i) {
   if (divPagos[i].cobrado) return;
   divNpIdx = i;
   npCtx = 'div';
@@ -484,7 +484,7 @@ export function openDivNumpad(i) {
   document.getElementById('npOverlay').classList.add('open');
 }
 
-export function openDivNPComp(i) {
+function openDivNPComp(i) {
   if (divPagos[i].cobrado) return;
   divNpIdx = i;
   npCtx = 'divComp';
