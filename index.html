@@ -8100,11 +8100,11 @@ async function iniciarApp(){
       const sucursal = localStorage.getItem('pos_sucursal');
       dbg('Buscando turno en Supabase... terminal:'+terminal, '#4fc3f7');
       if(email && terminal){
+        // Buscar por email Y terminal, si no hay buscar por email solo
         const query = 'estado=eq.abierto'
           + '&licencia_email=eq.' + encodeURIComponent(email)
-          + '&terminal=eq.'       + encodeURIComponent(terminal)
-          + '&order=fecha_apertura.desc&limit=1';
-        const r = await fetch(SUPA_URL+'/rest/v1/pos_turno?'+query, {
+          + '&order=fecha_apertura.desc&limit=5';
+        const r = await fetch(SUPA_URL+'/rest/v1/pos_turno?'+query+'&select=id,terminal,sucursal,fecha_apertura', {
           headers:{
             'apikey':        SUPA_ANON,
             'Authorization': 'Bearer '+SUPA_ANON,
@@ -8113,9 +8113,18 @@ async function iniciarApp(){
         });
         if(r.ok){
           const rows = await r.json();
-          if(rows && rows[0]){
-            const t = rows[0];
-            dbg('Turno encontrado en Supabase: id='+t.id, '#66bb6a');
+          // Mostrar todos los turnos encontrados para diagnóstico
+          if(rows && rows.length > 0){
+            rows.forEach(t => dbg('Turno DB: id='+t.id+' terminal=['+t.terminal+'] suc='+t.sucursal, '#fff'));
+          } else {
+            dbg('Sin turnos abiertos en Supabase (ninguno)', '#ef5350');
+          }
+          // Buscar primero por terminal exacta, luego por sucursal
+          const t = rows.find(x => x.terminal === terminal)
+                 || rows.find(x => x.sucursal === localStorage.getItem('pos_sucursal'))
+                 || rows[0];
+          if(t){
+            dbg('Usando turno: id='+t.id+' terminal='+t.terminal, '#66bb6a');
             // Reconstruir turnoData desde Supabase
             turnoData.fechaApertura  = new Date(t.fecha_apertura);
             turnoData.efectivoInicial = t.efectivo_inicial || 0;
