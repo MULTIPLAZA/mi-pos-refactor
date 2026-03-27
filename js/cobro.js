@@ -421,10 +421,10 @@ function openNpDelivery() {
 
 // ── FACTURACIÓN ──────────────────────────────────────────────
 
-let facturaActiva        = false;
-let rucTimer             = null;
-let timbradoSeleccionado = null;
-let timbradoSession      = null;
+var facturaActiva        = false;
+var rucTimer             = null;
+var timbradoSeleccionado = null;
+var timbradoSession      = null;
 
 /**
  * Carga el timbrado activo para esta sesión desde Supabase
@@ -631,7 +631,7 @@ function resetFactura() {
 // ── CONSULTA DE RUC ──────────────────────────────────────────
 
 // Datos de RUC para modo demo / sin conexión
-const RUC_DEMO = {
+var RUC_DEMO = {
   '80069563':  { nombre: 'SUPERMERCADO LA ESTRELLA SA',   direccion: 'Av. Mcal. López 1234, Asunción' },
   '800695639': { nombre: 'SUPERMERCADO LA ESTRELLA SA',   direccion: 'Av. Mcal. López 1234, Asunción' },
   '1234567':   { nombre: 'JUAN CARLOS PÉREZ RODRÍGUEZ',   direccion: 'Calle Palma 456, Asunción' },

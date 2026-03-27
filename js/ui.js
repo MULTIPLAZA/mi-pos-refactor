@@ -28,7 +28,7 @@ function gs(n) {
 
 // ── TOAST ────────────────────────────────────────────────────
 
-let _tt;
+var _tt;
 
 /**
  * Muestra una notificación temporal en pantalla por 1.8 segundos.

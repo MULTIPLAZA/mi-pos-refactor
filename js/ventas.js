@@ -12,23 +12,25 @@
 // gs, toast, goTo → disponibles globalmente desde js/ui.js
 
 // ── ESTADO ──────────────────────────────────────────────────
-let cart = [];
-let curCat = 'Todos los artículos';
-let showTkt = false;
-let npCtx = '';
-let npVal = '';
-let ticketDescuento = 0;
+// Declaradas con var para que sean globales y visibles
+// desde el script inline del index.html y otros archivos JS.
+var cart = [];
+var curCat = 'Todos los artículos';
+var showTkt = false;
+var npCtx = '';
+var npVal = '';
+var ticketDescuento = 0;
 
-let ticketCounter = parseInt(localStorage.getItem('pos_ticket_counter') || '1');
-let tipoPedido = 'llevar'; // 'local' | 'llevar' | 'delivery'
-let pendientes = [];
-let currentTicketNro = null;
+var ticketCounter = parseInt(localStorage.getItem('pos_ticket_counter') || '1');
+var tipoPedido = 'llevar'; // 'local' | 'llevar' | 'delivery'
+var pendientes = [];
+var currentTicketNro = null;
 
 // Pago dividido
-let divPagos = [];
-let divNpIdx = -1;
-const PAY_METHODS = ['Efectivo', 'POS', 'Transferencia'];
-let divMethodIdx = -1;
+var divPagos = [];
+var divNpIdx = -1;
+var PAY_METHODS = ['Efectivo', 'POS', 'Transferencia'];
+var divMethodIdx = -1;
 
 // ── CARRITO ─────────────────────────────────────────────────
 
