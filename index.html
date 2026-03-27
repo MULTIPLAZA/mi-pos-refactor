@@ -8036,6 +8036,17 @@ function doDesactivar(){
 
 // ── FUNCIÓN CENTRAL DE INICIO ─────────────────────────────
 async function iniciarApp(){
+  // ── DEBUG VISUAL ─────────────────────────────────────────
+  function dbg(msg,color){
+    let p=document.getElementById('_dbg');
+    if(!p){p=document.createElement('div');p.id='_dbg';
+    p.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:rgba(0,0,0,.93);color:#fff;font-family:monospace;font-size:11px;padding:6px 8px;max-height:45vh;overflow-y:auto;';
+    document.body.appendChild(p);setTimeout(()=>{try{p.remove();}catch(e){}},15000);}
+    const d=document.createElement('div');d.style.color=color||'#4fc3f7';
+    d.textContent=new Date().toLocaleTimeString('es-PY')+' '+msg;
+    p.appendChild(d);p.scrollTop=p.scrollHeight;}
+  dbg('▶ iniciarApp inicio');
+  // ─────────────────────────────────────────────────────────
   // ── PASO 1: Config local (sin red) ───────────────────────
   // Restaurar desde localStorage o cookies (cookies sobreviven al borrar caché)
   const terminal = localStorage.getItem('pos_terminal') || cookieGet('pos_terminal');
@@ -8051,6 +8062,7 @@ async function iniciarApp(){
   cargarConfigLocal();
   restaurarConfigImpresoras();
   cargarTimbradoSesion();
+  dbg('PASO 1 — terminal:'+(localStorage.getItem('pos_terminal')||'?')+' sucursal:'+(localStorage.getItem('pos_sucursal')||'?'));
 
   // ── PASO 2: Restaurar pendientes ──────────────────────────
   try {
@@ -8058,41 +8070,44 @@ async function iniciarApp(){
     if(rp){
       const sp = JSON.parse(rp);
       if(Array.isArray(sp) && sp.length > 0){
-        // Normalizar: algunos tickets viejos usan 'items' en vez de 'cart'
-        pendientes = sp.map(p => ({
-          ...p,
-          cart: p.cart || p.items || [],
-        }));
+        pendientes = sp.map(p => ({ ...p, cart: p.cart || p.items || [] }));
         const mx = sp.reduce((m,p)=>Math.max(m, p.nro||0), 0);
         if(mx >= ticketCounter) ticketCounter = mx + 1;
-        console.log('[App] Pendientes restaurados:', sp.length);
+        dbg('PASO 2 — pendientes:'+sp.length);
       }
     }
-    // Asegurar que ticketCounter es siempre mayor que cualquier nro cobrado
     const savedCounter = parseInt(localStorage.getItem('pos_ticket_counter')||'1');
     if(savedCounter > ticketCounter) ticketCounter = savedCounter;
     localStorage.setItem('pos_ticket_counter', ticketCounter);
-  } catch(e){ console.warn('[Pendientes]', e.message); }
+    dbg('ticketCounter:'+ticketCounter);
+  } catch(e){ dbg('PASO 2 ERROR:'+e.message,'#ef5350'); }
 
-  // ── PASO 3: Restaurar turno ── ANTES de cualquier await ──
-  const turnoOk = turnoRestaurar();
+  // ── PASO 3: Restaurar turno ──────────────────────────────
+  let turnoOk = false;
+  try {
+    const _raw = localStorage.getItem('pos_turno_activo');
+    dbg('pos_turno_activo: '+(_raw ? _raw.substring(0,60)+'...' : 'NULL'), _raw?'#fff':'#ffa726');
+    turnoOk = turnoRestaurar();
+    dbg('turnoRestaurar() → '+turnoOk, turnoOk?'#66bb6a':'#ffa726');
+  } catch(e){ dbg('PASO 3 ERROR:'+e.message,'#ef5350'); }
 
-  // Actualizar UI con el estado restaurado (nro ticket, badge pendientes)
   updTabTicketHeader();
   updBtnGuardar();
 
   if(turnoOk){
-    // Si hay mesas configuradas, ir a pantalla mesas; sino, a la venta
     if(mesasSalones.length > 0){
       goTo('scMesas');
       renderMesasScreen();
+      dbg('→ scMesas','#66bb6a');
       toast('Sesión restaurada');
     } else {
       goTo('scSale');
+      dbg('→ scSale ✓','#66bb6a');
       toast('Sesión restaurada — '+turnoData.ventas.length+' venta'+(turnoData.ventas.length!==1?'s':''));
     }
   } else {
     goTo('scClosed');
+    dbg('→ scClosed (turno no encontrado)','#ffa726');
   }
 
   // ── PASO 4: Cargar productos/categorías (background) ─────
