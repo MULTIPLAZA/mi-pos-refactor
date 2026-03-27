@@ -1700,6 +1700,7 @@
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
     <div style="flex:1;font-size:17px;font-weight:700;" id="reciboTitulo">Comprobante</div>
+    <button class="cbk" onclick="detectarImpresora()" title="Detectar impresora" style="font-size:10px;color:#ffa726;">🔍</button>
     <button class="cbk" onclick="imprimirRecibo()" title="Imprimir">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
     </button>
@@ -4112,33 +4113,87 @@ function imprimirTicketPendiente(idx){
 function imprimirDirecto(html, size){
   const mmW = size === '58' ? '58mm' : '80mm';
 
-  // Reutilizar o crear iframe oculto permanente
-  let iframe = document.getElementById('_printFrame');
-  if(!iframe){
-    iframe = document.createElement('iframe');
-    iframe.id = '_printFrame';
-    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;opacity:0;pointer-events:none;';
-    document.body.appendChild(iframe);
+  // En Android/PWA el único método que funciona es window.print()
+  // con el contenido inyectado en la página principal via @media print
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  const content   = bodyMatch  ? bodyMatch[1]  : html;
+  const ticketCss = styleMatch ? styleMatch[1] : '';
+
+  // Inyectar contenido en un div oculto
+  let pd = document.getElementById('_printDiv');
+  if(!pd){
+    pd = document.createElement('div');
+    pd.id = '_printDiv';
+    document.body.appendChild(pd);
   }
+  pd.innerHTML = content;
 
-  // Inyectar CSS de página al HTML del ticket
-  const htmlConPagina = html.replace('</style>',
-    '@page{size:'+mmW+' auto;margin:0mm}body{margin:0;padding:0}</style>');
+  // CSS: ocultar todo excepto el ticket al imprimir
+  let ps = document.getElementById('_printStyle');
+  if(!ps){
+    ps = document.createElement('style');
+    ps.id = '_printStyle';
+    document.head.appendChild(ps);
+  }
+  ps.textContent =
+    '@media print{' +
+      'body > *:not(#_printDiv){ display:none !important; }' +
+      '#_printDiv{ display:block !important; }' +
+      '@page{ size:' + mmW + ' auto; margin:0; }' +
+    '}' +
+    '@media screen{ #_printDiv{ display:none; } }' +
+    ticketCss;
 
-  const doc = iframe.contentWindow.document;
-  doc.open();
-  doc.write(htmlConPagina);
-  doc.close();
-
+  // Pequeño delay para que el DOM se actualice antes de imprimir
   setTimeout(function(){
-    try{
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-    } catch(e){
-      // Fallback: inyectar en la página principal con @media print
-      _imprimirConCSSMedia(html, mmW);
-    }
-  }, 400);
+    window.print();
+    // Limpiar después de imprimir
+    setTimeout(function(){
+      pd.innerHTML = '';
+      ps.textContent = '';
+    }, 3000);
+  }, 300);
+}
+
+function detectarImpresora(){
+  const ifaces = [];
+  // Detectar interfaces conocidas
+  if(typeof window.AndroidPrint !== 'undefined')       ifaces.push('AndroidPrint: SI');
+  else                                                  ifaces.push('AndroidPrint: NO');
+  if(typeof window.POSSteward !== 'undefined')         ifaces.push('POSSteward: SI');
+  else                                                  ifaces.push('POSSteward: NO');
+  if(typeof window.printer !== 'undefined')            ifaces.push('window.printer: SI');
+  else                                                  ifaces.push('window.printer: NO');
+  if(typeof window.PrintManager !== 'undefined')       ifaces.push('PrintManager: SI');
+  else                                                  ifaces.push('PrintManager: NO');
+  if(typeof window.cordova !== 'undefined')            ifaces.push('Cordova: SI');
+  else                                                  ifaces.push('Cordova: NO');
+  // Listar propiedades de window que contengan "print" en el nombre
+  const printProps = Object.keys(window).filter(k => k.toLowerCase().includes('print'));
+  ifaces.push('window.*print*: ' + (printProps.length ? printProps.join(', ') : 'ninguno'));
+  // Mostrar en panel
+  let p = document.getElementById('_dbg');
+  if(!p){
+    p = document.createElement('div');
+    p.id = '_dbg';
+    p.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:rgba(0,0,0,.93);color:#fff;font-family:monospace;font-size:11px;padding:8px;max-height:60vh;overflow-y:auto;';
+    document.body.appendChild(p);
+    setTimeout(()=>{try{p.remove();}catch(e){}}, 20000);
+  }
+  p.innerHTML = '';
+  ifaces.forEach(line => {
+    const d = document.createElement('div');
+    d.style.color = line.includes(': SI') ? '#66bb6a' : '#aaa';
+    d.textContent = line;
+    p.appendChild(d);
+  });
+  // Botón cerrar
+  const btn = document.createElement('button');
+  btn.textContent = '✕ Cerrar';
+  btn.style.cssText = 'margin-top:8px;background:#333;border:none;color:#fff;padding:6px 12px;border-radius:4px;cursor:pointer;';
+  btn.onclick = () => p.remove();
+  p.appendChild(btn);
 }
 
 function imprimirRecibo(){
