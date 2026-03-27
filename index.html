@@ -8083,13 +8083,58 @@ async function iniciarApp(){
   } catch(e){ dbg('PASO 2 ERROR:'+e.message,'#ef5350'); }
 
   // ── PASO 3: Restaurar turno ──────────────────────────────
+  // Primero intentar desde localStorage (más rápido)
   let turnoOk = false;
   try {
     const _raw = localStorage.getItem('pos_turno_activo');
     dbg('pos_turno_activo: '+(_raw ? _raw.substring(0,60)+'...' : 'NULL'), _raw?'#fff':'#ffa726');
     turnoOk = turnoRestaurar();
-    dbg('turnoRestaurar() → '+turnoOk, turnoOk?'#66bb6a':'#ffa726');
+    dbg('localStorage → '+turnoOk, turnoOk?'#66bb6a':'#ffa726');
   } catch(e){ dbg('PASO 3 ERROR:'+e.message,'#ef5350'); }
+
+  // Si no hay turno en localStorage, buscar en Supabase (otra terminal abrió el turno)
+  if(!turnoOk && navigator.onLine && !USAR_DEMO){
+    try {
+      const email    = localStorage.getItem(SK.email);
+      const terminal = localStorage.getItem('pos_terminal');
+      const sucursal = localStorage.getItem('pos_sucursal');
+      dbg('Buscando turno en Supabase... terminal:'+terminal, '#4fc3f7');
+      if(email && terminal){
+        const query = 'estado=eq.abierto'
+          + '&licencia_email=eq.' + encodeURIComponent(email)
+          + '&terminal=eq.'       + encodeURIComponent(terminal)
+          + '&order=fecha_apertura.desc&limit=1';
+        const r = await fetch(SUPA_URL+'/rest/v1/pos_turno?'+query, {
+          headers:{
+            'apikey':        SUPA_ANON,
+            'Authorization': 'Bearer '+SUPA_ANON,
+            'Accept':        'application/json'
+          }
+        });
+        if(r.ok){
+          const rows = await r.json();
+          if(rows && rows[0]){
+            const t = rows[0];
+            dbg('Turno encontrado en Supabase: id='+t.id, '#66bb6a');
+            // Reconstruir turnoData desde Supabase
+            turnoData.fechaApertura  = new Date(t.fecha_apertura);
+            turnoData.efectivoInicial = t.efectivo_inicial || 0;
+            turnoData.supaId         = t.id;
+            turnoData.dbId           = t.id;
+            turnoData.ventas         = [];
+            turnoData.egresos        = [];
+            turnoData.ingresos       = [];
+            // Guardar en localStorage para la próxima vez
+            turnoGuardar();
+            turnoOk = true;
+            dbg('Turno restaurado desde Supabase ✓', '#66bb6a');
+          } else {
+            dbg('Sin turno abierto en Supabase para esta terminal', '#ffa726');
+          }
+        }
+      }
+    } catch(e){ dbg('Supabase ERROR:'+e.message,'#ef5350'); }
+  }
 
   updTabTicketHeader();
   updBtnGuardar();
@@ -8107,7 +8152,7 @@ async function iniciarApp(){
     }
   } else {
     goTo('scClosed');
-    dbg('→ scClosed (turno no encontrado)','#ffa726');
+    dbg('→ scClosed (sin turno activo)','#ffa726');
   }
 
   // ── PASO 4: Cargar productos/categorías (background) ─────
