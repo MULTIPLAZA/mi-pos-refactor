@@ -4083,6 +4083,9 @@ function imprimirTicketPendiente(idx){
     factura:    null,
     descTicket: 0,
   };
+  // ── CRÍTICO: actualizar ultimoReciboData para que imprimirRecibo()
+  // use estos datos y no los de la última venta cobrada
+  ultimoReciboData = data;
   const html = generarHTMLTicket(data, size);
   mostrarPreviewRecibo(html, size);
   const titulo = document.getElementById('reciboTitulo');
