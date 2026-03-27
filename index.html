@@ -3205,6 +3205,7 @@ function toggleSearch(){
 
 
 // CONFIRM PAYMENT
+function generarRecibo(data){
   ultimoReciboData = data;
 
   const esFactura = data.factura && data.factura.timbrado;
@@ -7787,6 +7788,7 @@ async function iniciarApp(){
 }
 
 // ── ARRANQUE ──────────────────────────────────────────────
+async function guardarConfigTerminalSupabase(cfg){
   const deviceId = await licGetDeviceIdAsync(); // siempre usar el ID de ESTE dispositivo
   try{
     await fetch(SUPA_URL+'/rest/v1/pos_config',{
