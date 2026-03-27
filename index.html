@@ -3563,16 +3563,29 @@ function generarRecibo(data){
   const titulo = document.getElementById('reciboTitulo');
   if(titulo) titulo.textContent = esFactura ? 'Factura' : 'Ticket';
 
-  // Generar HTML y renderizarlo en un iframe dentro de reciboPapel
+  // Generar HTML
   const htmlImpresion = esFactura
     ? generarHTMLFactura(data, size)
     : generarHTMLTicket(data, size);
 
+  // Mostrar preview en scRecibo
   mostrarPreviewRecibo(htmlImpresion, size);
 
   // Botón comanda
   const btnComanda = document.getElementById('btnComandaRecibo');
   if(btnComanda) btnComanda.style.display = data.items?.length ? 'flex' : 'none';
+
+  // ── IMPRESIÓN DIRECTA ──────────────────────────────────
+  // Imprimir automáticamente sin que el cajero tenga que tocar nada
+  const p = printers['ticket'];
+  if(p && p.type === 'bt' && p.device){
+    imprimirBluetooth(p.device, htmlImpresion, size);
+  } else if(isAndroidAPK() && p && p.type === 'bt' && p.androidName){
+    imprimirAndroidNativo(htmlImpresion, size);
+  } else {
+    // Impresora interna (Vizzion) o PC — usar iframe oculto
+    imprimirDirecto(htmlImpresion, size);
+  }
 }
 
 function mostrarPreviewRecibo(html, size){
@@ -4094,6 +4107,40 @@ function imprimirTicketPendiente(idx){
   goTo('scRecibo');
 }
 
+// ── IMPRESIÓN DIRECTA ─────────────────────────────────────
+// Imprime sin abrir ventana nueva — funciona en PWA y terminales Android
+function imprimirDirecto(html, size){
+  const mmW = size === '58' ? '58mm' : '80mm';
+
+  // Reutilizar o crear iframe oculto permanente
+  let iframe = document.getElementById('_printFrame');
+  if(!iframe){
+    iframe = document.createElement('iframe');
+    iframe.id = '_printFrame';
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;opacity:0;pointer-events:none;';
+    document.body.appendChild(iframe);
+  }
+
+  // Inyectar CSS de página al HTML del ticket
+  const htmlConPagina = html.replace('</style>',
+    '@page{size:'+mmW+' auto;margin:0mm}body{margin:0;padding:0}</style>');
+
+  const doc = iframe.contentWindow.document;
+  doc.open();
+  doc.write(htmlConPagina);
+  doc.close();
+
+  setTimeout(function(){
+    try{
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    } catch(e){
+      // Fallback: inyectar en la página principal con @media print
+      _imprimirConCSSMedia(html, mmW);
+    }
+  }, 400);
+}
+
 function imprimirRecibo(){
   if(!ultimoReciboData){ toast('Sin datos para imprimir'); return; }
   const size = getPaperSize('ticket');
@@ -4101,12 +4148,13 @@ function imprimirRecibo(){
   const html = esFactura
     ? generarHTMLFactura(ultimoReciboData, size)
     : generarHTMLTicket(ultimoReciboData, size);
-  // Si hay impresora BT configurada, usar ESC/POS; si no, ventana de impresión
   const p = printers['ticket'];
-  if(p && p.type==='bt' && p.device){
+  if(p && p.type === 'bt' && p.device){
     imprimirBluetooth(p.device, html, size);
+  } else if(isAndroidAPK() && p && p.type === 'bt' && p.androidName){
+    imprimirAndroidNativo(html, size);
   } else {
-    abrirVentanaImpresion(html, size);
+    imprimirDirecto(html, size);
   }
 }
 
