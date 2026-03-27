@@ -1,5 +1,20 @@
-const CACHE = 'ampersand-pos-v1773929758';
-const ASSETS = ['/', '/index.html', '/manifest.json', '/icon.png', '/icon-192.png', '/icon-512.png'];
+// ─── IMPORTANTE: cambiá este número cada vez que subas cambios al repo ───
+// Esto fuerza a todos los dispositivos a descartar el caché viejo y bajar
+// los archivos nuevos. Usá la fecha del día: YYYYMMDD-HHmm
+const CACHE = 'ampersand-pos-v20260327-1600';
+// ─────────────────────────────────────────────────────────────────────────
+
+const ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/icon.png',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/js/ui.js',
+  '/js/ventas.js',
+  '/js/cobro.js',
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -22,16 +37,13 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET') return;
-  // Dejar pasar: Supabase, CDNs externos
+  // Dejar pasar siempre a la red: Supabase y CDNs externos
   if (url.hostname.includes('supabase.co')) return;
   if (url.hostname.includes('jsdelivr.net')) return;
   if (url.hostname.includes('googleapis.com')) return;
   if (url.hostname.includes('cdnjs.cloudflare.com')) return;
-  // Solo cachear recursos propios
-  if (!url.hostname.includes('workers.dev') &&
-      !url.hostname.includes('pages.dev') &&
-      !url.hostname.includes('localhost')) return;
 
+  // Network First: intenta red primero, usa caché si falla
   e.respondWith(
     fetch(e.request)
       .then(res => {
