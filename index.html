@@ -4113,65 +4113,75 @@ function imprimirTicketPendiente(idx){
 function imprimirDirecto(html, size){
   const mmW = size === '58' ? '58mm' : '80mm';
 
-  // En Android/PWA el único método que funciona es window.print()
-  // con el contenido inyectado en la página principal via @media print
-  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-  const content   = bodyMatch  ? bodyMatch[1]  : html;
-  const ticketCss = styleMatch ? styleMatch[1] : '';
+  // Método 1: Blob URL + ventana nueva (más compatible con Android PWA)
+  try {
+    const fullHtml = html.replace('</style>',
+      '@page{size:'+mmW+' auto;margin:0}body{margin:0;padding:0}</style>');
+    const blob = new Blob([fullHtml], {type: 'text/html'});
+    const url  = URL.createObjectURL(blob);
+    const win  = window.open(url, '_blank');
+    if(win){
+      // Esperar a que cargue y luego imprimir
+      win.onload = function(){
+        setTimeout(function(){
+          win.print();
+          setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+        }, 500);
+      };
+      // Fallback si onload no dispara
+      setTimeout(function(){
+        try{ win.print(); }catch(e){}
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+      }, 2000);
+      return;
+    }
+  } catch(e){ console.warn('[Print] Blob falló:', e.message); }
 
-  // Inyectar contenido en un div oculto
+  // Método 2: @media print directo en la página
+  const bodyMatch  = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  const content    = bodyMatch  ? bodyMatch[1]  : html;
+  const ticketCss  = styleMatch ? styleMatch[1] : '';
+
   let pd = document.getElementById('_printDiv');
-  if(!pd){
-    pd = document.createElement('div');
-    pd.id = '_printDiv';
-    document.body.appendChild(pd);
-  }
+  if(!pd){ pd = document.createElement('div'); pd.id = '_printDiv'; document.body.appendChild(pd); }
   pd.innerHTML = content;
 
-  // CSS: ocultar todo excepto el ticket al imprimir
   let ps = document.getElementById('_printStyle');
-  if(!ps){
-    ps = document.createElement('style');
-    ps.id = '_printStyle';
-    document.head.appendChild(ps);
-  }
+  if(!ps){ ps = document.createElement('style'); ps.id = '_printStyle'; document.head.appendChild(ps); }
   ps.textContent =
-    '@media print{' +
-      'body > *:not(#_printDiv){ display:none !important; }' +
-      '#_printDiv{ display:block !important; }' +
-      '@page{ size:' + mmW + ' auto; margin:0; }' +
-    '}' +
-    '@media screen{ #_printDiv{ display:none; } }' +
-    ticketCss;
+    '@media print{body>*:not(#_printDiv){display:none!important}#_printDiv{display:block!important}' +
+    '@page{size:'+mmW+' auto;margin:0}}' +
+    '@media screen{#_printDiv{display:none}}' + ticketCss;
 
-  // Pequeño delay para que el DOM se actualice antes de imprimir
   setTimeout(function(){
     window.print();
-    // Limpiar después de imprimir
-    setTimeout(function(){
-      pd.innerHTML = '';
-      ps.textContent = '';
-    }, 3000);
+    setTimeout(function(){ pd.innerHTML=''; ps.textContent=''; }, 5000);
   }, 300);
 }
 
 function detectarImpresora(){
   const ifaces = [];
-  // Detectar interfaces conocidas
-  if(typeof window.AndroidPrint !== 'undefined')       ifaces.push('AndroidPrint: SI');
-  else                                                  ifaces.push('AndroidPrint: NO');
-  if(typeof window.POSSteward !== 'undefined')         ifaces.push('POSSteward: SI');
-  else                                                  ifaces.push('POSSteward: NO');
-  if(typeof window.printer !== 'undefined')            ifaces.push('window.printer: SI');
-  else                                                  ifaces.push('window.printer: NO');
-  if(typeof window.PrintManager !== 'undefined')       ifaces.push('PrintManager: SI');
-  else                                                  ifaces.push('PrintManager: NO');
-  if(typeof window.cordova !== 'undefined')            ifaces.push('Cordova: SI');
-  else                                                  ifaces.push('Cordova: NO');
-  // Listar propiedades de window que contengan "print" en el nombre
+
+  // Test window.open
+  const testWin = window.open('', '_blank');
+  if(testWin){ testWin.close(); ifaces.push('window.open: OK ✓'); }
+  else        { ifaces.push('window.open: BLOQUEADO ✗ — permitir en Chrome'); }
+
+  // Web Bluetooth disponible?
+  if(navigator.bluetooth) ifaces.push('Web Bluetooth: DISPONIBLE ✓');
+  else                    ifaces.push('Web Bluetooth: NO');
+
+  // PWA mode?
+  const isPWA = window.matchMedia('(display-mode: standalone)').matches;
+  ifaces.push('Modo PWA: ' + (isPWA ? 'SI' : 'NO (navegador)'));
+
+  ifaces.push('--- Propiedades print en window ---');
   const printProps = Object.keys(window).filter(k => k.toLowerCase().includes('print'));
-  ifaces.push('window.*print*: ' + (printProps.length ? printProps.join(', ') : 'ninguno'));
+  ifaces.push(printProps.length ? printProps.join(', ') : 'solo window.print nativo');
+
+  // Botón para escanear BT
+  ifaces.push('--- Acción ---');
   // Mostrar en panel
   let p = document.getElementById('_dbg');
   if(!p){
@@ -4188,6 +4198,35 @@ function detectarImpresora(){
     d.textContent = line;
     p.appendChild(d);
   });
+  // Botón escanear Bluetooth
+  if(navigator.bluetooth){
+    const btnBT = document.createElement('button');
+    btnBT.textContent = '🔵 Escanear impresoras BT';
+    btnBT.style.cssText = 'margin-top:8px;margin-right:8px;background:#1565c0;border:none;color:#fff;padding:6px 12px;border-radius:4px;cursor:pointer;';
+    btnBT.onclick = async function(){
+      try {
+        const device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+        });
+        const d2 = document.createElement('div');
+        d2.style.color = '#66bb6a';
+        d2.textContent = '✓ Dispositivo: ' + device.name + ' (id:' + device.id + ')';
+        p.insertBefore(d2, btnBT);
+        // Guardar nombre para usar como impresora BT
+        localStorage.setItem('printerName_ticket', device.name);
+        localStorage.setItem('printerType_ticket', 'bt');
+        localStorage.setItem('printerAndroidName_ticket', device.name);
+        toast('Impresora guardada: ' + device.name);
+      } catch(e){
+        const d2 = document.createElement('div');
+        d2.style.color = '#ef5350';
+        d2.textContent = 'Error BT: ' + e.message;
+        p.insertBefore(d2, btnBT);
+      }
+    };
+    p.appendChild(btnBT);
+  }
   // Botón cerrar
   const btn = document.createElement('button');
   btn.textContent = '✕ Cerrar';
