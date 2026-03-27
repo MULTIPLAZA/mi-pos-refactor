@@ -4145,15 +4145,16 @@ function imprimirConQuickPrinter(html, size){
   // Agregar corte al final
   texto += '\n\n\n';
 
-  // Intent correcto para QuickPrinter — usa ACTION_SEND con text/plain
-  // Formato: intent:#Intent;action=pe.diegoveloper.printing;type=text/plain;S.android.intent.extra.TEXT=TEXTO;end
+  // Probar con el action directo de QuickPrinter
+  // Formato documentado en github.com/diegoveloper/quickprinter
   const encoded = encodeURIComponent(texto);
-  const intent  = 'intent:#Intent;' +
-                  'action=pe.diegoveloper.printing;' +
-                  'type=text/plain;' +
-                  'S.android.intent.extra.TEXT=' + encoded + ';' +
-                  'package=pe.diegoveloper.printerserviceapp;' +
-                  'end';
+
+  // Método 1: Intent con action pe.diegoveloper.printing
+  const intent = 'intent:#Intent;' +
+                 'action=pe.diegoveloper.printing;' +
+                 'type=text/plain;' +
+                 'S.android.intent.extra.TEXT=' + encoded + ';' +
+                 'end';
   try {
     window.location.href = intent;
     return true;
