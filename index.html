@@ -3073,6 +3073,200 @@ const PRODS = [
 
 // ── UTILIDADES ───────────────────────────────────────────────
 
+// ── CONFIG ───────────────────────────────────────────────────
+
+async function sincronizarConfigNegocio(){
+  const email = localStorage.getItem('lic_email');
+  if(!email || USAR_DEMO) return;
+  try {
+    const rows = await fetch(
+      SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+
+      '&clave=in.(negocio_config,timbrados_config,timbrados_mapa)',
+      { headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'} }
+    ).then(r=>r.ok?r.json():[]);
+
+    rows.forEach(row => {
+      try {
+        const val = JSON.parse(row.valor||'{}');
+        if(row.clave === 'negocio_config'){
+          if(val.an)  configData.negocio   = val.an;
+          if(val.ar)  configData.ruc        = val.ar;
+          if(val.ad)  configData.direccion  = val.ad;
+          if(val.ciudad) configData.ciudad  = val.ciudad;
+          if(val.at)  configData.telefono   = val.at;
+          if(val.email_negocio) configData.email = val.email_negocio;
+          if(val.pie_recibo)    configData.pie_recibo  = val.pie_recibo;
+          if(val.mostrar_ruc)   configData.mostrar_ruc = val.mostrar_ruc;
+          if(val.moneda)        configData.moneda = val.moneda;
+          Object.entries(val).forEach(([k,v])=>{ if(v) localStorage.setItem(k,v); });
+          console.log('[Config] Negocio:', configData.negocio, '| RUC:', configData.ruc);
+        }
+      } catch(e){ console.warn('[Config] Error parsing', row.clave, e.message); }
+    });
+    cargarTimbradoSesion();
+  } catch(e){ console.warn('[Config] Error sync:', e.message); }
+}
+
+function renderGeneralInfo(){
+  const el = document.getElementById('generalInfoPanel');
+  if(!el) return;
+  const terminal   = localStorage.getItem('pos_terminal') || 'Terminal 1';
+  const sucursal   = localStorage.getItem('pos_sucursal') || '—';
+  const depId      = localStorage.getItem('pos_deposito_id') || null;
+  const tim = getTimbradoActivo();
+  const pad3 = n => String(n||0).padStart(3,'0');
+  const padN = n => String(n||0).padStart(7,'0');
+  el.innerHTML = `
+    <div style="background:#111;border:1.5px solid #2a2a2a;border-radius:10px;overflow:hidden;margin-bottom:14px;">
+      <div style="padding:10px 14px;border-bottom:1px solid #1e1e1e;display:flex;align-items:center;gap:8px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <span style="font-size:10px;font-weight:800;color:var(--green);letter-spacing:1px;text-transform:uppercase;">Esta Terminal</span>
+      </div>
+      <div style="padding:10px 14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-size:12px;color:#777;">Nombre</span>
+          <span style="font-size:16px;font-weight:800;color:#fff;">${terminal}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-size:12px;color:#777;">Sucursal</span>
+          <span style="font-size:13px;font-weight:600;color:#ccc;">${sucursal}</span>
+        </div>
+      </div>
+    </div>
+    ${tim ? `
+    <div style="background:#111;border:1.5px solid rgba(76,175,80,.3);border-radius:10px;overflow:hidden;margin-bottom:14px;">
+      <div style="padding:10px 14px;border-bottom:1px solid #1e1e1e;">
+        <span style="font-size:10px;font-weight:800;color:var(--green);">TIMBRADO ACTIVO</span>
+      </div>
+      <div style="padding:10px 14px;display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-size:12px;color:#777;">Timbrado</span>
+          <span style="font-size:13px;font-weight:800;color:#fff;font-family:monospace;">${tim.nro}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding-top:4px;border-top:1px solid #1e1e1e;">
+          <span style="font-size:12px;color:#777;">Próxima factura</span>
+          <span style="font-size:14px;font-weight:800;color:var(--green);font-family:monospace;">${pad3(tim.sucursal)}-${pad3(tim.punto_exp)}-${padN(tim.nro_actual||tim.desde||1)}</span>
+        </div>
+      </div>
+    </div>` : `
+    <div style="background:rgba(239,83,80,.08);border:1.5px solid rgba(239,83,80,.3);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+      <span style="font-size:13px;font-weight:700;color:#ef5350;">Sin timbrado configurado</span>
+    </div>`}
+  `;
+  loadGeneralConfigInputs();
+}
+
+function loadGeneralConfigInputs(){
+  const set = (id, val) => { const el = document.getElementById(id); if(el && val) el.value = val; };
+  set('cfgNegocio',   configData.negocio   || localStorage.getItem('an') || '');
+  set('cfgDireccion', configData.direccion  || localStorage.getItem('ad') || '');
+  set('cfgTelefono',  configData.telefono   || localStorage.getItem('at') || '');
+  set('cfgRuc',       configData.ruc        || localStorage.getItem('ar') || '');
+  const chk = document.getElementById('cfgPresupuestos');
+  if(chk){
+    const habilitado = configData.presupuestosHabilitados !== undefined
+      ? configData.presupuestosHabilitados
+      : localStorage.getItem('pos_presupuestos') === '1';
+    chk.checked = !!habilitado;
+    configData.presupuestosHabilitados = !!habilitado;
+  }
+}
+
+function presupuestosHabilitados(){
+  return !!(configData.presupuestosHabilitados || localStorage.getItem('pos_presupuestos') === '1');
+}
+
+function renderConfigInfo(){
+  const el = document.getElementById('configInfoPanel');
+  if(!el) return;
+  const terminal  = localStorage.getItem('pos_terminal') || 'Terminal 1';
+  const sucursal  = localStorage.getItem('pos_sucursal') || '—';
+  const deposito  = localStorage.getItem('pos_deposito') || '—';
+  const negocio   = configData.negocio   || localStorage.getItem('an') || '—';
+  const ruc       = configData.ruc       || localStorage.getItem('ar') || '—';
+  const direccion = configData.direccion || localStorage.getItem('ad') || '—';
+  const ciudad    = configData.ciudad    || localStorage.getItem('ciudad') || '';
+  const telefono  = configData.telefono  || localStorage.getItem('at') || '—';
+  const email     = localStorage.getItem('lic_email') || '—';
+  const plan      = localStorage.getItem('lic_plan')  || '—';
+  const vence     = localStorage.getItem('lic_vence') || '—';
+  const tim = getTimbradoActivo();
+  const pad3 = n => String(n||0).padStart(3,'0');
+  const padN = n => String(n||0).padStart(7,'0');
+  const timInfo = tim ? pad3(tim.sucursal)+'-'+pad3(tim.punto_exp)+' · Timb. '+tim.nro : null;
+  el.innerHTML = `
+    <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;margin-bottom:12px;">
+      <div style="background:#222;padding:10px 14px;display:flex;align-items:center;gap:8px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <span style="font-size:12px;font-weight:800;color:var(--green);text-transform:uppercase;">Esta Terminal</span>
+      </div>
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:#777;">Nombre</span>
+          <span style="font-size:15px;font-weight:800;color:#fff;">${terminal}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:#777;">Sucursal</span>
+          <span style="font-size:13px;font-weight:600;color:#ccc;">${sucursal}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:#777;">Depósito</span>
+          <span style="font-size:13px;color:#aaa;">${deposito}</span>
+        </div>
+        ${timInfo ? `
+        <div style="border-top:1px solid #2a2a2a;padding-top:8px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:#777;">Timbrado</span>
+          <span style="font-size:12px;font-weight:700;color:var(--green);font-family:monospace;">${timInfo}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:#777;">Próx. factura</span>
+          <span style="font-size:13px;font-weight:700;color:#fff;font-family:monospace;">${pad3(tim.sucursal)}-${pad3(tim.punto_exp)}-${padN(tim.nro_actual||tim.desde||1)}</span>
+        </div>` : `
+        <div style="border-top:1px solid #2a2a2a;padding-top:8px;">
+          <span style="font-size:12px;color:#ef5350;">⚠️ Sin timbrado asignado</span>
+        </div>`}
+      </div>
+    </div>
+    <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;margin-bottom:12px;">
+      <div style="background:#222;padding:10px 14px;">
+        <span style="font-size:12px;font-weight:800;color:#42a5f5;text-transform:uppercase;">Datos del Negocio</span>
+      </div>
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <span style="font-size:12px;color:#777;flex-shrink:0;">Razón social</span>
+          <span style="font-size:13px;font-weight:700;color:#fff;text-align:right;">${negocio}</span>
+        </div>
+        ${ruc !== '—' ? `<div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:#777;">RUC</span><span style="font-size:13px;font-weight:600;color:#ccc;font-family:monospace;">${ruc}</span></div>` : ''}
+        ${direccion !== '—' ? `<div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-size:12px;color:#777;flex-shrink:0;">Dirección</span><span style="font-size:12px;color:#aaa;text-align:right;">${direccion}${ciudad?', '+ciudad:''}</span></div>` : ''}
+        ${telefono !== '—' ? `<div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:#777;">Teléfono</span><span style="font-size:13px;color:#aaa;">${telefono}</span></div>` : ''}
+      </div>
+    </div>
+    <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;margin-bottom:12px;">
+      <div style="background:#222;padding:10px 14px;">
+        <span style="font-size:12px;font-weight:800;color:#ff9800;text-transform:uppercase;">Licencia</span>
+      </div>
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:#777;">Email</span><span style="font-size:12px;color:#aaa;">${email}</span></div>
+        <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:#777;">Plan</span><span style="font-size:13px;font-weight:700;color:var(--green);">${plan}</span></div>
+        <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:#777;">Vence</span><span style="font-size:13px;color:#aaa;">${vence}</span></div>
+      </div>
+    </div>`;
+  const emailEl = document.getElementById('configEmail');
+  if(emailEl) emailEl.textContent = email;
+}
+
+function cargarConfigLocal(){
+  const keys = {
+    an:'negocio', ar:'ruc', ad:'direccion',
+    ciudad:'ciudad', at:'telefono', pie_recibo:'pie_recibo',
+    mostrar_ruc:'mostrar_ruc', moneda:'moneda'
+  };
+  Object.entries(keys).forEach(([lk, ck])=>{
+    const v = localStorage.getItem(lk);
+    if(v) configData[ck] = v;
+  });
+}
+
 // ── CARRITO ──────────────────────────────────────────────────
 async function doOpenShift(){
   const v = parseInt(document.getElementById('shiftDisp').textContent.replace(/[₲.,]/g,''))||0;
