@@ -678,7 +678,7 @@
     // estaban todas juntas en un solo <script> enorme.
 
     import { gs, toast, goTo, loadTheme, animAddToCart } from './js/ui.js';
-    import { leerPendientesLocal } from './js/db.js';
+    import { leerPendientes } from './js/db.js';
     import {
       cart, pendientes, ticketCounter, tipoPedido,
       addCart, chgQty, calcTotal, calcSubtotal, calcDescuentoMonto,
@@ -690,16 +690,15 @@
       pickDivMethod, openDivNumpad, openDivNPComp,
     } from './js/ventas.js';
     import {
-      inicializarCatalogo, getProds, getProductColor,
-      renderP, filterP, renderCatPills, renderCategoriasVenta,
+      cargarProductos, getProds, getProductColor,
+      renderP, filterP, renderCatPills,
       toggleSearch, onSearch, renderArtList,
-      abrirNuevoArticulo, abrirEditarArticulo, guardarArticulo,
-      borrarArticuloConConfirm,
+      abrirNuevoArticulo, abrirEditarArticulo,
     } from './js/articulos.js';
     import { goCobrar, selPay, npKey, aplicarBillete, confirmarPago } from './js/cobro.js';
     import {
       sincronizarConfigNegocio, renderConfigInfo, renderGeneralInfo,
-      loadGeneralConfigInputs, guardarConfigGeneral, cargarTimbradoSesion,
+      loadGeneralConfigInputs, cargarTimbradoSesion,
       presupuestosHabilitados, doOpenShift, supaInsertTurno, getTurnoActivo,
     } from './js/config.js';
 
@@ -727,9 +726,10 @@
       }
 
       // 3. Cargamos el catálogo de productos y la configuración
+      const sucursalId = localStorage.getItem('pos_sucursal_id');
       await Promise.all([
-        inicializarCatalogo(negocioId),
-        sincronizarConfigNegocio(negocioId),
+        cargarProductos(sucursalId),
+        sincronizarConfigNegocio(),
       ]);
 
       // 4. Renderizamos la pantalla inicial
@@ -851,7 +851,7 @@
     window.goCobrar = goCobrar;
     window.selPay = selPay;
     window.npKey = npKey;
-    window.confirmarPago = () => confirmarPago(supabase, negocioId, getTurnoActivo()?.id, updUI, null);
+    window.confirmarPago = () => confirmarPago(updUI);
 
     // Funciones de pago dividido
     window.goDividir = goDividir;
@@ -871,14 +871,14 @@
     window.renderArtList = renderArtList;
     window.abrirNuevoArticulo = abrirNuevoArticulo;
     window.abrirEditarArticulo = abrirEditarArticulo;
-    window.guardarArticulo = guardarArticulo;
+    window.guardarArticulo = () => toast('Guardar artículo: próximamente');
 
     // Funciones de config
     window.renderConfigInfo = renderConfigInfo;
     window.renderGeneralInfo = renderGeneralInfo;
-    window.guardarConfigGeneral = guardarConfigGeneral;
+    window.guardarConfigGeneral = () => toast('Guardar config: próximamente');
     window.doOpenShift = doOpenShift;
-    window.supaInsertTurno = () => supaInsertTurno(supabase, 'usuario_actual');
+    window.supaInsertTurno = () => supaInsertTurno();
 
     // Función de mesa (placeholder para futura funcionalidad)
     function guardarConMesa() { toast('Función de mesas próximamente'); }

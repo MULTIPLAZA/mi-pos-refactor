@@ -46,8 +46,13 @@ import {
   setCart, setCurrentTicketNro, setTicketDescuento,
   updBtnGuardar, setNpCtx, setNpVal,
   divPagos, divNpIdx,
+  npVal, npCtx,
 } from './ventas.js';
 import { insertarVenta, guardarTicketCounter, guardarPendientes, leerConfigLocal } from './db.js';
+
+// Accesores locales — leen el live binding exportado del módulo (no window.*)
+const getNpVal = () => npVal;
+const getNpCtx = () => npCtx;
 
 // ── ESTADO DEL COBRO ───────────────────────────────────────────
 
@@ -137,7 +142,7 @@ function _resetNumpad() {
 /** Actualiza el display y recalcula el vuelto */
 function _actualizarDisplayNumpad() {
   const efecEl = document.getElementById('efecVal');
-  if (efecEl) efecEl.textContent = window.npVal ? gs(parseInt(window.npVal) || 0) : gs(0);
+  if (efecEl) efecEl.textContent = getNpVal() ? gs(parseInt(getNpVal()) || 0) : gs(0);
   _actualizarVuelto();
 }
 
@@ -146,7 +151,7 @@ function _actualizarVuelto() {
   const vueltoEl = document.getElementById('vueltoAmt');
   if (!vueltoEl || metodoPago !== 'Efectivo') return;
 
-  const recibido = parseInt(window.npVal || 0) || 0;
+  const recibido = parseInt(getNpVal() || 0) || 0;
   const total    = calcTotal();
   const vuelto   = recibido - total;
 
@@ -160,8 +165,8 @@ function _actualizarVuelto() {
  * @param {string} key — '0'-'9', '000', '⌫', '✓'
  */
 export function npKey(key) {
-  const ctx = window.npCtx || '';
-  let val   = window.npVal || '';
+  const ctx = getNpCtx();
+  let val   = getNpVal();
 
   if (key === '⌫') {
     setNpVal(val.slice(0, -1));
@@ -188,7 +193,7 @@ export function npKey(key) {
  */
 function _confirmarNumpad(ctx, val) {
   const num = parseInt(val) || 0;
-  const idx = window.divNpIdx ?? -1;
+  const idx = divNpIdx ?? -1;
 
   if (ctx === 'div' && idx >= 0 && divPagos[idx]) {
     divPagos[idx].monto = num;
@@ -206,7 +211,7 @@ function _confirmarNumpad(ctx, val) {
     const el = document.getElementById('compDisplay');
     if (el) el.textContent = val || '—';
   }
-  // ctx === 'efec' → el valor ya está en window.npVal, se lee al confirmar pago
+  // ctx === 'efec' → el valor ya está en npVal (módulo ventas.js), se lee al confirmar pago
 
   document.getElementById('npOverlay')?.classList.remove('open');
 }
@@ -232,7 +237,7 @@ export function openNpEfectivo() {
  * @param {number} monto — Denominación del billete
  */
 export function aplicarBillete(monto) {
-  const actual = parseInt(window.npVal || 0) || 0;
+  const actual = parseInt(getNpVal() || 0) || 0;
   setNpVal(String(actual + monto));
   _actualizarDisplayNumpad();
 }
@@ -254,7 +259,7 @@ export function aplicarBillete(monto) {
  */
 export async function confirmarPago(updUI) {
   const total    = calcTotal();
-  const recibido = parseInt(window.npVal || 0) || 0;
+  const recibido = parseInt(getNpVal() || 0) || 0;
 
   // Validar monto para efectivo
   if (metodoPago === 'Efectivo' && recibido < total) {
