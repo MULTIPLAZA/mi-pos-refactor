@@ -1976,7 +1976,7 @@
     <!-- FUNCIONALIDADES -->
     <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-weight:700;padding:4px 0 8px;">Funcionalidades</div>
     <div style="background:var(--bg-card);border-radius:8px;border:1px solid var(--border);overflow:hidden;margin-bottom:14px;">
-      <div class="general-field" style="border-bottom:none;">
+      <div class="general-field">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
           <div>
             <div style="font-size:14px;font-weight:600;color:var(--text);">Presupuestos</div>
@@ -1984,6 +1984,18 @@
           </div>
           <label class="toggle-switch" style="flex-shrink:0;">
             <input type="checkbox" id="cfgPresupuestos" onchange="saveGeneralConfig()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="general-field" style="border-bottom:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);">Comandas</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">Muestra botón para imprimir comanda en la pantalla de cobro</div>
+          </div>
+          <label class="toggle-switch" style="flex-shrink:0;">
+            <input type="checkbox" id="cfgComandas" onchange="saveGeneralConfig()">
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -2974,7 +2986,11 @@
   </div>
 
   <!-- FOOTER: CONFIRMAR PAGO -->
-  <div class="cobrar-footer">
+  <div class="cobrar-footer" style="display:flex;flex-direction:column;gap:8px;">
+    <button id="btnComandaCobro" onclick="imprimirComandaPreCobro()" style="display:none;background:var(--card2);border:1.5px solid var(--border2);border-radius:10px;color:var(--text);font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;padding:13px;cursor:pointer;align-items:center;justify-content:center;gap:10px;letter-spacing:.3px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></rect></svg>
+      COMANDA
+    </button>
     <button class="btn-confirmar" onclick="confirmarPago()">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
       CONFIRMAR PAGO
@@ -3207,10 +3223,27 @@ function loadGeneralConfigInputs(){
     chk.checked = !!habilitado;
     configData.presupuestosHabilitados = !!habilitado;
   }
+  const chkCom = document.getElementById('cfgComandas');
+  if(chkCom){
+    const hab = configData.comandasHabilitadas !== undefined
+      ? configData.comandasHabilitadas
+      : localStorage.getItem('pos_comandas') === '1';
+    chkCom.checked = !!hab;
+    configData.comandasHabilitadas = !!hab;
+  }
 }
 
 function presupuestosHabilitados(){
   return !!(configData.presupuestosHabilitados || localStorage.getItem('pos_presupuestos') === '1');
+}
+
+function comandasHabilitadas(){
+  return !!(configData.comandasHabilitadas || localStorage.getItem('pos_comandas') === '1');
+}
+
+function updBtnComandaCobro(){
+  const btn = document.getElementById('btnComandaCobro');
+  if(btn) btn.style.display = comandasHabilitadas() ? 'flex' : 'none';
 }
 
 function renderConfigInfo(){
@@ -3594,47 +3627,19 @@ function generarRecibo(data){
 
   const esFactura = data.factura && data.factura.timbrado;
   const size      = getPaperSize('ticket');
-  const nro       = String(data.nroTicket||0).padStart(4,'0');
 
-  // Título
-  const titulo = document.getElementById('reciboTitulo');
-  if(titulo) titulo.textContent = esFactura ? '🧾 Factura #'+nro : '🎫 Ticket #'+nro;
-
-  // Resumen rápido en la pantalla de acciones
-  const resumenEl = document.getElementById('reciboResumen');
-  const totalEl   = document.getElementById('reciboTotal');
-  const metodoEl  = document.getElementById('reciboMetodo');
-  if(resumenEl){
-    const cant = (data.items||[]).reduce((s,i)=>s+i.qty,0);
-    resumenEl.textContent = cant + ' artículo' + (cant!==1?'s':'') + ' · ' +
-      (data.tipoPedido && data.tipoPedido!=='llevar' ? data.tipoPedido.toUpperCase() : 'PARA LLEVAR') +
-      (data.mesa ? ' · Mesa '+data.mesa : '');
-  }
-  if(totalEl)  totalEl.textContent  = '₲ ' + Math.round(data.total||0).toLocaleString('es-PY');
-  if(metodoEl) metodoEl.textContent = (data.metodo||'EFECTIVO').toUpperCase() +
-    (data.vuelto ? ' · Vuelto: ₲'+Math.round(data.vuelto).toLocaleString('es-PY') : '');
-
-  // Botón comanda
-  const btnComanda   = document.getElementById('btnComandaRecibo');
-  const btnTicketCom = document.getElementById('btnTicketComanda');
-  if(btnComanda)   btnComanda.style.display   = (data.items?.length) ? 'flex' : 'none';
-  if(btnTicketCom) btnTicketCom.style.display = (data.items?.length) ? 'flex' : 'none';
-
-  // Generar HTML en background (para WhatsApp y reimprimir)
+  // Generar HTML para reimprimir si es necesario
   const htmlImpresion = esFactura
     ? generarHTMLFactura(data, size)
     : generarHTMLTicket(data, size);
-
-  // Guardar en reciboPapel para compartirWhatsApp
   mostrarPreviewRecibo(htmlImpresion, size);
 
-  // ── IMPRESIÓN DIRECTA ──────────────────────────────────
-  const p = printers['ticket'];
+  // ── IMPRIMIR DIRECTO ────────────────────────────────────
+  const p        = printers['ticket'];
   const btpsTipo = localStorage.getItem('printerType_ticket');
   const btpsMac  = localStorage.getItem('btps_mac');
 
   if(btpsTipo === 'btps' || btpsMac){
-    // BT Print Server — servidor HTTP local
     BTPrinter.imprimirRecibo(data);
   } else if(isAndroidAPK() && typeof window.AndroidPrint !== 'undefined'){
     imprimirAndroidNativo(htmlImpresion, size);
@@ -3643,6 +3648,9 @@ function generarRecibo(data){
   } else {
     imprimirDirecto(htmlImpresion, size);
   }
+
+  // Ir directo a nueva venta
+  finalizarRecibo();
 }
 
 function mostrarPreviewRecibo(html, size){
@@ -4403,10 +4411,14 @@ function imprimirComanda(data){
     let txt = '';
     txt += sep + n;
 
-    // Nro de orden — lo más grande posible en texto plano
-    // Usamos doble ancho ESC/POS via markup si el servidor lo soporta, sino centrado
+    // Nro de orden — lo más grande posible
+    // Línea de espaciado + nro bien centrado + negrita
+    txt += n;
+    txt += '[CENTER][BOLD]================================[/BOLD][/CENTER]' + n;
+    txt += '[CENTER][BOLD]  ORDEN NRO:  [/BOLD][/CENTER]' + n;
     txt += '[CENTER][BOLD]# ' + nro + '[/BOLD][/CENTER]' + n;
-    txt += sep + n;
+    txt += '[CENTER][BOLD]================================[/BOLD][/CENTER]' + n;
+    txt += n;
 
     // Hora y fecha
     txt += '[CENTER][BOLD]' + hora + '  ' + fecha + '[/BOLD][/CENTER]' + n;
@@ -6814,12 +6826,16 @@ function saveGeneralConfig(){
   configData.telefono  = document.getElementById('cfgTelefono')?.value  || configData.telefono;
   configData.ruc       = document.getElementById('cfgRuc')?.value       || configData.ruc;
   configData.presupuestosHabilitados = !!(document.getElementById('cfgPresupuestos')?.checked);
+  configData.comandasHabilitadas     = !!(document.getElementById('cfgComandas')?.checked);
   // Persistir en localStorage
   localStorage.setItem('an', configData.negocio);
   localStorage.setItem('ad', configData.direccion);
   localStorage.setItem('at', configData.telefono);
   localStorage.setItem('ar', configData.ruc);
   localStorage.setItem('pos_presupuestos', configData.presupuestosHabilitados ? '1' : '0');
+  localStorage.setItem('pos_comandas', configData.comandasHabilitadas ? '1' : '0');
+  // Mostrar u ocultar botón comanda en cobro
+  updBtnComandaCobro();
 }
 
 function cerrarSesion(){

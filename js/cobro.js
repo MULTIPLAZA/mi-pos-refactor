@@ -63,6 +63,8 @@ function goCobrar() {
   document.getElementById('npLbl').textContent = 'Efectivo recibido';
 
   goTo('scCobrar');
+  // Mostrar/ocultar botón comanda según config
+  if(typeof updBtnComandaCobro === 'function') updBtnComandaCobro();
 }
 
 // ── MÉTODO DE PAGO ───────────────────────────────────────────
@@ -853,8 +855,6 @@ function confirmarPago() {
     fecha:       new Date(),
     factura:     facturaData,
   });
-
-  goTo('scRecibo');
 }
 
 // ── RECIBO ───────────────────────────────────────────────────
