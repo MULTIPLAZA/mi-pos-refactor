@@ -3615,6 +3615,8 @@ function generarRecibo(data){
   const btpsTipo = localStorage.getItem('printerType_ticket');
   const btpsMac  = localStorage.getItem('btps_mac');
 
+  toast('[Debug] tipo:' + btpsTipo + ' mac:' + (btpsMac ? btpsMac.substring(0,5) : 'null'));
+
   if(btpsTipo === 'btps' || btpsMac){
     // BT Print Server — servidor HTTP local (prioridad si hay MAC guardada)
     BTPrinter.imprimirRecibo(data);
@@ -8117,9 +8119,25 @@ const BTPrinter = {
     var cols = size === '58' ? 32 : 42;
     var mac  = localStorage.getItem('btps_mac');
 
+    toast('Conectando a impresora...');
+
     // Verificar servidor
     var s = await this.status();
-    if (!s) { toast('Abri la app BT Print Server en tu dispositivo'); return false; }
+    if (!s) {
+      // Mostrar error visible y persistente
+      var esHttps = location.protocol === 'https:';
+      if (esHttps) {
+        this._showError(
+          'No se puede conectar al servidor de impresión.\n\n' +
+          '⚠️ Estás usando la app desde el navegador (HTTPS). ' +
+          'El servidor BT Print Server corre en HTTP local y el navegador lo bloquea.\n\n' +
+          '✅ Solución: Abrí la app desde el ícono instalado (APK), no desde Chrome.'
+        );
+      } else {
+        this._showError('Abrí la app BT Print Server en tu dispositivo y asegurate de que esté corriendo.');
+      }
+      return false;
+    }
 
     // Si no está conectado, reconectar con MAC guardada
     if (!s.connected) {
@@ -8131,7 +8149,6 @@ const BTPrinter = {
         return false;
       }
       this._updUI(true, cr.device);
-      // Pequeño delay para que la conexión BT se estabilice
       await new Promise(function(r){ setTimeout(r, 500); });
     }
 
@@ -8156,6 +8173,26 @@ const BTPrinter = {
 
     toast('Error al imprimir, intenta de nuevo');
     return false;
+  },
+
+  _showError(msg) {
+    // Mostrar error persistente que el usuario tiene que cerrar manualmente
+    var existing = document.getElementById('_btpsError');
+    if (existing) existing.remove();
+    var div = document.createElement('div');
+    div.id = '_btpsError';
+    div.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;' +
+      'background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px;';
+    div.innerHTML =
+      '<div style="background:#1e1e1e;border:2px solid #ef5350;border-radius:12px;padding:24px;max-width:380px;width:100%;">' +
+        '<div style="font-size:28px;text-align:center;margin-bottom:12px;">🖨️</div>' +
+        '<div style="color:#ef5350;font-weight:700;font-size:15px;margin-bottom:12px;text-align:center;">Error de impresión</div>' +
+        '<div style="color:#ccc;font-size:13px;line-height:1.6;white-space:pre-line;">' + msg + '</div>' +
+        '<button onclick="document.getElementById(\'_btpsError\').remove()" ' +
+          'style="margin-top:20px;width:100%;background:#ef5350;border:none;border-radius:8px;' +
+          'color:#fff;font-weight:800;font-size:14px;padding:12px;cursor:pointer;">CERRAR</button>' +
+      '</div>';
+    document.body.appendChild(div);
   },
 
   _updUI(connected, deviceName) {
