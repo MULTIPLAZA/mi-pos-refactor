@@ -1792,6 +1792,40 @@
   </header>
   <div style="flex:1;overflow-y:auto;">
 
+    <!-- BT Print Server -->
+    <div style="padding:12px 12px 0;font-size:11px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;font-weight:700;">
+      BT Print Server <span id="btpsBadge" style="font-size:16px;">○</span>
+    </div>
+    <div class="printer-card">
+      <div class="printer-card-header">
+        <div class="printer-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2">
+            <rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/>
+          </svg>
+        </div>
+        <div style="flex:1;">
+          <div class="printer-name">Servidor local HTTP</div>
+          <div class="printer-status" id="btpsStatus" style="color:#ef5350;">● Desconectada</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center;">
+        <input id="btpsMacInput" type="text" placeholder="MAC: AA:BB:CC:DD:EE:FF"
+          value=""
+          style="flex:1;background:var(--card2);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;font-family:monospace;"
+          oninput="this.value=this.value.toUpperCase()">
+        <button onclick="btpsConectar()" style="background:var(--green);border:none;border-radius:8px;color:#fff;font-weight:800;font-size:13px;padding:10px 16px;cursor:pointer;">CONECTAR</button>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:var(--muted);">
+        Instalá <strong>BT Print Server</strong> en tu celular. El servidor corre en 127.0.0.1:8080 y se conecta a tu impresora Bluetooth automáticamente.
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px;">
+        <button onclick="btpsVerEstado()" style="flex:1;background:var(--card2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12px;font-weight:700;padding:8px;cursor:pointer;">VER ESTADO</button>
+        <button onclick="btpsTestImprimir()" style="flex:1;background:var(--card2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12px;font-weight:700;padding:8px;cursor:pointer;">TEST IMPRESIÓN</button>
+      </div>
+    </div>
+
+    <div class="printer-sep"></div>
+
     <!-- Impresora de tickets -->
     <div style="padding:12px 12px 0;font-size:11px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;font-weight:700;">Impresora de Tickets</div>
     <div class="printer-card" id="ticketPrinterCard">
@@ -3577,14 +3611,17 @@ function generarRecibo(data){
   if(btnComanda) btnComanda.style.display = data.items?.length ? 'flex' : 'none';
 
   // ── IMPRESIÓN DIRECTA ──────────────────────────────────
-  // Imprimir automáticamente sin que el cajero tenga que tocar nada
   const p = printers['ticket'];
-  if(p && p.type === 'bt' && p.device){
-    imprimirBluetooth(p.device, htmlImpresion, size);
-  } else if(isAndroidAPK() && p && p.type === 'bt' && p.androidName){
+  const btpsTipo = localStorage.getItem('printerType_ticket');
+
+  if(btpsTipo === 'btps'){
+    // BT Print Server — servidor HTTP local
+    BTPrinter.imprimirRecibo(data);
+  } else if(isAndroidAPK() && typeof window.AndroidPrint !== 'undefined'){
     imprimirAndroidNativo(htmlImpresion, size);
+  } else if(p && p.type === 'bt' && p.device){
+    imprimirBluetooth(p.device, htmlImpresion, size);
   } else {
-    // Impresora interna (Vizzion) o PC — usar iframe oculto
     imprimirDirecto(htmlImpresion, size);
   }
 }
@@ -4317,16 +4354,24 @@ function detectarImpresora(){
 
 function imprimirRecibo(){
   if(!ultimoReciboData){ toast('Sin datos para imprimir'); return; }
+
+  // BT Print Server tiene prioridad si está configurado
+  const btpsTipo = localStorage.getItem('printerType_ticket');
+  if(btpsTipo === 'btps'){
+    BTPrinter.imprimirRecibo(ultimoReciboData);
+    return;
+  }
+
   const size = getPaperSize('ticket');
   const esFactura = ultimoReciboData.factura && ultimoReciboData.factura.timbrado;
   const html = esFactura
     ? generarHTMLFactura(ultimoReciboData, size)
     : generarHTMLTicket(ultimoReciboData, size);
   const p = printers['ticket'];
-  if(p && p.type === 'bt' && p.device){
-    imprimirBluetooth(p.device, html, size);
-  } else if(isAndroidAPK() && p && p.type === 'bt' && p.androidName){
+  if(isAndroidAPK() && typeof window.AndroidPrint !== 'undefined'){
     imprimirAndroidNativo(html, size);
+  } else if(p && p.type === 'bt' && p.device){
+    imprimirBluetooth(p.device, html, size);
   } else {
     imprimirDirecto(html, size);
   }
@@ -6877,6 +6922,59 @@ function usarImpresoraPC(tipo){
   toast('Configurada impresora PC/USB para '+tipo);
 }
 
+
+// ── BT Print Server — funciones de UI ──────────────────────────────
+async function btpsConectar(){
+  const input = document.getElementById('btpsMacInput');
+  const mac   = (input ? input.value.trim() : '').toUpperCase();
+  if (!mac.match(/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/)) {
+    toast('MAC inválida — formato: AA:BB:CC:DD:EE:FF'); return;
+  }
+  localStorage.setItem('btps_mac', mac);
+  // Guardar también como tipo BT para el flujo estándar
+  localStorage.setItem('printerType_ticket', 'btps');
+  localStorage.setItem('printerName_ticket', mac);
+  toast('Conectando a ' + mac + '...');
+  const r = await BTPrinter.connect(mac);
+  if (r.status === 'ok') {
+    BTPrinter._updUI(true, r.device);
+    toast('✓ Impresora conectada: ' + r.device);
+  } else {
+    toast('❌ ' + (r.message || 'Error al conectar'));
+    BTPrinter._updUI(false, null);
+  }
+}
+
+async function btpsVerEstado(){
+  const s = await BTPrinter.status();
+  if (!s) { toast('⚠️ Servidor no disponible — abrí BT Print Server'); return; }
+  BTPrinter._updUI(s.connected, s.device);
+  toast(s.connected
+    ? '✓ Conectada: ' + (s.device || '') + ' | Cola: ' + s.queueSize
+    : '● Desconectada — MAC guardada: ' + (localStorage.getItem('btps_mac') || 'ninguna'));
+}
+
+async function btpsTestImprimir(){
+  const s = await BTPrinter.status();
+  if (!s) { toast('⚠️ Abrí la app BT Print Server'); return; }
+  if (!s.connected) { toast('⚠️ Impresora desconectada'); return; }
+  const r = await BTPrinter.print(
+    '[CENTER][BOLD]** PRUEBA **[/BOLD][/CENTER]\n' +
+    '--------------------------------\n' +
+    'Ampersand POS - Test OK\n' +
+    new Date().toLocaleString('es-PY') + '\n' +
+    '--------------------------------\n' +
+    '[FEED:4]\n[CUT]'
+  );
+  toast(r.status === 'ok' ? '✓ Test enviado a la impresora' : '❌ ' + r.message);
+}
+
+function btpsCargarMacGuardada(){
+  const mac = localStorage.getItem('btps_mac');
+  const inp = document.getElementById('btpsMacInput');
+  if (mac && inp) inp.value = mac;
+}
+
 function desconectarImpresora(tipo){
   if(printers[tipo].device && printers[tipo].device.gatt && printers[tipo].device.gatt.connected){
     printers[tipo].device.gatt.disconnect();
@@ -7871,6 +7969,277 @@ window.addEventListener('online', () => {
 // ══════════════════════════════════════════════════════════
 // SISTEMA DE LICENCIAS
 // ══════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════
+// MÓDULO: BluetoothPrinter — puente HTTP con BT Print Server
+// Servidor local en http://127.0.0.1:8080
+// ══════════════════════════════════════════════════════════════════
+const BTPrinter = {
+  BASE: 'http://127.0.0.1:8080',
+  TIMEOUT_MS: 5000,
+  _statusEl: null,
+  _nameEl: null,
+
+  // ── Utilidad fetch con timeout ────────────────────────────────────
+  async _fetch(path, opts = {}) {
+    const ctrl = new AbortController();
+    const tid  = setTimeout(() => ctrl.abort(), this.TIMEOUT_MS);
+    try {
+      const r = await fetch(this.BASE + path, { ...opts, signal: ctrl.signal });
+      clearTimeout(tid);
+      return r;
+    } catch(e) {
+      clearTimeout(tid);
+      throw e;
+    }
+  },
+
+  // ── GET /status ───────────────────────────────────────────────────
+  async status() {
+    try {
+      const r = await this._fetch('/status');
+      return await r.json();
+    } catch(e) {
+      return null; // servidor no disponible
+    }
+  },
+
+  // ── POST /connect { mac } ─────────────────────────────────────────
+  async connect(mac) {
+    try {
+      const r = await this._fetch('/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mac })
+      });
+      return await r.json();
+    } catch(e) {
+      return { status: 'error', message: 'Abrí la app BT Print Server en tu dispositivo' };
+    }
+  },
+
+  // ── POST /print texto con markup ──────────────────────────────────
+  async print(text) {
+    try {
+      const r = await this._fetch('/print', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        body: text
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        if (r.status === 503) return { status: 'error', message: 'Impresora desconectada, reconectando...' };
+        return { status: 'error', message: err.message || 'Error al imprimir' };
+      }
+      return await r.json();
+    } catch(e) {
+      return { status: 'error', message: 'Abrí la app BT Print Server en tu dispositivo' };
+    }
+  },
+
+  // ── Verificar al iniciar y reconectar si es necesario ────────────
+  async iniciar() {
+    const mac = localStorage.getItem('btps_mac');
+    if (!mac) return; // nunca se configuró
+
+    const s = await this.status();
+    if (!s) {
+      console.log('[BTPrinter] Servidor no disponible');
+      this._updUI(false, null);
+      return;
+    }
+
+    this._updUI(s.connected, s.device);
+
+    if (!s.connected && mac) {
+      console.log('[BTPrinter] Reconectando a ' + mac);
+      toast('Reconectando impresora...');
+      const r = await this.connect(mac);
+      if (r.status === 'ok') {
+        this._updUI(true, r.device);
+        toast('✓ Impresora conectada: ' + r.device);
+      }
+    }
+  },
+
+  // ── Construir texto del ticket con markup ──────────────────────────
+  buildTicket(data, cols) {
+    cols = cols || 32;
+    const sep  = '-'.repeat(cols);
+    const pad  = (l, r) => {
+      const sp = Math.max(1, cols - String(l).length - String(r).length);
+      return String(l) + ' '.repeat(sp) + String(r);
+    };
+    const center = (t) => {
+      const sp = Math.max(0, Math.floor((cols - String(t).length) / 2));
+      return ' '.repeat(sp) + String(t);
+    };
+    const gs = (n) => Math.round(n||0).toLocaleString('es-PY');
+
+    let txt = '';
+
+    // Encabezado negocio
+    if (configData && configData.negocio) {
+      txt += '[CENTER][BOLD]' + configData.negocio.toUpperCase() + '[/BOLD][/CENTER]
+';
+    }
+    if (configData && configData.ruc)      txt += '[CENTER]RUC: ' + configData.ruc + '[/CENTER]
+';
+    if (configData && configData.direccion) txt += '[CENTER]' + configData.direccion + '[/CENTER]
+';
+    if (configData && configData.telefono)  txt += '[CENTER]Tel: ' + configData.telefono + '[/CENTER]
+';
+    txt += sep + '
+';
+
+    // Número y fecha
+    const nro  = String(data.nroTicket || '').padStart(4, '0');
+    const fecha = (data.fecha || new Date()).toLocaleString('es-PY');
+    txt += 'TICKET NRO: ' + nro + '
+';
+    txt += 'FECHA: ' + fecha + '
+';
+    if (data.obs) txt += 'OBS: ' + data.obs + '
+';
+    txt += sep + '
+';
+
+    // Items
+    txt += 'DESCRIPCION
+';
+    txt += pad('CANT x P.UNIT', 'SUBTOTAL') + '
+';
+    txt += sep + '
+';
+
+    (data.items || []).forEach(item => {
+      if (item.esDescuento) {
+        txt += item.name + '
+';
+        txt += pad('  Descuento', '-' + gs(item.montoDesc)) + '
+';
+        return;
+      }
+      txt += item.name + '
+';
+      txt += pad('  ' + item.qty + ' x ' + gs(item.price), gs(item.price * item.qty)) + '
+';
+      if (item.obs) txt += '  [' + item.obs + ']
+';
+    });
+
+    txt += sep + '
+';
+
+    // Descuento en ticket
+    if (data.descTicket && data.descTicket > 0) {
+      txt += pad('Descuento ' + data.descTicket + '%', '-' + gs(data.total * data.descTicket / 100)) + '
+';
+    }
+
+    // Total
+    txt += '[BOLD]' + pad('TOTAL:', gs(data.total)) + '[/BOLD]
+';
+    txt += sep + '
+';
+
+    // Pago
+    txt += pad('FORMA DE PAGO', 'IMPORTE') + '
+';
+    txt += sep + '
+';
+    txt += pad((data.metodo || 'EFECTIVO').toUpperCase() + ':', gs(data.total)) + '
+';
+
+    // Factura si tiene
+    if (data.factura && data.factura.timbrado) {
+      txt += sep + '
+';
+      txt += '[CENTER]** FACTURA **[/CENTER]
+';
+      txt += 'Timbrado: ' + data.factura.timbrado + '
+';
+      txt += 'Nro: ' + (data.factura.nroFactura || '') + '
+';
+      if (data.factura.ruc)    txt += 'RUC: ' + data.factura.ruc + '
+';
+      if (data.factura.nombre) txt += 'Cliente: ' + data.factura.nombre + '
+';
+    }
+
+    txt += sep + '
+';
+    txt += '[CENTER]Comprobante no valido para el IVA[/CENTER]
+';
+    txt += '[CENTER]Gracias por su compra![/CENTER]
+';
+    if (configData && configData.mensajeTicket) {
+      txt += '[CENTER]' + configData.mensajeTicket + '[/CENTER]
+';
+    }
+    txt += '[FEED:4]
+[CUT]';
+
+    return txt;
+  },
+
+  // ── Imprimir recibo de venta ──────────────────────────────────────
+  async imprimirRecibo(data) {
+    const size = localStorage.getItem('printerSize_ticket') || '58';
+    const cols = size === '58' ? 32 : 42;
+
+    // Verificar servidor
+    const s = await this.status();
+    if (!s) {
+      toast('⚠️ Abrí la app BT Print Server en tu dispositivo');
+      return false;
+    }
+
+    // Reconectar si es necesario
+    if (!s.connected) {
+      const mac = localStorage.getItem('btps_mac');
+      if (!mac) {
+        toast('⚠️ Configurá la impresora en Ajustes → Impresoras');
+        return false;
+      }
+      toast('Impresora desconectada, reconectando...');
+      const cr = await this.connect(mac);
+      if (cr.status !== 'ok') {
+        toast('❌ ' + (cr.message || 'No se pudo conectar'));
+        return false;
+      }
+      this._updUI(true, cr.device);
+    }
+
+    const ticket = this.buildTicket(data, cols);
+    const r = await this.print(ticket);
+
+    if (r.status === 'ok') {
+      toast('✓ Impreso correctamente');
+      return true;
+    } else {
+      toast('❌ ' + (r.message || 'Error al imprimir, intentá de nuevo'));
+      return false;
+    }
+  },
+
+  // ── Actualizar UI del estado en config ────────────────────────────
+  _updUI(connected, deviceName) {
+    // Indicador en pantalla de config impresoras
+    const el = document.getElementById('btpsStatus');
+    if (el) {
+      el.textContent = connected ? ('✓ Conectada: ' + (deviceName || '')) : '● Desconectada';
+      el.style.color = connected ? 'var(--green)' : '#ef5350';
+    }
+    // Badge en header de impresoras
+    const badge = document.getElementById('btpsBadge');
+    if (badge) {
+      badge.textContent = connected ? '●' : '○';
+      badge.style.color = connected ? 'var(--green)' : '#ef5350';
+    }
+  }
+};
+
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
 const APP_VERSION = 'v1.1.0 (2026-03-27)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
@@ -8272,6 +8641,8 @@ async function iniciarApp(){
     d.textContent=new Date().toLocaleTimeString('es-PY')+' '+msg;
     p.appendChild(d);p.scrollTop=p.scrollHeight;}
   dbg('▶ iniciarApp inicio');
+  // Iniciar BT Print Server (verificar y reconectar si hay MAC guardada)
+  setTimeout(() => { BTPrinter.iniciar(); btpsCargarMacGuardada(); }, 2000);
   // Mostrar versión en drawer y configuración
   const _vEl = document.getElementById('drawerVersion');
   if(_vEl) _vEl.textContent = APP_VERSION;
