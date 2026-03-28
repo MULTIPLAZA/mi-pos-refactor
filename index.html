@@ -4170,8 +4170,19 @@ function imprimirDirecto(html, size){
   // Intentar QuickPrinter primero (para Vizzion y Android con impresora interna)
   const esAndroid = /android/i.test(navigator.userAgent);
   if(esAndroid){
-    imprimirConQuickPrinter(html, size);
-    return;
+    // Si el APK expone AndroidPrint, usar ESC/POS directo
+    if(typeof window.AndroidPrint !== 'undefined'){
+      imprimirAndroidNativo(html, size);
+      return;
+    }
+    // Si no hay AndroidPrint, intentar QuickPrinter
+    // Solo si NO estamos dentro de un WebView APK (que rompería la navegación)
+    const esWebView = /wv\)/.test(navigator.userAgent) || /; wv\)/.test(navigator.userAgent);
+    if(!esWebView){
+      imprimirConQuickPrinter(html, size);
+      return;
+    }
+    // Dentro del APK sin AndroidPrint — usar @media print
   }
 
   // Método 1: Blob URL + ventana nueva (PC / iOS)
