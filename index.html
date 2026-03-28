@@ -1779,7 +1779,7 @@
 
     <div class="config-footer">
       <span class="config-email" id="configEmail"></span>
-      <span style="font-size:11px;color:var(--muted);margin-top:2px;" id="configVersion"></span>
+      <span style="font-size:12px;font-weight:700;color:var(--green);margin-top:4px;letter-spacing:.3px;" id="configVersion"></span>
       <button class="config-logout-btn" onclick="cerrarSesion()">CERRAR SESIÓN</button>
     </div>
   </div>
@@ -2525,7 +2525,7 @@
     </div>
   </div>
   <div class="drawer-footer">
-    <span class="drawer-version" id="drawerVersion">v1.1.0</span>
+    <span class="drawer-version" id="drawerVersion" style="font-size:11px;font-weight:700;color:var(--green);opacity:.9;">v1.2.0</span>
   </div>
 </div>
 
@@ -3627,10 +3627,6 @@ function generarRecibo(data){
 
   // Guardar en reciboPapel para compartirWhatsApp
   mostrarPreviewRecibo(htmlImpresion, size);
-
-  // Botón comanda
-  const btnComanda = document.getElementById('btnComandaRecibo');
-  if(btnComanda) btnComanda.style.display = data.items?.length ? 'flex' : 'none';
 
   // ── IMPRESIÓN DIRECTA ──────────────────────────────────
   const p = printers['ticket'];
@@ -8325,7 +8321,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.1.0 (2026-03-27)';
+const APP_VERSION = 'v1.2.0 (2026-03-28)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
@@ -8727,9 +8723,9 @@ async function iniciarApp(){
   });
   // Mostrar versión en drawer y configuración
   const _vEl = document.getElementById('drawerVersion');
-  if(_vEl) _vEl.textContent = APP_VERSION;
+  if(_vEl) _vEl.textContent = APP_VERSION + ' · by Nodo Informática';
   const _vCfg = document.getElementById('configVersion');
-  if(_vCfg) _vCfg.textContent = APP_VERSION;
+  if(_vCfg) _vCfg.textContent = APP_VERSION + ' · by Nodo Informática';
   // ─────────────────────────────────────────────────────────
   // ── PASO 1: Config local (sin red) ───────────────────────
   // Restaurar desde localStorage o cookies (cookies sobreviven al borrar caché)
