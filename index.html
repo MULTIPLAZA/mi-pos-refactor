@@ -8054,74 +8054,105 @@ const BTPrinter = {
 
   buildTicket(data, cols) {
     if (!cols) cols = 32;
-    var sep = '-'.repeat(cols);
-    var n   = '\n';
+    var sep  = '='.repeat(cols);
+    var sep2 = '-'.repeat(cols);
+    var n    = '\n';
+    var cfg  = (typeof configData !== 'undefined') ? configData : {};
+
     function pad(l, r) {
       var sp = Math.max(1, cols - String(l).length - String(r).length);
       return String(l) + ' '.repeat(sp) + String(r);
     }
     function ctr(t) {
-      var sp = Math.max(0, Math.floor((cols - String(t).length) / 2));
-      return ' '.repeat(sp) + String(t);
+      t = String(t);
+      var sp = Math.max(0, Math.floor((cols - t.length) / 2));
+      return ' '.repeat(sp) + t;
     }
     function gs(v) { return Math.round(v||0).toLocaleString('es-PY'); }
+    function trunc(s, max) { s = String(s||''); return s.length > max ? s.substring(0, max-1) + '.' : s; }
 
     var txt = '';
-    if (typeof configData !== 'undefined') {
-      if (configData.negocio)  txt += '[CENTER][BOLD]' + configData.negocio.toUpperCase() + '[/BOLD][/CENTER]' + n;
-      if (configData.ruc)      txt += '[CENTER]RUC: ' + configData.ruc + '[/CENTER]' + n;
-      if (configData.direccion) txt += '[CENTER]' + configData.direccion + '[/CENTER]' + n;
-      if (configData.telefono)  txt += '[CENTER]Tel: ' + configData.telefono + '[/CENTER]' + n;
-    }
+
+    // ── ENCABEZADO ──────────────────────────────────────
+    if (cfg.negocio) txt += '[CENTER][BOLD]' + cfg.negocio.toUpperCase() + '[/BOLD][/CENTER]' + n;
+    if (cfg.ruc)     txt += '[CENTER]RUC ' + cfg.ruc + '[/CENTER]' + n;
+    if (cfg.direccion) txt += '[CENTER]' + trunc(cfg.direccion, cols) + '[/CENTER]' + n;
+    if (cfg.telefono)  txt += '[CENTER]Tel: ' + cfg.telefono + '[/CENTER]' + n;
     txt += sep + n;
 
+    // ── DATOS DEL TICKET ─────────────────────────────────
     var nro   = String(data.nroTicket || '').padStart(4, '0');
-    var fecha = (data.fecha || new Date()).toLocaleString('es-PY');
-    txt += 'TICKET NRO: ' + nro + n;
-    txt += 'FECHA: ' + fecha + n;
-    if (data.obs) txt += 'OBS: ' + data.obs + n;
-    txt += sep + n;
-    txt += 'DESCRIPCION' + n;
-    txt += pad('CANT x P.UNIT', 'SUBTOTAL') + n;
-    txt += sep + n;
+    var fecha = (data.fecha || new Date());
+    var fechaStr = (fecha instanceof Date ? fecha : new Date(fecha)).toLocaleDateString('es-PY');
+    var horaStr  = (fecha instanceof Date ? fecha : new Date(fecha)).toLocaleTimeString('es-PY', {hour:'2-digit',minute:'2-digit'});
 
+    txt += pad('Ticket #' + nro, fechaStr + ' ' + horaStr) + n;
+    if (data.tipoPedido && data.tipoPedido !== 'llevar') {
+      txt += '[CENTER]** ' + data.tipoPedido.toUpperCase() + ' **[/CENTER]' + n;
+    }
+    if (data.obs) txt += 'Obs: ' + trunc(data.obs, cols - 5) + n;
+    txt += sep2 + n;
+
+    // ── ITEMS ─────────────────────────────────────────────
     (data.items || []).forEach(function(item) {
       if (item.esDescuento) {
-        txt += item.name + n;
-        txt += pad('  Descuento', '-' + gs(item.montoDesc)) + n;
+        txt += pad('  ' + trunc(item.name, cols - 12), '-' + gs(item.montoDesc)) + n;
         return;
       }
-      txt += item.name + n;
-      txt += pad('  ' + item.qty + ' x ' + gs(item.price), gs(item.price * item.qty)) + n;
-      if (item.obs) txt += '  [' + item.obs + ']' + n;
+      // Nombre del producto (truncado si es muy largo)
+      var nombre = trunc(item.name, cols);
+      txt += nombre + n;
+      // Cantidad x precio → subtotal
+      var detalle = '  ' + item.qty + ' x ' + gs(item.price);
+      var subtotal = gs(item.price * item.qty * (1 - (item.desc||0)/100));
+      txt += pad(detalle, subtotal) + n;
+      if (item.obs) txt += '  (' + trunc(item.obs, cols - 4) + ')' + n;
     });
 
-    txt += sep + n;
-    if (data.descTicket && data.descTicket > 0) {
-      txt += pad('Descuento ' + data.descTicket + '%', '-' + gs(data.total * data.descTicket / 100)) + n;
-    }
-    txt += '[BOLD]' + pad('TOTAL:', gs(data.total)) + '[/BOLD]' + n;
-    txt += sep + n;
-    txt += pad('FORMA DE PAGO', 'IMPORTE') + n;
-    txt += sep + n;
-    txt += pad((data.metodo || 'EFECTIVO').toUpperCase() + ':', gs(data.total)) + n;
+    txt += sep2 + n;
 
+    // ── DESCUENTO Y TOTAL ─────────────────────────────────
+    if (data.descTicket && data.descTicket > 0) {
+      var montoDesc = Math.round(data.total * data.descTicket / 100);
+      txt += pad('Descuento ' + data.descTicket + '%', '-' + gs(montoDesc)) + n;
+      txt += sep2 + n;
+    }
+    txt += '[BOLD]' + pad('TOTAL', gs(data.total) + ' Gs.') + '[/BOLD]' + n;
+    txt += sep + n;
+
+    // ── PAGO ──────────────────────────────────────────────
+    var metodo = (data.metodo || 'EFECTIVO').toUpperCase();
+    txt += pad(metodo, gs(data.total) + ' Gs.') + n;
+    if (data.vuelto && data.vuelto > 0) {
+      txt += pad('Vuelto', gs(data.vuelto) + ' Gs.') + n;
+    }
+
+    // ── DATOS FISCALES (si es factura) ────────────────────
     if (data.factura && data.factura.timbrado) {
       txt += sep + n;
-      txt += '[CENTER]** FACTURA **[/CENTER]' + n;
+      txt += '[CENTER][BOLD]FACTURA[/BOLD][/CENTER]' + n;
       txt += 'Timbrado: ' + data.factura.timbrado + n;
-      txt += 'Nro: ' + (data.factura.nroFactura || '') + n;
-      if (data.factura.ruc)    txt += 'RUC: ' + data.factura.ruc + n;
-      if (data.factura.nombre) txt += 'Cliente: ' + data.factura.nombre + n;
+      if (data.factura.nroFactura) txt += 'Nro: ' + data.factura.nroFactura + n;
+      if (data.factura.ruc)        txt += 'RUC: ' + data.factura.ruc + n;
+      if (data.factura.nombre)     txt += 'Cliente: ' + trunc(data.factura.nombre, cols - 9) + n;
+      // IVA desglose
+      var base10  = Math.round(data.total / 1.1);
+      var iva10   = data.total - base10;
+      txt += sep2 + n;
+      txt += pad('Base Imponible 10%', gs(base10)) + n;
+      txt += pad('IVA 10%', gs(iva10)) + n;
+      txt += pad('Total', gs(data.total)) + n;
+    } else {
+      txt += sep2 + n;
+      txt += '[CENTER]Comprobante no valido para el IVA[/CENTER]' + n;
     }
 
-    txt += sep + n;
-    txt += '[CENTER]Comprobante no valido para el IVA[/CENTER]' + n;
-    txt += '[CENTER]Gracias por su compra![/CENTER]' + n;
-    if (typeof configData !== 'undefined' && configData.mensajeTicket) {
-      txt += '[CENTER]' + configData.mensajeTicket + '[/CENTER]' + n;
-    }
-    txt += '[FEED:4]' + n + '[CUT]';
+    // ── PIE ───────────────────────────────────────────────
+    txt += '[CENTER]*** Gracias por su compra! ***[/CENTER]' + n;
+    if (cfg.mensajeTicket) txt += '[CENTER]' + cfg.mensajeTicket + '[/CENTER]' + n;
+
+    // Solo 2 líneas de avance antes del corte (antes era 4)
+    txt += '[FEED:2]' + n + '[CUT]';
     return txt;
   },
 
