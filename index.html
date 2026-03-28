@@ -1700,44 +1700,46 @@
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
     <div style="flex:1;font-size:17px;font-weight:700;" id="reciboTitulo">Comprobante</div>
-    <button class="cbk" onclick="imprimirRecibo()" title="Imprimir">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+  </div>
+
+  <!-- Resumen rápido de la venta -->
+  <div style="padding:16px 16px 0;text-align:center;">
+    <div id="reciboResumen" style="font-size:13px;color:var(--muted);margin-bottom:4px;"></div>
+    <div id="reciboTotal" style="font-size:32px;font-weight:900;color:var(--text);font-family:'Barlow',sans-serif;letter-spacing:-1px;"></div>
+    <div id="reciboMetodo" style="font-size:12px;color:var(--muted);margin-top:2px;"></div>
+  </div>
+
+  <!-- Botones de acción principales -->
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:16px;gap:12px;">
+
+    <!-- TICKET -->
+    <button onclick="imprimirRecibo()" style="background:var(--green);border:none;border-radius:14px;color:#fff;font-family:'Barlow',sans-serif;font-size:20px;font-weight:900;padding:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:12px;letter-spacing:.5px;box-shadow:0 4px 20px rgba(76,175,80,.4);">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      TICKET
     </button>
+
+    <!-- COMANDA -->
+    <button onclick="imprimirComandaActual()" id="btnComandaRecibo" style="background:rgba(255,152,0,.12);border:2px solid var(--orange);border-radius:14px;color:var(--orange);font-family:'Barlow',sans-serif;font-size:20px;font-weight:900;padding:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:12px;letter-spacing:.5px;">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
+      COMANDA
+    </button>
+
+    <!-- TICKET + COMANDA -->
+    <button onclick="imprimirRecibo();setTimeout(imprimirComandaActual,800);" id="btnTicketComanda" style="background:rgba(33,150,243,.12);border:2px solid #2196f3;border-radius:14px;color:#2196f3;font-family:'Barlow',sans-serif;font-size:17px;font-weight:900;padding:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;letter-spacing:.5px;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      TICKET + COMANDA
+    </button>
+
+    <!-- NO IMPRIMIR -->
+    <button onclick="finalizarRecibo()" style="background:transparent;border:1.5px solid #333;border-radius:14px;color:#666;font-family:'Barlow',sans-serif;font-size:16px;font-weight:700;padding:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      NO IMPRIMIR — NUEVA VENTA
+    </button>
+
   </div>
-  <div class="recibo-body">
-    <!-- Vista previa tipo ticket real -->
-    <div style="display:flex;justify-content:center;padding:12px 0;">
-      <div id="reciboPapel" style="background:#fff;color:#000;font-family:'Courier New',monospace;font-size:12px;line-height:1.4;width:280px;padding:14px 10px;box-shadow:0 2px 16px rgba(0,0,0,.5);white-space:pre-wrap;word-break:break-all;"></div>
-    </div>
 
-    <!-- Botones de acción -->
-    <div style="padding:0 14px 12px;display:flex;flex-direction:column;gap:10px;">
-
-      <!-- Fila 1: Ticket + Factura -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <button onclick="imprimirRecibo()" style="background:var(--green);border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;padding:14px 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-          IMPRIMIR
-        </button>
-        <button id="btnComandaRecibo" onclick="imprimirComandaActual()" style="display:none;background:rgba(255,152,0,.15);border:1.5px solid var(--orange);border-radius:8px;color:var(--orange);font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;padding:14px 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
-          COMANDA
-        </button>
-      </div>
-
-      <!-- WhatsApp -->
-      <button onclick="compartirWhatsApp()" style="background:rgba(37,211,102,.15);border:1.5px solid #25d366;border-radius:8px;color:#25d366;font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;padding:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M11.5 2.5C6.253 2.5 2 6.753 2 12c0 1.821.487 3.53 1.338 5L2 22l5.15-1.316A9.454 9.454 0 0011.5 21.5c5.247 0 9.5-4.253 9.5-9.5S16.747 2.5 11.5 2.5z"/></svg>
-        COMPARTIR WHATSAPP
-      </button>
-
-      <!-- Nueva venta -->
-      <button onclick="finalizarRecibo()" style="background:transparent;border:1.5px solid #333;border-radius:8px;color:#888;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;padding:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        NUEVA VENTA
-      </button>
-    </div>
-  </div>
+  <!-- Preview oculto (se usa para WhatsApp/reimprimir si es necesario) -->
+  <div id="reciboPapel" style="display:none;"></div>
 </div>
 
 <!-- ======== SCREEN: CONFIGURACIÓN ======== -->
@@ -3592,17 +3594,38 @@ function generarRecibo(data){
 
   const esFactura = data.factura && data.factura.timbrado;
   const size      = getPaperSize('ticket');
+  const nro       = String(data.nroTicket||0).padStart(4,'0');
 
   // Título
   const titulo = document.getElementById('reciboTitulo');
-  if(titulo) titulo.textContent = esFactura ? 'Factura' : 'Ticket';
+  if(titulo) titulo.textContent = esFactura ? '🧾 Factura #'+nro : '🎫 Ticket #'+nro;
 
-  // Generar HTML
+  // Resumen rápido en la pantalla de acciones
+  const resumenEl = document.getElementById('reciboResumen');
+  const totalEl   = document.getElementById('reciboTotal');
+  const metodoEl  = document.getElementById('reciboMetodo');
+  if(resumenEl){
+    const cant = (data.items||[]).reduce((s,i)=>s+i.qty,0);
+    resumenEl.textContent = cant + ' artículo' + (cant!==1?'s':'') + ' · ' +
+      (data.tipoPedido && data.tipoPedido!=='llevar' ? data.tipoPedido.toUpperCase() : 'PARA LLEVAR') +
+      (data.mesa ? ' · Mesa '+data.mesa : '');
+  }
+  if(totalEl)  totalEl.textContent  = '₲ ' + Math.round(data.total||0).toLocaleString('es-PY');
+  if(metodoEl) metodoEl.textContent = (data.metodo||'EFECTIVO').toUpperCase() +
+    (data.vuelto ? ' · Vuelto: ₲'+Math.round(data.vuelto).toLocaleString('es-PY') : '');
+
+  // Botón comanda
+  const btnComanda   = document.getElementById('btnComandaRecibo');
+  const btnTicketCom = document.getElementById('btnTicketComanda');
+  if(btnComanda)   btnComanda.style.display   = (data.items?.length) ? 'flex' : 'none';
+  if(btnTicketCom) btnTicketCom.style.display = (data.items?.length) ? 'flex' : 'none';
+
+  // Generar HTML en background (para WhatsApp y reimprimir)
   const htmlImpresion = esFactura
     ? generarHTMLFactura(data, size)
     : generarHTMLTicket(data, size);
 
-  // Mostrar preview en scRecibo
+  // Guardar en reciboPapel para compartirWhatsApp
   mostrarPreviewRecibo(htmlImpresion, size);
 
   // Botón comanda
@@ -8149,32 +8172,38 @@ const BTPrinter = {
     // ── FACTURA ───────────────────────────────────────────
     if (data.factura && data.factura.timbrado) {
       var f = data.factura;
+      // Intentar obtener vigencia del timbrado activo en caché
+      var timCache = (typeof getTimbradoActivo === 'function') ? getTimbradoActivo() : null;
+      var vigInicio = f.fecha_desde || (timCache && (timCache.vig_inicio || timCache.fecha_desde)) || '';
+      var vigFin    = f.fecha_hasta || (timCache && (timCache.vig_fin    || timCache.fecha_hasta)) || '';
+
       txt += sep + n;
-      txt += '[CENTER][BOLD]FACTURA[/BOLD][/CENTER]' + n;
+      txt += '[CENTER][BOLD]FACTURA CONTADO[/BOLD][/CENTER]' + n;
       txt += sep2 + n;
-      // Número de factura completo
-      if (f.nro_factura) txt += 'Nro: ' + f.nro_factura + n;
       txt += 'Timbrado: ' + f.timbrado + n;
-      // Punto de expedición y sucursal
-      if (f.sucursal_nro && f.punto_exp) {
-        txt += 'Suc: ' + f.sucursal_nro + '  P.Exp: ' + f.punto_exp + n;
-      }
-      // Vigencia del timbrado
-      if (f.fecha_desde || f.fecha_hasta) {
-        txt += 'Vigencia: ' + (f.fecha_desde || '?') + ' al ' + (f.fecha_hasta || '?') + n;
-      }
+      if (vigInicio) txt += 'Inicio: ' + vigInicio + n;
+      if (vigFin && vigFin !== '2999-12-31') txt += 'Vto: ' + vigFin + n;
+      if (f.nro_factura || f.nroFactura) txt += '[BOLD]Nro: ' + (f.nro_factura || f.nroFactura) + '[/BOLD]' + n;
+      if (f.sucursal_nro && f.punto_exp) txt += 'Suc: ' + f.sucursal_nro + '  P.Exp: ' + f.punto_exp + n;
       txt += sep2 + n;
-      // Datos del cliente — sin truncar, usar wrap para múltiples líneas
-      if (f.ruc)    txt += wrap('RUC:', f.ruc, '     ');
-      if (f.nombre) txt += wrap('Cliente:', f.nombre, '         ');
-      if (f.direccion) txt += wrap('Dir:', f.direccion, '     ');
+      txt += 'Cliente: ' + (f.nombre || 'CONSUMIDOR FINAL') + n;
+      txt += 'RUC: '     + (f.ruc    || '0000000-0') + n;
+      if (f.direccion) txt += 'Dir: ' + f.direccion + n;
       txt += sep2 + n;
-      // IVA desglose
-      var base10 = Math.round(data.total / 1.1);
-      var iva10  = data.total - base10;
-      txt += pad('Base Imponible 10%', gs(base10)) + n;
-      txt += pad('IVA 10%', gs(iva10)) + n;
-      txt += '[BOLD]' + pad('Total', gs(data.total) + ' Gs.') + '[/BOLD]' + n;
+      // IVA desglose correcto
+      var grav10 = 0, grav5 = 0, exento = 0;
+      (data.items || []).filter(function(i){ return !i.esDescuento; }).forEach(function(item){
+        var sub = item.desc > 0 ? Math.round(item.price * item.qty * (1 - item.desc/100)) : item.price * item.qty;
+        if (item.iva === '5')          grav5   += sub;
+        else if (item.iva === 'exento') exento  += sub;
+        else                            grav10  += sub;
+      });
+      var iva10 = Math.round(grav10 * 10 / 110);
+      var iva5  = Math.round(grav5  * 5  / 105);
+      if (grav10 > 0) { txt += pad('Gravado 10%', gs(grav10)) + n; txt += pad('IVA 10%', gs(iva10)) + n; }
+      if (grav5  > 0) { txt += pad('Gravado 5%',  gs(grav5))  + n; txt += pad('IVA 5%',  gs(iva5))  + n; }
+      if (exento > 0)   txt += pad('Exento', gs(exento)) + n;
+      txt += '[BOLD]' + pad('TOTAL', gs(data.total) + ' Gs.') + '[/BOLD]' + n;
     } else {
       txt += sep2 + n;
       txt += ctr('Comprobante no valido para el IVA') + n;
