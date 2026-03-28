@@ -4366,44 +4366,77 @@ function imprimirComanda(data){
   const size = getPaperSize('comanda');
   const html = generarHTMLComanda(data, size);
 
-  // Usar BTPrinter si está configurado
   const btpsMac  = localStorage.getItem('btps_mac');
   const btpsTipo = localStorage.getItem('printerType_ticket');
   if(btpsMac || btpsTipo === 'btps'){
-    // Convertir HTML de comanda a texto plano para BTPrinter
     const cols = size === '58' ? 32 : 42;
     const sep  = '='.repeat(cols);
     const sep2 = '-'.repeat(cols);
     const n    = '\n';
-    function pad(l,r){ var sp=Math.max(1,cols-String(l).length-String(r).length); return String(l)+' '.repeat(sp)+String(r); }
-    function gs(v){ return Math.round(v||0).toLocaleString('es-PY'); }
 
-    const neg = configData.negocio || '';
-    const d   = data.fecha || new Date();
-    const fecha = d.toLocaleDateString('es-PY');
+    const d     = data.fecha ? (data.fecha instanceof Date ? data.fecha : new Date(data.fecha)) : new Date();
     const hora  = d.toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'});
+    const fecha = d.toLocaleDateString('es-PY');
+    const nro   = String(data.nroTicket||'').padStart(4,'0');
+
+    const tipoPedido = (data.tipoPedido||'llevar').toLowerCase();
+    const esMesa     = tipoPedido==='local' || tipoPedido==='mesa' || !!data.mesa;
+    const esDelivery = tipoPedido==='delivery';
+    const tipoLabel  = esDelivery          ? '*** DELIVERY ***'
+                     : esMesa && data.mesa ? '*** MESA ' + data.mesa.toUpperCase() + ' ***'
+                     : esMesa              ? '*** LOCAL ***'
+                     :                      '*** PARA LLEVAR ***';
+
+    // Función para partir texto largo en múltiples líneas
+    function wrapLine(txt, maxW, indent) {
+      if (!txt) return '';
+      const words = String(txt).split(' ');
+      const lines = []; let cur = '';
+      words.forEach(function(w){
+        if((cur+(cur?' ':'')+w).length > maxW){ if(cur) lines.push(cur); cur=w; }
+        else { cur = cur ? cur+' '+w : w; }
+      });
+      if(cur) lines.push(cur);
+      return lines[0] + (lines.slice(1).map(function(l){ return n+(indent||'   ')+l; }).join(''));
+    }
 
     let txt = '';
-    if(neg) txt += '[CENTER][BOLD]' + neg + '[/BOLD][/CENTER]' + n;
-    txt += '[CENTER][BOLD]*** COMANDA ***[/BOLD][/CENTER]' + n;
     txt += sep + n;
-    txt += pad('Orden #' + String(data.nroTicket||'').padStart(4,'0'), fecha + ' ' + hora) + n;
-    if(data.tipoPedido) txt += 'Tipo: ' + data.tipoPedido.toUpperCase() + n;
-    if(data.mesa)       txt += 'Mesa: ' + data.mesa + n;
+
+    // Nro de orden — lo más grande posible en texto plano
+    // Usamos doble ancho ESC/POS via markup si el servidor lo soporta, sino centrado
+    txt += '[CENTER][BOLD]# ' + nro + '[/BOLD][/CENTER]' + n;
+    txt += sep + n;
+
+    // Hora y fecha
+    txt += '[CENTER][BOLD]' + hora + '  ' + fecha + '[/BOLD][/CENTER]' + n;
     txt += sep2 + n;
 
+    // Tipo de pedido
+    txt += '[CENTER][BOLD]' + tipoLabel + '[/BOLD][/CENTER]' + n;
+    txt += sep2 + n;
+
+    // Cliente y obs
+    const cliente = (data.factura && data.factura.nombre) || data.cliente || '';
+    if(cliente) txt += 'Cliente: ' + cliente + n;
+    if(data.obs) txt += '[BOLD]OBS: ' + data.obs + '[/BOLD]' + n;
+    if(cliente || data.obs) txt += sep2 + n;
+
+    // Items
     (data.items||[]).forEach(function(item){
       if(item.esDescuento) return;
-      txt += '[BOLD]' + item.qty + 'x ' + item.name + '[/BOLD]' + n;
-      if(item.obs) txt += '  -> ' + item.obs + n;
+      const maxNom = cols - 3;
+      const nombre = wrapLine(item.name, maxNom, '   ');
+      txt += '[BOLD]' + item.qty + ' ' + nombre + '[/BOLD]' + n;
+      if(item.obs) txt += '  -> ' + wrapLine(item.obs, cols-5, '     ') + n;
     });
 
     txt += sep + n;
     txt += '[CUT]';
 
     BTPrinter.print(txt).then(function(r){
-      if(r.status !== 'ok') {
-        toast('Error comanda: ' + (r.message || 'Error'));
+      if(r.status !== 'ok'){
+        toast('Error comanda: ' + (r.message||'Error'));
         abrirVentanaImpresion(html, size);
       }
     });
