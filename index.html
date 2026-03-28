@@ -8115,19 +8115,45 @@ const BTPrinter = {
   async imprimirRecibo(data) {
     var size = localStorage.getItem('printerSize_ticket') || '58';
     var cols = size === '58' ? 32 : 42;
+    var mac  = localStorage.getItem('btps_mac');
+
+    // Verificar servidor
     var s = await this.status();
     if (!s) { toast('Abri la app BT Print Server en tu dispositivo'); return false; }
+
+    // Si no está conectado, reconectar con MAC guardada
     if (!s.connected) {
-      var mac = localStorage.getItem('btps_mac');
       if (!mac) { toast('Configura la impresora en Ajustes > Impresoras'); return false; }
-      toast('Impresora desconectada, reconectando...');
+      toast('Reconectando impresora...');
       var cr = await this.connect(mac);
-      if (cr.status !== 'ok') { toast('Error: ' + (cr.message || 'No se pudo conectar')); return false; }
+      if (cr.status !== 'ok') {
+        toast('Error: ' + (cr.message || 'No se pudo conectar'));
+        return false;
+      }
       this._updUI(true, cr.device);
+      // Pequeño delay para que la conexión BT se estabilice
+      await new Promise(function(r){ setTimeout(r, 500); });
     }
+
     var ticket = this.buildTicket(data, cols);
     var r = await this.print(ticket);
-    if (r.status === 'ok') { toast('Impreso correctamente'); return true; }
+
+    if (r.status === 'ok') {
+      toast('Impreso correctamente');
+      return true;
+    }
+
+    // Si falló porque se desconectó, reintentar una vez
+    if (r.message && r.message.includes('desconectada') && mac) {
+      toast('Reintentando...');
+      var cr2 = await this.connect(mac);
+      if (cr2.status === 'ok') {
+        await new Promise(function(res){ setTimeout(res, 500); });
+        var r2 = await this.print(ticket);
+        if (r2.status === 'ok') { toast('Impreso correctamente'); return true; }
+      }
+    }
+
     toast('Error al imprimir, intenta de nuevo');
     return false;
   },
@@ -8550,6 +8576,14 @@ async function iniciarApp(){
   dbg('▶ iniciarApp inicio');
   // Iniciar BT Print Server (verificar y reconectar si hay MAC guardada)
   setTimeout(() => { BTPrinter.iniciar(); btpsCargarMacGuardada(); }, 2000);
+
+  // Reconectar automáticamente cuando la app vuelve al foco
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'visible'){
+      const mac = localStorage.getItem('btps_mac');
+      if(mac) BTPrinter.iniciar();
+    }
+  });
   // Mostrar versión en drawer y configuración
   const _vEl = document.getElementById('drawerVersion');
   if(_vEl) _vEl.textContent = APP_VERSION;
