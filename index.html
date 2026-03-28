@@ -3953,11 +3953,15 @@ function generarHTMLTicket(data, size){
   // Forma de pago
   lineas += '<p class="row s"><span class="l1">FORMA DE PAGO</span><span class="l2">IMPORTE</span></p>';
   lineas += '<p class="hr"></p>';
-  lineas += '<p class="row s"><span class="l1">'+data.metodo+':</span><span class="l2">'+gn(data.total)+'</span></p>';
+  if(data.divPagos && data.divPagos.length > 0){
+    data.divPagos.forEach(p => {
+      lineas += '<p class="row s"><span class="l1">'+p.metodo+':</span><span class="l2">'+gn(p.monto)+'</span></p>';
+    });
+  } else {
+    lineas += '<p class="row s"><span class="l1">'+data.metodo+':</span><span class="l2">'+gn(data.total)+'</span></p>';
+  }
   if(data.vuelto) lineas += '<p class="row s"><span class="l1">VUELTO:</span><span class="l2">'+data.vuelto+'</span></p>';
   lineas += '<p class="hr"></p>';
-
-  // Pie
   lineas += '<p class="hr"></p>';
   lineas += '<p class="c s">Comprobante no válido para el IVA</p>';
   if(data.nroOrden) lineas += '<p class="c s">Orden Nro: '+String(data.nroOrden).padStart(4,'0')+'</p>';
@@ -4061,7 +4065,13 @@ function generarHTMLFactura(data, size){
   // Forma de pago
   lineas += '<p class="row s"><span class="l1">FORMA DE PAGO</span><span class="l2">IMPORTE</span></p>';
   lineas += '<p class="hr"></p>';
-  lineas += '<p class="row s"><span class="l1">'+data.metodo+':</span><span class="l2">'+gn(total)+'</span></p>';
+  if(data.divPagos && data.divPagos.length > 0){
+    data.divPagos.forEach(p => {
+      lineas += '<p class="row s"><span class="l1">'+p.metodo+':</span><span class="l2">'+gn(p.monto)+'</span></p>';
+    });
+  } else {
+    lineas += '<p class="row s"><span class="l1">'+data.metodo+':</span><span class="l2">'+gn(total)+'</span></p>';
+  }
   if(data.vuelto) lineas += '<p class="row s"><span class="l1">VUELTO:</span><span class="l2">'+data.vuelto+'</span></p>';
   lineas += '<p class="hr"></p>';
 

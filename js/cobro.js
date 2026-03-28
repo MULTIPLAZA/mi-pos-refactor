@@ -759,10 +759,20 @@ function confirmarPago() {
   // ── Capturar datos ANTES de limpiar ───────────────────────
   const totalVenta        = calcTotal();
   const itemsVenta        = JSON.parse(JSON.stringify(cart));
-  const metodoPago        = document.querySelector('.pay-btn.sel')?.textContent?.trim() || 'Efectivo';
   const comprobante       = document.getElementById('compDisplay')?.textContent || '';
   const efectivoEntregado = document.getElementById('efecVal')?.textContent || '';
   const vuelto            = document.getElementById('vueltoAmt')?.textContent || '';
+
+  // Detectar si es pago dividido (divPagos definido en ventas.js)
+  const esDividido = Array.isArray(typeof divPagos !== 'undefined' ? divPagos : null)
+    && divPagos.length > 0
+    && divPagos.some(p => p.monto > 0);
+  const divPagosCopia = esDividido
+    ? JSON.parse(JSON.stringify(divPagos.filter(p => p.monto > 0)))
+    : null;
+  const metodoPago = esDividido
+    ? divPagosCopia.map(p => p.metodo).join(' + ')
+    : document.querySelector('.pay-btn.sel')?.textContent?.trim() || 'Efectivo';
 
   // Número de ticket — avanzar contador si es nuevo
   const nroTicket = currentTicketNro !== null ? currentTicketNro : ticketCounter++;
@@ -834,6 +844,7 @@ function confirmarPago() {
     factura:     facturaData,
     fecha:       new Date(),
     nroTicket,
+    divPagos:    divPagosCopia,
   });
 
   mesaLimpiarAlPagar();
@@ -854,6 +865,7 @@ function confirmarPago() {
     mesa:        mesaActual ? mesaActual.nombre : null,
     fecha:       new Date(),
     factura:     facturaData,
+    divPagos:    divPagosCopia,
   });
 }
 
