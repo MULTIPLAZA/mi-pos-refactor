@@ -58,12 +58,34 @@ function goTo(id) {
   const el = document.getElementById(id);
   if (el) el.classList.add('active');
 
+  // Pushear al historial para que el botón atrás de Android navegue
+  // en vez de cerrar la app
+  if (window.history && window.history.pushState) {
+    window.history.pushState({ screen: id }, '', '#' + id);
+  }
+
   // Callbacks post-navegación
   if (id === 'scConfig')        setTimeout(() => window.renderConfigInfo?.(),   50);
   if (id === 'scConfigGeneral') setTimeout(() => window.renderGeneralInfo?.(),  50);
   if (id === 'scDescuentos')    setTimeout(() => window.renderDescList?.(),     50);
   if (id === 'scArticulosList') setTimeout(() => window.renderArtList?.(),      50);
 }
+
+// Manejar botón atrás del navegador/Android
+window.addEventListener('popstate', function(e) {
+  const screen = e.state && e.state.screen;
+  if (screen) {
+    // Navegar a la pantalla anterior sin pushear al historial
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const el = document.getElementById(screen);
+    if (el) el.classList.add('active');
+  } else {
+    // Si no hay estado, ir a la pantalla principal
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const main = document.getElementById('scSale') || document.getElementById('scClosed');
+    if (main) main.classList.add('active');
+  }
+});
 
 // ── ANIMACIÓN AL AGREGAR AL CARRITO ─────────────────────────
 

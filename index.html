@@ -4296,6 +4296,51 @@ function imprimirRecibo(){
 function imprimirComanda(data){
   const size = getPaperSize('comanda');
   const html = generarHTMLComanda(data, size);
+
+  // Usar BTPrinter si está configurado
+  const btpsMac  = localStorage.getItem('btps_mac');
+  const btpsTipo = localStorage.getItem('printerType_ticket');
+  if(btpsMac || btpsTipo === 'btps'){
+    // Convertir HTML de comanda a texto plano para BTPrinter
+    const cols = size === '58' ? 32 : 42;
+    const sep  = '='.repeat(cols);
+    const sep2 = '-'.repeat(cols);
+    const n    = '\n';
+    function pad(l,r){ var sp=Math.max(1,cols-String(l).length-String(r).length); return String(l)+' '.repeat(sp)+String(r); }
+    function gs(v){ return Math.round(v||0).toLocaleString('es-PY'); }
+
+    const neg = configData.negocio || '';
+    const d   = data.fecha || new Date();
+    const fecha = d.toLocaleDateString('es-PY');
+    const hora  = d.toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'});
+
+    let txt = '';
+    if(neg) txt += '[CENTER][BOLD]' + neg + '[/BOLD][/CENTER]' + n;
+    txt += '[CENTER][BOLD]*** COMANDA ***[/BOLD][/CENTER]' + n;
+    txt += sep + n;
+    txt += pad('Orden #' + String(data.nroTicket||'').padStart(4,'0'), fecha + ' ' + hora) + n;
+    if(data.tipoPedido) txt += 'Tipo: ' + data.tipoPedido.toUpperCase() + n;
+    if(data.mesa)       txt += 'Mesa: ' + data.mesa + n;
+    txt += sep2 + n;
+
+    (data.items||[]).forEach(function(item){
+      if(item.esDescuento) return;
+      txt += '[BOLD]' + item.qty + 'x ' + item.name + '[/BOLD]' + n;
+      if(item.obs) txt += '  -> ' + item.obs + n;
+    });
+
+    txt += sep + n;
+    txt += '[FEED:1]' + n + '[CUT]';
+
+    BTPrinter.print(txt).then(function(r){
+      if(r.status !== 'ok') {
+        toast('Error comanda: ' + (r.message || 'Error'));
+        abrirVentanaImpresion(html, size);
+      }
+    });
+    return;
+  }
+
   abrirVentanaImpresion(html, size);
 }
 
