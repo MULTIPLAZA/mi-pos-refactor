@@ -55,7 +55,83 @@
   }
 
   /* ── CONFIGURACIÓN ── */
-  #scConfig, #scConfigImpresoras, #scConfigImpuestos, #scConfigGeneral { background: var(--bg); }
+  #scConfig, #scConfigImpresoras, #scConfigImpuestos, #scConfigGeneral, #scConfigSync { background: var(--bg); }
+
+  /* ── SYNC BADGE ────────────────────────────────────────── */
+  #syncBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .3px;
+    padding: 4px 9px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: opacity .2s;
+    border: none;
+    outline: none;
+    white-space: nowrap;
+  }
+  #syncBadge.sync-ok      { background: rgba(76,175,80,.18);  color: #4caf50; }
+  #syncBadge.sync-pending { background: rgba(255,152,0,.18);  color: #ff9800; }
+  #syncBadge.sync-error   { background: rgba(229,57,53,.18);  color: #e53935; }
+  #syncBadge.sync-offline { background: rgba(150,150,150,.18);color: #888;    }
+  #syncBadge .sync-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  #syncBadge.sync-ok      .sync-dot { background: #4caf50; }
+  #syncBadge.sync-pending .sync-dot { background: #ff9800; animation: syncPulse 1.2s infinite; }
+  #syncBadge.sync-error   .sync-dot { background: #e53935; }
+  #syncBadge.sync-offline .sync-dot { background: #888; }
+  @keyframes syncPulse {
+    0%,100% { opacity:1; } 50% { opacity:.3; }
+  }
+
+  /* ── PANEL SYNC ─────────────────────────────────────────── */
+  .sync-section { padding: 12px 14px 0; }
+  .sync-section-title {
+    font-size: 11px; font-weight: 700; color: var(--muted);
+    letter-spacing: .8px; text-transform: uppercase; margin-bottom: 8px;
+  }
+  .sync-stat-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; background: var(--bg-card);
+    border-radius: 10px; margin-bottom: 6px;
+    font-size: 13px;
+  }
+  .sync-stat-label { color: var(--muted); }
+  .sync-stat-value { font-weight: 700; color: var(--text); }
+  .sync-item-row {
+    background: var(--bg-card); border-radius: 10px;
+    padding: 10px 14px; margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .sync-item-row.error  { border-left: 3px solid #e53935; }
+  .sync-item-row.pending{ border-left: 3px solid #ff9800; }
+  .sync-item-fecha { color: var(--muted); font-size: 11px; margin-bottom: 2px; }
+  .sync-item-info  { font-weight: 700; color: var(--text); }
+  .sync-btn-retry {
+    margin-top: 6px; padding: 5px 12px;
+    background: rgba(229,57,53,.12); border: 1.5px solid #e53935;
+    border-radius: 6px; color: #e53935;
+    font-family: 'Barlow', sans-serif; font-size: 11px; font-weight: 800;
+    cursor: pointer; letter-spacing: .3px;
+  }
+  .sync-btn-now {
+    width: 100%; padding: 14px; margin: 8px 0;
+    background: var(--green); border: none; border-radius: 12px;
+    color: #fff; font-family: 'Barlow', sans-serif;
+    font-size: 15px; font-weight: 800; cursor: pointer; letter-spacing: .5px;
+  }
+  .sync-btn-now:disabled { opacity: .5; cursor: default; }
+  .sync-empty {
+    text-align: center; padding: 32px 16px;
+    color: var(--muted); font-size: 13px;
+  }
 
   .config-menu-item {
     display:flex; align-items:center; gap:18px;
@@ -1775,6 +1851,12 @@
         <span>General</span>
         <svg style="margin-left:auto;color:#555" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
+      <div class="config-menu-item" onclick="goTo('scConfigSync');renderSyncPanel()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+        <span>Sincronización</span>
+        <span id="syncMenuBadge" style="margin-left:auto;display:none;background:#ff9800;color:#fff;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px;"></span>
+        <svg style="margin-left:6px;color:#555" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
     </div>
 
     <div class="config-footer">
@@ -1782,6 +1864,20 @@
       <span style="font-size:12px;font-weight:700;color:var(--green);margin-top:4px;letter-spacing:.3px;" id="configVersion"></span>
       <button class="config-logout-btn" onclick="cerrarSesion()">CERRAR SESIÓN</button>
     </div>
+  </div>
+</div>
+
+<!-- ======== SCREEN: SINCRONIZACIÓN ======== -->
+<div id="scConfigSync" class="screen">
+  <header class="header">
+    <button class="hbtn" onclick="goTo('scConfig')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <div class="htitle"><span class="htitle-text">Sincronización</span></div>
+    <button class="hbtn" onclick="renderSyncPanel()" title="Actualizar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+    </button>
+  </header>
+  <div style="flex:1;overflow-y:auto;padding-bottom:24px;" id="syncPanelContent">
+    <div class="sync-empty">Cargando...</div>
   </div>
 </div>
 
@@ -2762,9 +2858,12 @@
       <span>Ticket</span><div class="tbadge" id="sBadge">0</div>
       <span class="mob-ticket-nro" id="mobTicketNro">#0001</span>
     </div>
-    <div class="hright">
+    <div class="hright" style="display:flex;align-items:center;gap:4px;">
+      <button id="syncBadge" class="sync-ok" onclick="goTo('scConfigSync')" title="Estado de sincronización">
+        <span class="sync-dot"></span>
+        <span id="syncBadgeTxt">Sync</span>
+      </button>
       <button class="hbtn"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></button>
-      <button class="hbtn"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
       <button class="hbtn theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
     </div>
   </header>
@@ -3953,15 +4052,11 @@ function generarHTMLTicket(data, size){
   // Forma de pago
   lineas += '<p class="row s"><span class="l1">FORMA DE PAGO</span><span class="l2">IMPORTE</span></p>';
   lineas += '<p class="hr"></p>';
-  if(data.divPagos && data.divPagos.length > 0){
-    data.divPagos.forEach(p => {
-      lineas += '<p class="row s"><span class="l1">'+p.metodo+':</span><span class="l2">'+gn(p.monto)+'</span></p>';
-    });
-  } else {
-    lineas += '<p class="row s"><span class="l1">'+data.metodo+':</span><span class="l2">'+gn(data.total)+'</span></p>';
-  }
+  lineas += '<p class="row s"><span class="l1">'+data.metodo+':</span><span class="l2">'+gn(data.total)+'</span></p>';
   if(data.vuelto) lineas += '<p class="row s"><span class="l1">VUELTO:</span><span class="l2">'+data.vuelto+'</span></p>';
   lineas += '<p class="hr"></p>';
+
+  // Pie
   lineas += '<p class="hr"></p>';
   lineas += '<p class="c s">Comprobante no válido para el IVA</p>';
   if(data.nroOrden) lineas += '<p class="c s">Orden Nro: '+String(data.nroOrden).padStart(4,'0')+'</p>';
@@ -4065,13 +4160,7 @@ function generarHTMLFactura(data, size){
   // Forma de pago
   lineas += '<p class="row s"><span class="l1">FORMA DE PAGO</span><span class="l2">IMPORTE</span></p>';
   lineas += '<p class="hr"></p>';
-  if(data.divPagos && data.divPagos.length > 0){
-    data.divPagos.forEach(p => {
-      lineas += '<p class="row s"><span class="l1">'+p.metodo+':</span><span class="l2">'+gn(p.monto)+'</span></p>';
-    });
-  } else {
-    lineas += '<p class="row s"><span class="l1">'+data.metodo+':</span><span class="l2">'+gn(total)+'</span></p>';
-  }
+  lineas += '<p class="row s"><span class="l1">'+data.metodo+':</span><span class="l2">'+gn(total)+'</span></p>';
   if(data.vuelto) lineas += '<p class="row s"><span class="l1">VUELTO:</span><span class="l2">'+data.vuelto+'</span></p>';
   lineas += '<p class="hr"></p>';
 
@@ -7598,6 +7687,33 @@ async function supaLoadProductos(){
     filterP();
     // Cargar descuentos en background
     try { await cargarDescuentosConfig(); } catch(ed){ console.warn('[Desc]', ed.message); }
+
+    // Persistir en IndexedDB para uso offline
+    if(db){
+      try {
+        const rows = data.map(p => ({
+          id:              p.id,
+          nombre:          p.nombre,
+          precio:          p.precio || 0,
+          precio_variable: p.precio_variable || false,
+          costo:           p.costo || 0,
+          codigo:          p.codigo || '',
+          categoria:       p.categoria || 'Sin categoría',
+          iva:             p.iva || '10',
+          color:           p.color || '#546e7a',
+          color_propio:    p.color_propio || false,
+          mitad:           p.mitad || false,
+          inventario:      p.inventario || false,
+          comanda:         p.comanda || false,
+          item_libre:      false,
+          activo:          p.activo !== false && p.activo !== 0,
+          imagen:          p.imagen || null,
+          updatedAt:       new Date().toISOString(),
+        }));
+        await db.productos.bulkPut(rows);
+        console.log('[DB] Productos cacheados offline:', rows.length);
+      } catch(ed){ console.warn('[DB] Cache productos:', ed.message); }
+    }
   } catch(e){
     if(!e.message?.includes('Failed to fetch'))
       console.warn('[Supabase] Productos:', e.message);
@@ -7621,6 +7737,20 @@ async function supaLoadCategorias(){
     const maxId = Math.max(...CATEGORIAS.map(c=>c.id), 0);
     nextCatId = maxId + 1;
     console.log('[Supabase] Categorías cargadas:', CATEGORIAS.length);
+
+    // Persistir en IndexedDB para uso offline
+    if(db){
+      try {
+        const rows = data.map(c => ({
+          id:        c.id,
+          nombre:    c.nombre,
+          color:     c.color || '#546e7a',
+          updatedAt: new Date().toISOString(),
+        }));
+        await db.categorias.bulkPut(rows);
+        console.log('[DB] Categorías cacheadas offline:', rows.length);
+      } catch(ed){ console.warn('[DB] Cache categorías:', ed.message); }
+    }
   } catch(e){
     if(!e.message.includes('Failed to fetch'))
       console.warn('[Supabase] Categorías:', e.message);
@@ -7768,7 +7898,7 @@ async function initDB(){
       turno:       '++id, fecha_apertura, estado, terminal',
       egresos:     '++id, turno_id, fecha, sincronizado, anulada',
       config:      'clave',
-      sync_queue:  '++id, tabla, sincronizado, timestamp',
+      sync_queue:  '++id, tabla, sincronizado, timestamp, error_msg',
     });
     await db.open();
     console.log('[DB] IndexedDB inicializado OK');
@@ -8010,6 +8140,7 @@ async function syncConSupabase(){
     if(pendientes.length === 0){ syncEnProceso=false; return; }
 
     console.log('[Sync] Enviando', pendientes.length, 'registros...');
+    let exitos = 0, fallos = 0;
 
     for(const item of pendientes){
       try {
@@ -8022,12 +8153,29 @@ async function syncConSupabase(){
           await supaFetch('POST', tabla, datos);
         }
 
-        await db.sync_queue.update(item.id, { sincronizado: 1 });
+        await db.sync_queue.update(item.id, { sincronizado: 1, error_msg: null });
+        exitos++;
       } catch(e){
         console.log('[Sync] Error en item', item.id, e.message);
+        await db.sync_queue.update(item.id, { sincronizado: 2, error_msg: e.message });
+        fallos++;
       }
     }
-    console.log('[Sync] Completado');
+    console.log('[Sync] Completado — OK:', exitos, '| Errores:', fallos);
+    // Guardar timestamp de última sync exitosa
+    if(exitos > 0){
+      const ahora = new Date().toLocaleString('es-PY');
+      localStorage.setItem('pos_ultima_sync', ahora);
+    }
+    // Notificar resultado si había pendientes
+    if(exitos > 0 && fallos === 0){
+      toast('✅ ' + exitos + ' venta' + (exitos !== 1 ? 's' : '') + ' sincronizada' + (exitos !== 1 ? 's' : ''));
+    } else if(fallos > 0){
+      toast('⚠️ ' + exitos + ' sincronizada' + (exitos !== 1 ? 's' : '') + ' — ' + fallos + ' con error. Revisá Configuración → Sincronización');
+    }
+    // Limpiar cola y actualizar badge
+    await limpiarSyncQueue();
+    updSyncBadge();
   } catch(e){
     console.log('[Sync] Error general:', e.message);
   }
@@ -8063,11 +8211,231 @@ setInterval(function(){
 }, 30 * 60 * 1000);
 // También sync ventas pendientes cada 5 minutos
 setInterval(syncVentasPendientes, 5 * 60 * 1000);
+// Actualizar badge cada 30 segundos
+setInterval(updSyncBadge, 30 * 1000);
+
 window.addEventListener('online', () => {
   console.log('[Sync] Conexion detectada, sincronizando...');
-  setTimeout(syncConSupabase, 2000);
-  setTimeout(syncVentasPendientes, 4000);
+  updSyncBadge();
+  // Avisar al usuario que volvió internet y hay pendientes
+  if(db){
+    db.sync_queue.where('sincronizado').equals(0).count().then(n => {
+      if(n > 0){
+        toast('📶 Conexión restaurada — sincronizando ' + n + ' venta' + (n !== 1 ? 's' : '') + ' pendiente' + (n !== 1 ? 's' : '') + '...');
+      } else {
+        toast('📶 Conexión restaurada');
+      }
+    }).catch(()=>{ toast('📶 Conexión restaurada'); });
+  }
+  setTimeout(async () => {
+    await syncConSupabase();
+    await syncVentasPendientes();
+    updSyncBadge();
+  }, 2000);
 });
+
+window.addEventListener('offline', () => {
+  console.log('[Sync] Sin conexión');
+  updSyncBadge();
+  toast('📵 Sin conexión — las ventas se guardan localmente');
+});
+
+// ══════════════════════════════════════════════════════════
+// SYNC UI — Badge, panel y reintentos
+// ══════════════════════════════════════════════════════════
+
+/** Actualiza el badge de sync en el header */
+async function updSyncBadge(){
+  const badge   = document.getElementById('syncBadge');
+  const badgeTxt= document.getElementById('syncBadgeTxt');
+  const menuBdg = document.getElementById('syncMenuBadge');
+  if(!badge || !badgeTxt) return;
+
+  if(!navigator.onLine){
+    badge.className = 'sync-offline';
+    badgeTxt.textContent = 'Sin red';
+    if(menuBdg) { menuBdg.style.display = 'none'; }
+    return;
+  }
+
+  if(!db){
+    badge.className = 'sync-ok';
+    badgeTxt.textContent = 'Sync';
+    return;
+  }
+
+  try {
+    const pendientes = await db.sync_queue.where('sincronizado').equals(0).count();
+    const errores    = await db.sync_queue.where('sincronizado').equals(2).count();
+
+    if(errores > 0){
+      badge.className = 'sync-error';
+      badgeTxt.textContent = errores + ' error' + (errores !== 1 ? 'es' : '');
+      if(menuBdg){ menuBdg.textContent = errores; menuBdg.style.display = 'inline'; }
+    } else if(pendientes > 0){
+      badge.className = 'sync-pending';
+      badgeTxt.textContent = pendientes + ' pendiente' + (pendientes !== 1 ? 's' : '');
+      if(menuBdg){ menuBdg.textContent = pendientes; menuBdg.style.display = 'inline'; }
+    } else {
+      badge.className = 'sync-ok';
+      badgeTxt.textContent = 'Sincronizado';
+      if(menuBdg){ menuBdg.style.display = 'none'; }
+    }
+  } catch(e){
+    badge.className = 'sync-ok';
+    badgeTxt.textContent = 'Sync';
+  }
+}
+
+/** Renderiza el panel completo de sincronización */
+async function renderSyncPanel(){
+  const el = document.getElementById('syncPanelContent');
+  if(!el) return;
+
+  const online   = navigator.onLine;
+  const ultimaSync = localStorage.getItem('pos_ultima_sync') || '—';
+
+  // Stats
+  let pendientes = 0, errores = 0, sincronizados = 0;
+  if(db){
+    try {
+      pendientes    = await db.sync_queue.where('sincronizado').equals(0).count();
+      errores       = await db.sync_queue.where('sincronizado').equals(2).count();
+      sincronizados = await db.sync_queue.where('sincronizado').equals(1).count();
+    } catch(e){}
+  }
+
+  let html = '';
+
+  // Estado de conexión
+  html += '<div class="sync-section">';
+  html += '<div class="sync-section-title">Estado</div>';
+  html += '<div class="sync-stat-row">';
+  html += '<span class="sync-stat-label">Conexión</span>';
+  html += '<span class="sync-stat-value" style="color:' + (online ? '#4caf50' : '#e53935') + '">' + (online ? '🟢 En línea' : '🔴 Sin internet') + '</span>';
+  html += '</div>';
+  html += '<div class="sync-stat-row"><span class="sync-stat-label">Última sync exitosa</span><span class="sync-stat-value" style="font-size:11px;">' + ultimaSync + '</span></div>';
+  html += '<div class="sync-stat-row"><span class="sync-stat-label">Ventas pendientes</span><span class="sync-stat-value" style="color:' + (pendientes > 0 ? '#ff9800' : 'var(--text)') + '">' + pendientes + '</span></div>';
+  html += '<div class="sync-stat-row"><span class="sync-stat-label">Con error</span><span class="sync-stat-value" style="color:' + (errores > 0 ? '#e53935' : 'var(--text)') + '">' + errores + '</span></div>';
+  html += '</div>';
+
+  // Botón sync manual
+  html += '<div class="sync-section">';
+  const btnDis = !online ? 'disabled' : '';
+  html += '<button class="sync-btn-now" onclick="syncManual()" ' + btnDis + '>';
+  html += online ? '↻ Sincronizar ahora' : 'Sin conexión a internet';
+  html += '</button>';
+  html += '</div>';
+
+  // Items con error
+  if(errores > 0 && db){
+    html += '<div class="sync-section">';
+    html += '<div class="sync-section-title">⚠️ Con error — requieren atención</div>';
+    try {
+      const items = await db.sync_queue.where('sincronizado').equals(2).limit(20).toArray();
+      items.forEach(item => {
+        let datos = {};
+        try { datos = JSON.parse(item.datos); } catch(e){}
+        const fecha = item.timestamp ? new Date(item.timestamp).toLocaleString('es-PY') : '—';
+        const total = datos.total ? gs(datos.total) : '';
+        html += '<div class="sync-item-row error">';
+        html += '<div class="sync-item-fecha">' + fecha + '</div>';
+        html += '<div class="sync-item-info">Venta ' + (total ? '· ' + total : '') + (datos.metodo_pago ? ' · ' + datos.metodo_pago : '') + '</div>';
+        if(item.error_msg) html += '<div style="font-size:11px;color:#e53935;margin-top:3px;">' + item.error_msg + '</div>';
+        html += '<button class="sync-btn-retry" onclick="reintentarSyncItem(' + item.id + ')">↻ Reintentar</button>';
+        html += '</div>';
+      });
+    } catch(e){ html += '<div class="sync-empty">Error al cargar items</div>'; }
+    html += '</div>';
+  }
+
+  // Items pendientes
+  if(pendientes > 0 && db){
+    html += '<div class="sync-section">';
+    html += '<div class="sync-section-title">🟡 Pendientes de envío</div>';
+    try {
+      const items = await db.sync_queue.where('sincronizado').equals(0).limit(20).toArray();
+      items.forEach(item => {
+        let datos = {};
+        try { datos = JSON.parse(item.datos); } catch(e){}
+        const fecha = item.timestamp ? new Date(item.timestamp).toLocaleString('es-PY') : '—';
+        const total = datos.total ? gs(datos.total) : '';
+        html += '<div class="sync-item-row pending">';
+        html += '<div class="sync-item-fecha">' + fecha + '</div>';
+        html += '<div class="sync-item-info">Venta ' + (total ? '· ' + total : '') + (datos.metodo_pago ? ' · ' + datos.metodo_pago : '') + '</div>';
+        html += '</div>';
+      });
+      if(pendientes > 20) html += '<div style="text-align:center;font-size:12px;color:var(--muted);padding:8px;">...y ' + (pendientes - 20) + ' más</div>';
+    } catch(e){}
+    html += '</div>';
+  }
+
+  if(pendientes === 0 && errores === 0){
+    html += '<div class="sync-empty">✅ Todo sincronizado<br><span style="font-size:11px;margin-top:4px;display:block;">No hay ventas pendientes de envío</span></div>';
+  }
+
+  // Nota informativa
+  html += '<div class="sync-section">';
+  html += '<div style="background:rgba(255,152,0,.08);border:1.5px solid rgba(255,152,0,.25);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.5;">';
+  html += '<b style="color:#ff9800;">⚠️ Importante sobre el modo offline</b><br>';
+  html += 'Podés vender sin internet — todas las ventas se guardan en tu dispositivo. ';
+  html += 'Cuando volvés a conectarte, la app sincroniza automáticamente con la nube. ';
+  html += 'Si cerrás la app con ventas pendientes, se enviarán la próxima vez que abras con internet.';
+  html += '</div>';
+  html += '</div>';
+
+  el.innerHTML = html;
+}
+
+/** Sync manual desde el panel */
+async function syncManual(){
+  const btn = document.querySelector('.sync-btn-now');
+  if(btn){ btn.disabled = true; btn.textContent = 'Sincronizando...'; }
+  try {
+    await syncConSupabase();
+    await syncVentasPendientes();
+    await limpiarSyncQueue();
+    updSyncBadge();
+    renderSyncPanel();
+    toast('✅ Sincronización completada');
+  } catch(e){
+    toast('⚠️ Error al sincronizar: ' + e.message);
+    renderSyncPanel();
+  }
+}
+
+/** Reintentar un item específico con error */
+async function reintentarSyncItem(itemId){
+  if(!db || !navigator.onLine) return;
+  try {
+    const item = await db.sync_queue.get(itemId);
+    if(!item) return;
+    const datos = JSON.parse(item.datos);
+    const tabla = 'pos_' + item.tabla;
+    await supaFetch('POST', tabla, datos);
+    await db.sync_queue.update(itemId, { sincronizado: 1 });
+    toast('✅ Venta sincronizada correctamente');
+    updSyncBadge();
+    renderSyncPanel();
+  } catch(e){
+    await db.sync_queue.update(itemId, { error_msg: e.message });
+    toast('⚠️ Error: ' + e.message);
+    renderSyncPanel();
+  }
+}
+
+/** Limpia registros ya sincronizados de más de 24 horas */
+async function limpiarSyncQueue(){
+  if(!db) return;
+  try {
+    const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    await db.sync_queue
+      .where('sincronizado').equals(1)
+      .and(item => item.timestamp < hace24h)
+      .delete();
+    console.log('[Sync] Cola limpiada');
+  } catch(e){ console.warn('[Sync] Error limpiando cola:', e.message); }
+}
 
 // ══════════════════════════════════════════════════════════
 // SISTEMA DE LICENCIAS
@@ -8380,7 +8748,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.2.0 (2026-03-28)';
+const APP_VERSION = 'v1.2.1 (2026-03-28)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
@@ -8883,16 +9251,20 @@ async function iniciarApp(){
     goTo('scClosed');
     }
 
-  // ── PASO 4: Cargar productos/categorías (background) ─────
+  // ── PASO 4: Cargar productos/categorías en PARALELO ──────
   if(!USAR_DEMO && navigator.onLine){
     try {
-      await supaLoadCategorias();
-      await supaLoadProductos();
+      await Promise.all([
+        supaLoadCategorias(),
+        supaLoadProductos(),
+      ]);
     } catch(e){ console.warn('[App] Carga Supabase:', e.message); }
   } else if(db){
     try {
-      await dbLoadCategorias();
-      await dbLoadProductos();
+      await Promise.all([
+        dbLoadCategorias(),
+        dbLoadProductos(),
+      ]);
     } catch(e){ console.warn('[App] Carga DB:', e.message); }
   }
 
@@ -8933,6 +9305,7 @@ async function iniciarApp(){
   setTimeout(syncConSupabase, 5000);
   setTimeout(syncVentasPendientes, 8000);
   setTimeout(mesasCargar, 6000); // Cargar mesas en background
+  setTimeout(updSyncBadge, 1500); // Actualizar badge de sync al iniciar
 }
 
 // ── ARRANQUE ──────────────────────────────────────────────
