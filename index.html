@@ -3613,9 +3613,10 @@ function generarRecibo(data){
   // ── IMPRESIÓN DIRECTA ──────────────────────────────────
   const p = printers['ticket'];
   const btpsTipo = localStorage.getItem('printerType_ticket');
+  const btpsMac  = localStorage.getItem('btps_mac');
 
-  if(btpsTipo === 'btps'){
-    // BT Print Server — servidor HTTP local
+  if(btpsTipo === 'btps' || btpsMac){
+    // BT Print Server — servidor HTTP local (prioridad si hay MAC guardada)
     BTPrinter.imprimirRecibo(data);
   } else if(isAndroidAPK() && typeof window.AndroidPrint !== 'undefined'){
     imprimirAndroidNativo(htmlImpresion, size);
@@ -4355,9 +4356,10 @@ function detectarImpresora(){
 function imprimirRecibo(){
   if(!ultimoReciboData){ toast('Sin datos para imprimir'); return; }
 
-  // BT Print Server tiene prioridad si está configurado
+  // BT Print Server tiene prioridad si hay MAC guardada
   const btpsTipo = localStorage.getItem('printerType_ticket');
-  if(btpsTipo === 'btps'){
+  const btpsMac  = localStorage.getItem('btps_mac');
+  if(btpsTipo === 'btps' || btpsMac){
     BTPrinter.imprimirRecibo(ultimoReciboData);
     return;
   }
