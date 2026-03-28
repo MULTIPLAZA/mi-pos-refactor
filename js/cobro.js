@@ -847,6 +847,7 @@ function confirmarPago() {
     efectivo:    efectivoEntregado,
     vuelto:      document.getElementById('vueltoRow').classList.contains('show') ? vuelto : '',
     nroTicket,
+    nroOrden:    nroTicket,
     tipoPedido:  tipoPedido || 'llevar',
     mesa:        mesaActual ? mesaActual.nombre : null,
     fecha:       new Date(),

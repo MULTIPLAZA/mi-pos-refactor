@@ -3862,7 +3862,7 @@ function generarHTMLTicket(data, size){
   let lineas = '';
 
   // Cabecera
-  lineas += '<p class="c b">'+neg+'</p>';
+  lineas += '<p class="c" style="font-size:14px;font-weight:900;letter-spacing:.5px;">'+neg+'</p>';
   if(ruc)  lineas += '<p class="c s">RUC: '+ruc+'</p>';
   if(dir)  lineas += '<p class="c s">'+dir+'</p>';
   if(tel)  lineas += '<p class="c s">Tel: '+tel+'</p>';
@@ -3927,11 +3927,12 @@ function generarHTMLTicket(data, size){
   lineas += '<p class="hr"></p>';
 
   // Pie
-  lineas += '<p class="c s">Comprobante no válido para el IVA</p>';
-  if(configData.pie_recibo) lineas += '<p class="c s">'+configData.pie_recibo+'</p>';
-  lineas += '<p class="c s">*** GRACIAS POR SU PREFERENCIA ***</p>';
   lineas += '<p class="hr"></p>';
-  lineas += '<br><br><br>';
+  lineas += '<p class="c s">Comprobante no válido para el IVA</p>';
+  if(data.nroOrden) lineas += '<p class="c s">Orden Nro: '+String(data.nroOrden).padStart(4,'0')+'</p>';
+  if(configData.pie_recibo) lineas += '<p class="c s">'+configData.pie_recibo+'</p>';
+  lineas += '<p class="c s b">*** GRACIAS POR SU PREFERENCIA ***</p>';
+  lineas += '<br>';
 
   return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
 }
@@ -3974,7 +3975,7 @@ function generarHTMLFactura(data, size){
   let lineas = '';
 
   // Cabecera
-  lineas += '<p class="c b">'+neg+'</p>';
+  lineas += '<p class="c" style="font-size:14px;font-weight:900;letter-spacing:.5px;">'+neg+'</p>';
   if(dir)  lineas += '<p class="c s">'+dir+'</p>';
   if(ruc)  lineas += '<p class="c s">RUC: '+ruc+'</p>';
   if(tel)  lineas += '<p class="c s">Tel: '+tel+'</p>';
@@ -4042,10 +4043,10 @@ function generarHTMLFactura(data, size){
   lineas += '<p class="s">DUPLICADO: ARCHIVO TRIBUTARIO</p>';
   lineas += '<p class="hr"></p>';
   lineas += '<p class="s">LOS DATOS IMPRESOS REQUIEREN DE CUIDADOS ESPECIALES.</p>';
+  if(data.nroOrden) lineas += '<p class="c s">Orden Nro: '+String(data.nroOrden).padStart(4,'0')+'</p>';
   if(configData.pie_recibo) lineas += '<p class="c s">'+configData.pie_recibo+'</p>';
   lineas += '<p class="c s b">*** GRACIAS POR SU PREFERENCIA ***</p>';
-  lineas += '<p class="hr"></p>';
-  lineas += '<br><br><br>';
+  lineas += '<br>';
 
   return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
 }
@@ -4099,7 +4100,6 @@ function imprimirTicketActual(){
   const size = getPaperSize('ticket');
   const ahora = new Date();
 
-  // Construir data igual que para el recibo pero sin cobro
   const data = {
     items:     JSON.parse(JSON.stringify(cart)),
     total:     calcTotal(),
@@ -4111,10 +4111,12 @@ function imprimirTicketActual(){
     descTicket: ticketDescuento || 0,
   };
 
+  // Actualizar ultimoReciboData para que imprimirRecibo() use estos datos
+  ultimoReciboData = data;
   const html = generarHTMLTicket(data, size);
   mostrarPreviewRecibo(html, size);
   const titulo = document.getElementById('reciboTitulo');
-  if(titulo) titulo.textContent = 'Ticket';
+  if(titulo) titulo.textContent = 'Ticket #' + String(data.nroTicket).padStart(4,'0');
   goTo('scRecibo');
 }
 
