@@ -3615,10 +3615,8 @@ function generarRecibo(data){
   const btpsTipo = localStorage.getItem('printerType_ticket');
   const btpsMac  = localStorage.getItem('btps_mac');
 
-  toast('[Debug] tipo:' + btpsTipo + ' mac:' + (btpsMac ? btpsMac.substring(0,5) : 'null'));
-
   if(btpsTipo === 'btps' || btpsMac){
-    // BT Print Server — servidor HTTP local (prioridad si hay MAC guardada)
+    // BT Print Server — servidor HTTP local
     BTPrinter.imprimirRecibo(data);
   } else if(isAndroidAPK() && typeof window.AndroidPrint !== 'undefined'){
     imprimirAndroidNativo(htmlImpresion, size);
@@ -6935,7 +6933,6 @@ async function btpsConectar(){
     toast('MAC inválida — formato: AA:BB:CC:DD:EE:FF'); return;
   }
   localStorage.setItem('btps_mac', mac);
-  // Guardar también como tipo BT para el flujo estándar
   localStorage.setItem('printerType_ticket', 'btps');
   localStorage.setItem('printerName_ticket', mac);
   toast('Conectando a ' + mac + '...');
@@ -6951,11 +6948,25 @@ async function btpsConectar(){
 
 async function btpsVerEstado(){
   const s = await BTPrinter.status();
-  if (!s) { toast('⚠️ Servidor no disponible — abrí BT Print Server'); return; }
+  if (!s) { toast('Servidor no disponible — abre BT Print Server'); return; }
   BTPrinter._updUI(s.connected, s.device);
-  toast(s.connected
-    ? '✓ Conectada: ' + (s.device || '') + ' | Cola: ' + s.queueSize
-    : '● Desconectada — MAC guardada: ' + (localStorage.getItem('btps_mac') || 'ninguna'));
+  if (s.connected) {
+    // Guardar tipo btps para que al cobrar use BTPrinter
+    localStorage.setItem('printerType_ticket', 'btps');
+    toast('Conectada: ' + (s.device || ''));
+
+    // Guardar MAC automáticamente desde la respuesta del servidor
+    const inp = document.getElementById('btpsMacInput');
+    if (s.deviceMac) {
+      localStorage.setItem('btps_mac', s.deviceMac);
+      if (inp) inp.value = s.deviceMac;
+    } else {
+      const macGuardada = localStorage.getItem('btps_mac');
+      if (inp && macGuardada) inp.value = macGuardada;
+    }
+  } else {
+    toast('Desconectada — MAC guardada: ' + (localStorage.getItem('btps_mac') || 'ninguna'));
+  }
 }
 
 async function btpsTestImprimir(){
@@ -8141,7 +8152,18 @@ const BTPrinter = {
 
     // Si no está conectado, reconectar con MAC guardada
     if (!s.connected) {
-      if (!mac) { toast('Configura la impresora en Ajustes > Impresoras'); return false; }
+      if (!mac) {
+        // Sin MAC no podemos reconectar — pedir al usuario que conecte desde config
+        this._showError(
+          'La impresora se desconecto.\n\n' +
+          'Para reconectar:\n' +
+          '1. Ir a Configuracion > Impresoras\n' +
+          '2. Ingresar la MAC de tu impresora\n' +
+          '3. Tocar CONECTAR\n\n' +
+          'O bien tocar VER ESTADO si el BT Print Server ya tiene la impresora conectada.'
+        );
+        return false;
+      }
       toast('Reconectando impresora...');
       var cr = await this.connect(mac);
       if (cr.status !== 'ok') {
