@@ -7977,48 +7977,35 @@ window.addEventListener('online', () => {
 const BTPrinter = {
   BASE: 'http://127.0.0.1:8080',
   TIMEOUT_MS: 5000,
-  _statusEl: null,
-  _nameEl: null,
 
-  // ── Utilidad fetch con timeout ────────────────────────────────────
-  async _fetch(path, opts = {}) {
+  async _fetch(path, opts) {
     const ctrl = new AbortController();
     const tid  = setTimeout(() => ctrl.abort(), this.TIMEOUT_MS);
     try {
-      const r = await fetch(this.BASE + path, { ...opts, signal: ctrl.signal });
+      const r = await fetch(this.BASE + path, Object.assign({}, opts, { signal: ctrl.signal }));
       clearTimeout(tid);
       return r;
-    } catch(e) {
-      clearTimeout(tid);
-      throw e;
-    }
+    } catch(e) { clearTimeout(tid); throw e; }
   },
 
-  // ── GET /status ───────────────────────────────────────────────────
   async status() {
-    try {
-      const r = await this._fetch('/status');
-      return await r.json();
-    } catch(e) {
-      return null; // servidor no disponible
-    }
+    try { const r = await this._fetch('/status'); return await r.json(); }
+    catch(e) { return null; }
   },
 
-  // ── POST /connect { mac } ─────────────────────────────────────────
   async connect(mac) {
     try {
       const r = await this._fetch('/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mac })
+        body: JSON.stringify({ mac: mac })
       });
       return await r.json();
     } catch(e) {
-      return { status: 'error', message: 'Abrí la app BT Print Server en tu dispositivo' };
+      return { status: 'error', message: 'Abri la app BT Print Server en tu dispositivo' };
     }
   },
 
-  // ── POST /print texto con markup ──────────────────────────────────
   async print(text) {
     try {
       const r = await this._fetch('/print', {
@@ -8027,218 +8014,136 @@ const BTPrinter = {
         body: text
       });
       if (!r.ok) {
-        const err = await r.json().catch(() => ({}));
+        const err = await r.json().catch(function(){ return {}; });
         if (r.status === 503) return { status: 'error', message: 'Impresora desconectada, reconectando...' };
         return { status: 'error', message: err.message || 'Error al imprimir' };
       }
       return await r.json();
     } catch(e) {
-      return { status: 'error', message: 'Abrí la app BT Print Server en tu dispositivo' };
+      return { status: 'error', message: 'Abri la app BT Print Server en tu dispositivo' };
     }
   },
 
-  // ── Verificar al iniciar y reconectar si es necesario ────────────
   async iniciar() {
     const mac = localStorage.getItem('btps_mac');
-    if (!mac) return; // nunca se configuró
-
+    if (!mac) return;
     const s = await this.status();
-    if (!s) {
-      console.log('[BTPrinter] Servidor no disponible');
-      this._updUI(false, null);
-      return;
-    }
-
+    if (!s) { this._updUI(false, null); return; }
     this._updUI(s.connected, s.device);
-
-    if (!s.connected && mac) {
-      console.log('[BTPrinter] Reconectando a ' + mac);
+    if (!s.connected) {
       toast('Reconectando impresora...');
       const r = await this.connect(mac);
-      if (r.status === 'ok') {
-        this._updUI(true, r.device);
-        toast('✓ Impresora conectada: ' + r.device);
-      }
+      if (r.status === 'ok') { this._updUI(true, r.device); toast('Impresora conectada: ' + r.device); }
     }
   },
 
-  // ── Construir texto del ticket con markup ──────────────────────────
   buildTicket(data, cols) {
-    cols = cols || 32;
-    const sep  = '-'.repeat(cols);
-    const pad  = (l, r) => {
-      const sp = Math.max(1, cols - String(l).length - String(r).length);
+    if (!cols) cols = 32;
+    var sep = '-'.repeat(cols);
+    var n   = '\n';
+    function pad(l, r) {
+      var sp = Math.max(1, cols - String(l).length - String(r).length);
       return String(l) + ' '.repeat(sp) + String(r);
-    };
-    const center = (t) => {
-      const sp = Math.max(0, Math.floor((cols - String(t).length) / 2));
-      return ' '.repeat(sp) + String(t);
-    };
-    const gs = (n) => Math.round(n||0).toLocaleString('es-PY');
-
-    let txt = '';
-
-    // Encabezado negocio
-    if (configData && configData.negocio) {
-      txt += '[CENTER][BOLD]' + configData.negocio.toUpperCase() + '[/BOLD][/CENTER]
-';
     }
-    if (configData && configData.ruc)      txt += '[CENTER]RUC: ' + configData.ruc + '[/CENTER]
-';
-    if (configData && configData.direccion) txt += '[CENTER]' + configData.direccion + '[/CENTER]
-';
-    if (configData && configData.telefono)  txt += '[CENTER]Tel: ' + configData.telefono + '[/CENTER]
-';
-    txt += sep + '
-';
+    function ctr(t) {
+      var sp = Math.max(0, Math.floor((cols - String(t).length) / 2));
+      return ' '.repeat(sp) + String(t);
+    }
+    function gs(v) { return Math.round(v||0).toLocaleString('es-PY'); }
 
-    // Número y fecha
-    const nro  = String(data.nroTicket || '').padStart(4, '0');
-    const fecha = (data.fecha || new Date()).toLocaleString('es-PY');
-    txt += 'TICKET NRO: ' + nro + '
-';
-    txt += 'FECHA: ' + fecha + '
-';
-    if (data.obs) txt += 'OBS: ' + data.obs + '
-';
-    txt += sep + '
-';
+    var txt = '';
+    if (typeof configData !== 'undefined') {
+      if (configData.negocio)  txt += '[CENTER][BOLD]' + configData.negocio.toUpperCase() + '[/BOLD][/CENTER]' + n;
+      if (configData.ruc)      txt += '[CENTER]RUC: ' + configData.ruc + '[/CENTER]' + n;
+      if (configData.direccion) txt += '[CENTER]' + configData.direccion + '[/CENTER]' + n;
+      if (configData.telefono)  txt += '[CENTER]Tel: ' + configData.telefono + '[/CENTER]' + n;
+    }
+    txt += sep + n;
 
-    // Items
-    txt += 'DESCRIPCION
-';
-    txt += pad('CANT x P.UNIT', 'SUBTOTAL') + '
-';
-    txt += sep + '
-';
+    var nro   = String(data.nroTicket || '').padStart(4, '0');
+    var fecha = (data.fecha || new Date()).toLocaleString('es-PY');
+    txt += 'TICKET NRO: ' + nro + n;
+    txt += 'FECHA: ' + fecha + n;
+    if (data.obs) txt += 'OBS: ' + data.obs + n;
+    txt += sep + n;
+    txt += 'DESCRIPCION' + n;
+    txt += pad('CANT x P.UNIT', 'SUBTOTAL') + n;
+    txt += sep + n;
 
-    (data.items || []).forEach(item => {
+    (data.items || []).forEach(function(item) {
       if (item.esDescuento) {
-        txt += item.name + '
-';
-        txt += pad('  Descuento', '-' + gs(item.montoDesc)) + '
-';
+        txt += item.name + n;
+        txt += pad('  Descuento', '-' + gs(item.montoDesc)) + n;
         return;
       }
-      txt += item.name + '
-';
-      txt += pad('  ' + item.qty + ' x ' + gs(item.price), gs(item.price * item.qty)) + '
-';
-      if (item.obs) txt += '  [' + item.obs + ']
-';
+      txt += item.name + n;
+      txt += pad('  ' + item.qty + ' x ' + gs(item.price), gs(item.price * item.qty)) + n;
+      if (item.obs) txt += '  [' + item.obs + ']' + n;
     });
 
-    txt += sep + '
-';
-
-    // Descuento en ticket
+    txt += sep + n;
     if (data.descTicket && data.descTicket > 0) {
-      txt += pad('Descuento ' + data.descTicket + '%', '-' + gs(data.total * data.descTicket / 100)) + '
-';
+      txt += pad('Descuento ' + data.descTicket + '%', '-' + gs(data.total * data.descTicket / 100)) + n;
     }
+    txt += '[BOLD]' + pad('TOTAL:', gs(data.total)) + '[/BOLD]' + n;
+    txt += sep + n;
+    txt += pad('FORMA DE PAGO', 'IMPORTE') + n;
+    txt += sep + n;
+    txt += pad((data.metodo || 'EFECTIVO').toUpperCase() + ':', gs(data.total)) + n;
 
-    // Total
-    txt += '[BOLD]' + pad('TOTAL:', gs(data.total)) + '[/BOLD]
-';
-    txt += sep + '
-';
-
-    // Pago
-    txt += pad('FORMA DE PAGO', 'IMPORTE') + '
-';
-    txt += sep + '
-';
-    txt += pad((data.metodo || 'EFECTIVO').toUpperCase() + ':', gs(data.total)) + '
-';
-
-    // Factura si tiene
     if (data.factura && data.factura.timbrado) {
-      txt += sep + '
-';
-      txt += '[CENTER]** FACTURA **[/CENTER]
-';
-      txt += 'Timbrado: ' + data.factura.timbrado + '
-';
-      txt += 'Nro: ' + (data.factura.nroFactura || '') + '
-';
-      if (data.factura.ruc)    txt += 'RUC: ' + data.factura.ruc + '
-';
-      if (data.factura.nombre) txt += 'Cliente: ' + data.factura.nombre + '
-';
+      txt += sep + n;
+      txt += '[CENTER]** FACTURA **[/CENTER]' + n;
+      txt += 'Timbrado: ' + data.factura.timbrado + n;
+      txt += 'Nro: ' + (data.factura.nroFactura || '') + n;
+      if (data.factura.ruc)    txt += 'RUC: ' + data.factura.ruc + n;
+      if (data.factura.nombre) txt += 'Cliente: ' + data.factura.nombre + n;
     }
 
-    txt += sep + '
-';
-    txt += '[CENTER]Comprobante no valido para el IVA[/CENTER]
-';
-    txt += '[CENTER]Gracias por su compra![/CENTER]
-';
-    if (configData && configData.mensajeTicket) {
-      txt += '[CENTER]' + configData.mensajeTicket + '[/CENTER]
-';
+    txt += sep + n;
+    txt += '[CENTER]Comprobante no valido para el IVA[/CENTER]' + n;
+    txt += '[CENTER]Gracias por su compra![/CENTER]' + n;
+    if (typeof configData !== 'undefined' && configData.mensajeTicket) {
+      txt += '[CENTER]' + configData.mensajeTicket + '[/CENTER]' + n;
     }
-    txt += '[FEED:4]
-[CUT]';
-
+    txt += '[FEED:4]' + n + '[CUT]';
     return txt;
   },
 
-  // ── Imprimir recibo de venta ──────────────────────────────────────
   async imprimirRecibo(data) {
-    const size = localStorage.getItem('printerSize_ticket') || '58';
-    const cols = size === '58' ? 32 : 42;
-
-    // Verificar servidor
-    const s = await this.status();
-    if (!s) {
-      toast('⚠️ Abrí la app BT Print Server en tu dispositivo');
-      return false;
-    }
-
-    // Reconectar si es necesario
+    var size = localStorage.getItem('printerSize_ticket') || '58';
+    var cols = size === '58' ? 32 : 42;
+    var s = await this.status();
+    if (!s) { toast('Abri la app BT Print Server en tu dispositivo'); return false; }
     if (!s.connected) {
-      const mac = localStorage.getItem('btps_mac');
-      if (!mac) {
-        toast('⚠️ Configurá la impresora en Ajustes → Impresoras');
-        return false;
-      }
+      var mac = localStorage.getItem('btps_mac');
+      if (!mac) { toast('Configura la impresora en Ajustes > Impresoras'); return false; }
       toast('Impresora desconectada, reconectando...');
-      const cr = await this.connect(mac);
-      if (cr.status !== 'ok') {
-        toast('❌ ' + (cr.message || 'No se pudo conectar'));
-        return false;
-      }
+      var cr = await this.connect(mac);
+      if (cr.status !== 'ok') { toast('Error: ' + (cr.message || 'No se pudo conectar')); return false; }
       this._updUI(true, cr.device);
     }
-
-    const ticket = this.buildTicket(data, cols);
-    const r = await this.print(ticket);
-
-    if (r.status === 'ok') {
-      toast('✓ Impreso correctamente');
-      return true;
-    } else {
-      toast('❌ ' + (r.message || 'Error al imprimir, intentá de nuevo'));
-      return false;
-    }
+    var ticket = this.buildTicket(data, cols);
+    var r = await this.print(ticket);
+    if (r.status === 'ok') { toast('Impreso correctamente'); return true; }
+    toast('Error al imprimir, intenta de nuevo');
+    return false;
   },
 
-  // ── Actualizar UI del estado en config ────────────────────────────
   _updUI(connected, deviceName) {
-    // Indicador en pantalla de config impresoras
-    const el = document.getElementById('btpsStatus');
+    var el = document.getElementById('btpsStatus');
     if (el) {
-      el.textContent = connected ? ('✓ Conectada: ' + (deviceName || '')) : '● Desconectada';
+      el.textContent = connected ? ('Conectada: ' + (deviceName || '')) : 'Desconectada';
       el.style.color = connected ? 'var(--green)' : '#ef5350';
     }
-    // Badge en header de impresoras
-    const badge = document.getElementById('btpsBadge');
+    var badge = document.getElementById('btpsBadge');
     if (badge) {
       badge.textContent = connected ? '●' : '○';
       badge.style.color = connected ? 'var(--green)' : '#ef5350';
     }
   }
 };
+
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
 const APP_VERSION = 'v1.1.0 (2026-03-27)';
