@@ -4729,6 +4729,7 @@ function registrarVentaEnTurno(data){
     factura:     data.factura,
     fecha:       data.fecha,
     nroTicket:   data.nroTicket,
+    divPagos:    data.divPagos || null,
   });
   // Persistir en localStorage (sobrevive al cerrar la app)
   turnoGuardar();
@@ -4952,14 +4953,26 @@ async function renderTurno(){
   const totalIngresos = turnoData.ingresos.reduce((s,i)=>s+i.monto, 0);
   const saldoEsperado = turnoData.efectivoInicial + totalVentas + totalIngresos - totalEgresos;
 
-  // Por método de pago
+  // Por método de pago — desglosa divPagos si existe
   const metodos = {};
   turnoData.ventas.forEach(v => {
-    const m = (v.metodo || 'EFECTIVO').toUpperCase();
-    if(!metodos[m]) metodos[m] = { total:0, ops:0 };
-    metodos[m].total += v.total;
-    metodos[m].ops++;
+    if(v.divPagos && v.divPagos.length > 0){
+      // Pago dividido — acumular cada método por separado
+      v.divPagos.forEach(p => {
+        const m = (p.metodo || 'EFECTIVO').toUpperCase();
+        if(!metodos[m]) metodos[m] = { total:0, ops:0 };
+        metodos[m].total += p.monto || 0;
+        metodos[m].ops += 1/v.divPagos.length; // fracción de operación
+      });
+    } else {
+      const m = (v.metodo || 'EFECTIVO').toUpperCase();
+      if(!metodos[m]) metodos[m] = { total:0, ops:0 };
+      metodos[m].total += v.total;
+      metodos[m].ops++;
+    }
   });
+  // Redondear ops
+  Object.values(metodos).forEach(d => { d.ops = Math.round(d.ops); });
 
   // Otros datos
   const cantVentas = turnoData.ventas.length;
@@ -5450,9 +5463,17 @@ function cerrarTurno(){
 
   const metodos = {};
   turnoData.ventas.forEach(v=>{
-    const m=(v.metodo||'EFECTIVO').toUpperCase();
-    if(!metodos[m])metodos[m]={esperado:0,contado:0};
-    metodos[m].esperado+=v.total;
+    if(v.divPagos && v.divPagos.length > 0){
+      v.divPagos.forEach(p => {
+        const m = (p.metodo||'EFECTIVO').toUpperCase();
+        if(!metodos[m]) metodos[m]={esperado:0,contado:0};
+        metodos[m].esperado += p.monto || 0;
+      });
+    } else {
+      const m=(v.metodo||'EFECTIVO').toUpperCase();
+      if(!metodos[m])metodos[m]={esperado:0,contado:0};
+      metodos[m].esperado+=v.total;
+    }
   });
   if(!metodos['EFECTIVO'])metodos['EFECTIVO']={esperado:0,contado:0};
   metodos['EFECTIVO'].esperado += turnoData.efectivoInicial;
@@ -8876,7 +8897,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.3.7 (2026-03-29)';
+const APP_VERSION = 'v1.3.8 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
