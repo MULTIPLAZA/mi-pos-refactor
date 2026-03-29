@@ -3514,18 +3514,23 @@ async function doOpenShift(){
     if(!ok) return; // licMostrarBloqueo ya fue llamado
   }
 
-  turnoData.fechaApertura = new Date();
+  turnoData.fechaApertura  = new Date();
   turnoData.efectivoInicial = v;
-  turnoData.ventas = [];
-  turnoData.egresos = [];
-  turnoData.ingresos = [];
-  turnoData.supaId = null;
+  turnoData.ventas          = [];
+  turnoData.egresos         = [];
+  turnoData.ingresos        = [];
+  turnoData.supaId          = null;
+  turnoData.dbId            = null;
   // Persistir apertura en localStorage
   turnoGuardar();
-  // Guardar apertura en Supabase
+  // Guardar apertura en Supabase (background)
   supaInsertTurno('abierto', v);
-  if(db) dbAbrirTurno(v);
-  goTo('scSale'); renderP(PRODS); toast('Turno abierto ✓');
+  // Esperar a que IndexedDB asigne el dbId antes de navegar
+  // para que renderVentasList filtre correctamente por turno_id
+  if(db){
+    try { await dbAbrirTurno(v); } catch(e){}
+  }
+  goTo('scSale'); renderCatPills(); filterP(); toast('Turno abierto ✓');
 }
 
 function supaInsertTurno(estado, efectivoInicial){
@@ -8090,12 +8095,14 @@ async function dbSaveVenta(data){
 // ── TURNO ─────────────────────────────────────────────────
 async function dbAbrirTurno(efectivoInicial){
   if(!db) return null;
+  const email = localStorage.getItem('lic_email') || '';
   const turno = {
-    fecha_apertura:  new Date().toISOString(),
+    fecha_apertura:   new Date().toISOString(),
     efectivo_inicial: efectivoInicial,
-    estado:          'abierto',
-    terminal:        (typeof configData !== 'undefined' ? configData.terminal : null) || 'Principal',
-    sincronizado:    0,
+    estado:           'abierto',
+    terminal:         (typeof configData !== 'undefined' ? configData.terminal : null) || 'Principal',
+    licencia_email:   email,
+    sincronizado:     0,
   };
   const id = await db.turno.add(turno);
   turnoData.dbId = id;
@@ -8104,14 +8111,22 @@ async function dbAbrirTurno(efectivoInicial){
 }
 
 async function dbCerrarTurno(turnoDbId, totalContado, diferencia){
+  const email = localStorage.getItem('lic_email') || '';
   await db.turno.update(turnoDbId, {
-    fecha_cierre:  new Date().toISOString(),
-    estado:        'cerrado',
-    total_contado: totalContado,
+    fecha_cierre:   new Date().toISOString(),
+    estado:         'cerrado',
+    total_contado:  totalContado,
     diferencia,
-    sincronizado:  0,
+    licencia_email: email,
+    sincronizado:   0,
   });
-  await dbQueueSync('turno', 'update', { id: turnoDbId, estado:'cerrado', total_contado: totalContado, diferencia });
+  await dbQueueSync('turno', 'update', {
+    id:             turnoDbId,
+    estado:         'cerrado',
+    total_contado:  totalContado,
+    diferencia,
+    licencia_email: email,
+  });
 }
 
 async function dbSaveEgreso(egreso){
@@ -8170,18 +8185,42 @@ async function syncConSupabase(){
         const datos = JSON.parse(item.datos);
         const tabla = 'pos_' + item.tabla; // prefijo en Supabase
 
+        let supaId = null;
+
         if(item.operacion === 'delete'){
           await supaFetch('DELETE', tabla, null, { id: 'eq.'+datos.id });
         } else if(item.operacion === 'update'){
           const { id: itemId, ...datosUpdate } = datos;
           await supaFetch('PATCH', tabla, datosUpdate, { id: 'eq.'+itemId });
         } else {
-          // insert — usar upsert para evitar duplicados si se reintenta
-          await supaFetch('POST', tabla, datos, null, 'resolution=merge-duplicates');
+          // insert — usar return=representation para obtener el ID asignado por Supabase
+          const res = await supaFetch('POST', tabla, datos, null, 'return=representation');
+          try {
+            const inserted = await res.clone().json();
+            if(inserted && inserted[0]) supaId = inserted[0].id;
+          } catch(e){}
         }
 
         await db.sync_queue.update(item.id, { sincronizado: 1, error_msg: null });
         exitos++;
+
+        // Si era un turno nuevo, actualizar turno_id en ventas pendientes de la cola
+        if(item.tabla === 'turno' && item.operacion === 'insert' && supaId && datos.id){
+          const localTurnoId = datos.id;
+          const pendientesVentas = await db.sync_queue
+            .where('sincronizado').equals(0)
+            .toArray();
+          for(const v of pendientesVentas){
+            try {
+              const vd = JSON.parse(v.datos);
+              if(vd.turno_id === localTurnoId){
+                vd.turno_id = supaId;
+                await db.sync_queue.update(v.id, { datos: JSON.stringify(vd) });
+              }
+            } catch(e){}
+          }
+          console.log('[Sync] turno_id actualizado en ventas pendientes: local', localTurnoId, '→ supa', supaId);
+        }
       } catch(e){
         console.log('[Sync] Error en item', item.id, e.message);
         const esErrorRed     = e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('ERR_INTERNET') || !navigator.onLine;
@@ -8801,7 +8840,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.3.1 (2026-03-29)';
+const APP_VERSION = 'v1.3.3 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
@@ -10082,11 +10121,15 @@ async function renderVentasList(){
         let byTurno = await db.ventas
           .where('turno_id').equals(turnoData.dbId)
           .toArray();
-        // Si no hay nada por turno_id (ventas pre-migración), filtrar por fecha de apertura
+        // Si no hay nada por turno_id, filtrar por fecha de apertura del turno actual
+        // Acotamos también por fecha de cierre si existe, para no traer ventas de otros turnos
         if(!byTurno.length && turnoData.fechaApertura){
           const desde = new Date(turnoData.fechaApertura).toISOString();
+          const hasta = turnoData.fechaCierre
+            ? new Date(turnoData.fechaCierre).toISOString()
+            : new Date().toISOString();
           byTurno = await db.ventas
-            .where('fecha').aboveOrEqual(desde)
+            .where('fecha').between(desde, hasta, true, true)
             .toArray();
         }
         // Ordenar por fecha descendente
