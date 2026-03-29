@@ -989,6 +989,8 @@
     grid-template-columns: repeat(3, 1fr);
     gap:3px; padding:4px 4px; overflow-y:auto; flex:1;
     background:var(--bg); align-content:start;
+    min-height:0; /* evita colapso en flexbox */
+    will-change:contents; /* evita repaint parcial */
   }
   .ptile {
     aspect-ratio:1/1; display:flex; align-items:center; justify-content:center;
@@ -3634,7 +3636,13 @@ function renderP(list){
     return '<div class="ptile" style="background:'+getProductColor(p)+'" onclick="addCart('+p.id+',this)"><span class="pname">'+p.name+'</span></div>';
   }).join('');
 }
+let _filterPTimer = null;
 function filterP(){
+  // Debounce — evita renders simultáneos cuando supaLoad y renderCatPills se llaman juntos
+  clearTimeout(_filterPTimer);
+  _filterPTimer = setTimeout(_filterPInternal, 16);
+}
+function _filterPInternal(){
   const q = document.getElementById('sinput').value.toLowerCase();
 
   // Categoría especial: Descuentos
@@ -4970,26 +4978,31 @@ async function renderTurno(){
   const totalIngresos = turnoData.ingresos.reduce((s,i)=>s+i.monto, 0);
   const saldoEsperado = turnoData.efectivoInicial + totalVentas + totalIngresos - totalEgresos;
 
-  // Por método de pago — desglosa divPagos si existe
+  // Por método de pago — desglosa divPagos si existe, o el string compuesto
   const metodos = {};
+  const acumMetodo = (m, monto) => {
+    m = (m || 'EFECTIVO').toUpperCase().trim();
+    if(!metodos[m]) metodos[m] = { total:0, ops:0 };
+    metodos[m].total += monto;
+    metodos[m].ops++;
+  };
   turnoData.ventas.forEach(v => {
     if(v.divPagos && v.divPagos.length > 0){
-      // Pago dividido — acumular cada método por separado
-      v.divPagos.forEach(p => {
-        const m = (p.metodo || 'EFECTIVO').toUpperCase();
-        if(!metodos[m]) metodos[m] = { total:0, ops:0 };
-        metodos[m].total += p.monto || 0;
-        metodos[m].ops += 1/v.divPagos.length; // fracción de operación
+      // Venta nueva con divPagos detallado
+      v.divPagos.forEach(p => acumMetodo(p.metodo, p.monto || 0));
+    } else if(v.metodo && v.metodo.includes(' + ')){
+      // Venta antigua con string compuesto — dividir el total en partes iguales
+      const partes = v.metodo.split(' + ');
+      const montoParte = Math.round(v.total / partes.length);
+      partes.forEach((p, i) => {
+        // Último método absorbe el resto por redondeo
+        const m = i === partes.length - 1 ? v.total - montoParte*(partes.length-1) : montoParte;
+        acumMetodo(p, m);
       });
     } else {
-      const m = (v.metodo || 'EFECTIVO').toUpperCase();
-      if(!metodos[m]) metodos[m] = { total:0, ops:0 };
-      metodos[m].total += v.total;
-      metodos[m].ops++;
+      acumMetodo(v.metodo, v.total);
     }
   });
-  // Redondear ops
-  Object.values(metodos).forEach(d => { d.ops = Math.round(d.ops); });
 
   // Otros datos
   const cantVentas = turnoData.ventas.length;
@@ -5479,17 +5492,23 @@ function cerrarTurno(){
   }
 
   const metodos = {};
+  const acumCierre = (m, monto) => {
+    m = (m||'EFECTIVO').toUpperCase().trim();
+    if(!metodos[m]) metodos[m]={esperado:0,contado:0};
+    metodos[m].esperado += monto;
+  };
   turnoData.ventas.forEach(v=>{
     if(v.divPagos && v.divPagos.length > 0){
-      v.divPagos.forEach(p => {
-        const m = (p.metodo||'EFECTIVO').toUpperCase();
-        if(!metodos[m]) metodos[m]={esperado:0,contado:0};
-        metodos[m].esperado += p.monto || 0;
+      v.divPagos.forEach(p => acumCierre(p.metodo, p.monto||0));
+    } else if(v.metodo && v.metodo.includes(' + ')){
+      const partes = v.metodo.split(' + ');
+      const montoParte = Math.round(v.total / partes.length);
+      partes.forEach((p,i) => {
+        const m = i===partes.length-1 ? v.total-montoParte*(partes.length-1) : montoParte;
+        acumCierre(p, m);
       });
     } else {
-      const m=(v.metodo||'EFECTIVO').toUpperCase();
-      if(!metodos[m])metodos[m]={esperado:0,contado:0};
-      metodos[m].esperado+=v.total;
+      acumCierre(v.metodo, v.total);
     }
   });
   if(!metodos['EFECTIVO'])metodos['EFECTIVO']={esperado:0,contado:0};
@@ -8924,7 +8943,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.3.9 (2026-03-29)';
+const APP_VERSION = 'v1.4.0 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
