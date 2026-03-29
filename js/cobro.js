@@ -764,11 +764,13 @@ function confirmarPago() {
   const vuelto            = document.getElementById('vueltoAmt')?.textContent || '';
 
   // Detectar si es pago dividido (divPagos definido en ventas.js)
-  const esDividido = Array.isArray(typeof divPagos !== 'undefined' ? divPagos : null)
-    && divPagos.length > 0
-    && divPagos.some(p => p.monto > 0);
+  // Requiere que haya al menos 2 pagos cobrados con monto > 0
+  const divArr = (typeof divPagos !== 'undefined' && Array.isArray(divPagos)) ? divPagos : [];
+  const esDividido = divArr.length >= 2
+    && divArr.every(p => p.cobrado)
+    && divArr.some(p => p.monto > 0);
   const divPagosCopia = esDividido
-    ? JSON.parse(JSON.stringify(divPagos.filter(p => p.monto > 0)))
+    ? JSON.parse(JSON.stringify(divArr.filter(p => p.monto > 0)))
     : null;
   const metodoPago = esDividido
     ? divPagosCopia.map(p => p.metodo).join(' + ')
@@ -812,6 +814,8 @@ function confirmarPago() {
   // ── Limpiar estado ─────────────────────────────────────────
   ticketDescuento = 0;
   cart.forEach(i => { delete i.desc; });
+  // Limpiar divPagos para que no contamine la próxima venta normal
+  if(typeof divPagos !== 'undefined') divPagos.length = 0;
 
   if (currentTicketNro !== null) {
     const idx = pendientes.findIndex(p => p.nro === currentTicketNro);

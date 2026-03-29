@@ -6804,9 +6804,46 @@ function buildCierreTicket(size){
   cierreTextoPlano = wa;
 }
 
-function confirmarCierre(){
+async function confirmarCierre(){
   var size = getPaperSize('ticket') || '58';
   buildCierreTicket(size);
+
+  // ── Calcular totales para persistir el cierre ────────────
+  var totalContado = Object.values(cierreMetodos).reduce(function(s,d){return s+d.contado;},0);
+  var saldoEsperado = calcSaldoEsperado();
+  var diferencia = totalContado > 0 ? totalContado - saldoEsperado : 0;
+  var turnoDbIdCierre = turnoData.dbId;
+  var turnoSupaIdCierre = turnoData.supaId;
+
+  // ── Persistir cierre en IndexedDB + encolar sync ─────────
+  if(db && turnoDbIdCierre){
+    try { await dbCerrarTurno(turnoDbIdCierre, totalContado, diferencia); }
+    catch(e){ console.warn('[Cierre] Error IndexedDB:', e.message); }
+  }
+
+  // ── Persistir cierre en Supabase directo si hay internet ─
+  const supaId = turnoSupaIdCierre || turnoDbIdCierre;
+  if(navigator.onLine && supaId){
+    try {
+      await fetch(SUPA_URL+'/rest/v1/pos_turno?id=eq.'+supaId, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPA_ANON,
+          'Authorization': 'Bearer '+SUPA_ANON,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({
+          estado:        'cerrado',
+          fecha_cierre:  new Date().toISOString(),
+          total_contado: totalContado,
+          diferencia:    diferencia,
+        }),
+      });
+      console.log('[Cierre] Turno cerrado en Supabase OK');
+    } catch(e){ console.warn('[Cierre] Error Supabase:', e.message); }
+  }
+
   // Preview en iframe para fidelidad
   var papel = document.getElementById('previewPapel');
   var pxW = size==='80' ? 320 : 220;
@@ -6823,7 +6860,6 @@ function confirmarCierre(){
   papel.appendChild(iframeCierre);
   var doc = iframeCierre.contentWindow.document;
   doc.open(); doc.write(cierreTicketHTML); doc.close();
-  // Ajustar altura al contenido
   setTimeout(function(){
     try{ iframeCierre.style.height = (iframeCierre.contentWindow.document.body.scrollHeight+20)+'px'; }catch(e){}
   }, 200);
@@ -8840,7 +8876,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.3.5 (2026-03-29)';
+const APP_VERSION = 'v1.3.7 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
