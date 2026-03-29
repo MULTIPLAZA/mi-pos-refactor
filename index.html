@@ -6212,6 +6212,25 @@ async function cropConfirmar(){
     const filename = 'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)+'.jpg';
     const path     = email.replace(/[^a-z0-9]/gi,'_')+'/'+filename;
 
+    // Eliminar imagen anterior del Storage si existe y es diferente
+    const imgAnterior = window._artImagenAnterior;
+    if(imgAnterior && imgAnterior.includes('/storage/v1/object/public/productos/')){
+      try {
+        const oldPath = imgAnterior.split('/storage/v1/object/public/productos/')[1];
+        await fetch(SUPA_URL+'/storage/v1/object/productos/'+oldPath, {
+          method: 'DELETE',
+          headers: {
+            'apikey':        SUPA_ANON,
+            'Authorization': 'Bearer '+SUPA_ANON,
+          }
+        });
+        // Limpiar cache local de la imagen anterior
+        if(db) try { await db.config.delete('img_cache_'+imgAnterior); } catch(e){}
+        console.log('[Imagen] Anterior eliminada:', oldPath);
+      } catch(ed){ console.warn('[Imagen] Error borrando anterior:', ed.message); }
+    }
+    window._artImagenAnterior = null;
+
     const r = await fetch(
       SUPA_URL+'/storage/v1/object/productos/'+path,
       {
@@ -6291,8 +6310,23 @@ function mostrarPreviewImagen(src, uploading){
   }
 }
 
-function quitarImagen(){
-  artImagenBase64 = null;
+async function quitarImagen(){
+  // Eliminar del Storage si hay imagen anterior
+  const imgAnterior = window._artImagenAnterior;
+  if(imgAnterior && imgAnterior.includes('/storage/v1/object/public/productos/')){
+    try {
+      const oldPath = imgAnterior.split('/storage/v1/object/public/productos/')[1];
+      await fetch(SUPA_URL+'/storage/v1/object/productos/'+oldPath, {
+        method: 'DELETE',
+        headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer '+SUPA_ANON }
+      });
+      if(db) try { await db.config.delete('img_cache_'+imgAnterior); } catch(e){}
+      console.log('[Imagen] Eliminada del Storage:', oldPath);
+      toast('🗑 Imagen eliminada');
+    } catch(e){ console.warn('[Imagen] Error borrando:', e.message); }
+  }
+  window._artImagenAnterior = null;
+  artImagenBase64 = ''; // string vacío = borrar imagen (distinto de null = no cambiar)
   mostrarPreviewImagen(null, false);
   document.getElementById('artImgInput').value = '';
 }
@@ -6483,8 +6517,9 @@ function editarArticulo(idx){
   selIva(artIvaSel);
   renderColorPicker();
   renderCatSelector();
-  // Cargar imagen existente
+  // Cargar imagen existente — guardar URL anterior para borrarla si se cambia
   artImagenBase64 = null; // null = no cambiar
+  window._artImagenAnterior = p.imagen || null;
   setTimeout(()=>mostrarPreviewImagen(p.imagen||null), 80);
   goTo('scArticuloNuevo');
 }
@@ -6554,7 +6589,8 @@ function guardarArticulo(){
   if(!nombre){ toast('Ingresá el nombre del artículo'); return; }
 
   if(artEditIdx >= 0){
-    const imgUpdate = artImagenBase64 !== null ? {imagen: artImagenBase64} : {};
+    // null = no cambiar, '' = borrar imagen, string = nueva imagen
+    const imgUpdate = artImagenBase64 !== null ? {imagen: artImagenBase64 || null} : {};
     Object.assign(PRODS[artEditIdx], {
       name: nombre.toUpperCase(), price: precioVariable?0:precio,
       precioVariable, costo, codigo, color: artColorSel,
@@ -9165,7 +9201,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.4.3 (2026-03-29)';
+const APP_VERSION = 'v1.4.4 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
