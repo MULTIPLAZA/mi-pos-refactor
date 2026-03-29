@@ -1718,20 +1718,37 @@
   .mesas-body { flex:1; overflow-y:auto; padding:14px; }
   .mesas-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:10px; }
   .mesa-tile {
-    aspect-ratio:1; border-radius:10px; display:flex; flex-direction:column;
-    align-items:center; justify-content:center; gap:4px; cursor:pointer;
-    border:2px solid transparent; transition:all .15s; position:relative;
-    padding:8px 4px;
+    aspect-ratio:1; border-radius:4px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:3px; cursor:pointer;
+    border:none; transition:transform .12s, box-shadow .12s; position:relative;
+    padding:8px 6px;
   }
-  .mesa-tile.libre  { border-color:var(--green); background:rgba(76,175,80,.1); }
-  .mesa-tile.ocupada { border-color:#e53935; background:rgba(229,57,53,.12); }
-  .mesa-tile-nombre { font-size:13px; font-weight:800; font-family:'Barlow',sans-serif; text-transform:uppercase; text-align:center; color:var(--text); line-height:1.2; }
-  .mesa-tile-info   { font-size:10px; font-weight:600; color:var(--muted); text-align:center; }
-  .mesa-tile.ocupada .mesa-tile-nombre { color:#ef9a9a; }
-  .mesa-tile.ocupada .mesa-tile-info   { color:#ef9a9a; }
-  .mesa-dot { width:8px; height:8px; border-radius:50%; position:absolute; top:6px; right:6px; }
-  .mesa-dot.libre   { background:var(--green); }
-  .mesa-dot.ocupada { background:#e53935; }
+  .mesa-tile:active { transform:scale(.96); }
+  .mesa-tile.libre  {
+    background: #2e7d32;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  }
+  .mesa-tile.ocupada {
+    background: #c62828;
+    box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  }
+  .mesa-tile.activa {
+    background: #fff;
+    box-shadow: 0 0 0 3px #fff, 0 4px 12px rgba(0,0,0,.3);
+  }
+  .mesa-tile-nombre {
+    font-size:13px; font-weight:800; font-family:'Barlow',sans-serif;
+    text-transform:uppercase; text-align:center; color:#fff; line-height:1.2;
+  }
+  .mesa-tile.activa .mesa-tile-nombre { color:#111; }
+  .mesa-tile-info {
+    font-size:11px; font-weight:700; color:rgba(255,255,255,.8); text-align:center;
+  }
+  .mesa-tile.activa .mesa-tile-info   { color:#555; }
+  .mesa-tile.ocupada .mesa-tile-info  {
+    font-size:12px; font-weight:800; color:#fff;
+  }
+  .mesa-dot { display:none; }
   .mesas-empty { text-align:center; color:var(--muted); padding:60px 20px; font-size:14px; }
   .mesas-fab { position:fixed; bottom:20px; right:20px; width:52px; height:52px; border-radius:50%; background:var(--green); border:none; color:#fff; font-size:26px; cursor:pointer; box-shadow:0 4px 16px rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; z-index:10; }
 
@@ -7978,6 +7995,16 @@ async function initDB(){
       config:      'clave',
       sync_queue:  '++id, tabla, sincronizado, timestamp, error_msg',
     });
+    db.version(2).stores({
+      productos:   '++id, nombre, categoria, activo, updatedAt, imagen',
+      categorias:  '++id, nombre, updatedAt',
+      ventas:      '++id, fecha, turno_id, terminal, sincronizado, anulada, factura_anulada',
+      turno:       '++id, fecha_apertura, estado, terminal',
+      egresos:     '++id, turno_id, fecha, sincronizado, anulada',
+      config:      'clave',
+      sync_queue:  '++id, tabla, sincronizado, timestamp, error_msg',
+      mesas_cache: 'clave',
+    });
     await db.open();
     console.log('[DB] IndexedDB inicializado OK');
     await dbLoadConfig();
@@ -8897,7 +8924,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.3.8 (2026-03-29)';
+const APP_VERSION = 'v1.3.9 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
@@ -9616,10 +9643,26 @@ let mesasMesas    = [];   // [{id, salon_id, nombre, capacidad}]
 let mesaSalonSel  = null; // id del salón activo en la pantalla
 let mesaActual    = null; // {id, salon_id, nombre} — mesa asignada al ticket actual
 
-// ── Cargar desde Supabase ─────────────────────────────
+// ── Cargar desde Supabase o IndexedDB (offline) ───────
 async function mesasCargar(){
   const licId = parseInt(localStorage.getItem('ali'))||null;
   if(!licId || USAR_DEMO) return;
+
+  // Sin internet — cargar desde IndexedDB
+  if(!navigator.onLine){
+    if(db){
+      try{
+        const salRow = await db.mesas_cache.get('salones');
+        const mesRow = await db.mesas_cache.get('mesas');
+        if(salRow) mesasSalones = JSON.parse(salRow.valor);
+        if(mesRow) mesasMesas   = JSON.parse(mesRow.valor);
+        if(mesasSalones.length) console.log('[Mesas] Cargadas desde cache offline:', mesasSalones.length, 'salones');
+      }catch(e){ console.warn('[Mesas] Error cache offline:', e.message); }
+    }
+    return;
+  }
+
+  // Con internet — cargar desde Supabase y cachear
   try{
     const rs = await fetch(SUPA_URL+'/rest/v1/pos_salones?licencia_id=eq.'+licId+'&activo=eq.true&order=orden.asc,id.asc',
       {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
@@ -9628,6 +9671,15 @@ async function mesasCargar(){
     const rm = await fetch(SUPA_URL+'/rest/v1/pos_mesas?licencia_id=eq.'+licId+'&activo=eq.true&order=orden.asc,id.asc',
       {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
     mesasMesas = await rm.json();
+
+    // Cachear en IndexedDB para uso offline
+    if(db){
+      try{
+        await db.mesas_cache.put({ clave:'salones', valor: JSON.stringify(mesasSalones) });
+        await db.mesas_cache.put({ clave:'mesas',   valor: JSON.stringify(mesasMesas)   });
+        console.log('[Mesas] Cacheadas en IndexedDB:', mesasSalones.length, 'salones,', mesasMesas.length, 'mesas');
+      }catch(e){ console.warn('[Mesas] Error cacheando:', e.message); }
+    }
   }catch(e){ console.warn('[Mesas] Error cargando:', e.message); }
 }
 
@@ -9675,20 +9727,16 @@ function renderMesasScreen(){
   empty.style.display = 'none';
 
   grid.innerHTML = mesas.map(m => {
-    const pend   = pendientes.find(p => p.mesa_id === m.id);
+    const pend    = pendientes.find(p => p.mesa_id === m.id);
     const ocupada = !!pend;
-    const dot    = ocupada ? 'ocupada' : 'libre';
-    const info   = ocupada
+    const esActiva = mesaActual && mesaActual.id === m.id;
+    const estado  = esActiva ? 'activa' : ocupada ? 'ocupada' : 'libre';
+    const info    = ocupada
       ? ('₲'+Math.round(pend.total||0).toLocaleString('es-PY'))
       : (m.capacidad ? m.capacidad+' pers.' : '');
-    const esActiva = mesaActual && mesaActual.id === m.id;
-    var borderColor = ocupada ? '#e53935' : esActiva ? '#fff' : salon.color;
-    var bgColor = ocupada ? 'rgba(229,57,53,.12)' : esActiva ? 'rgba(255,255,255,.08)' : 'rgba('+hexToRgb(salon.color)+',.1)';
-    return '<div class="mesa-tile '+dot+(esActiva?' activa':'')+'" onclick="onMesaTap('+m.id+')" '+
-      'style="border-color:'+borderColor+';background:'+bgColor+(esActiva?';box-shadow:0 0 0 2px #fff3':'')+'">' +
-      '<div class="mesa-dot '+dot+'"></div>'+
+    return '<div class="mesa-tile '+estado+'" onclick="onMesaTap('+m.id+')">' +
       '<div class="mesa-tile-nombre">'+m.nombre+'</div>'+
-      '<div class="mesa-tile-info">'+info+'</div>'+
+      (info ? '<div class="mesa-tile-info">'+info+'</div>' : '')+
       '</div>';
   }).join('');
 }
