@@ -8184,16 +8184,20 @@ async function syncConSupabase(){
         exitos++;
       } catch(e){
         console.log('[Sync] Error en item', item.id, e.message);
-        // Error de red (sin internet) → dejar pendiente para reintentar
-        // Error de Supabase (4xx) → marcar como error permanente
-        const esErrorRed = e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('ERR_INTERNET') || !navigator.onLine;
+        const esErrorRed     = e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('ERR_INTERNET') || !navigator.onLine;
+        const esDuplicado    = e.message.includes('23505') || e.message.includes('duplicate key') || e.message.includes('409');
+
         if(esErrorRed){
-          // No cambiar estado — queda en sincronizado:0 para reintentarse
+          // Sin internet → dejar en 0 para reintentar
           console.log('[Sync] Error de red, se reintentará cuando vuelva internet');
-          // Si estamos offline, cortar el loop — no tiene sentido seguir intentando
           if(!navigator.onLine) break;
+        } else if(esDuplicado){
+          // Ya existe en Supabase → marcar como sincronizado (no es un error real)
+          console.log('[Sync] Item ya existe en Supabase, marcando como sincronizado');
+          await db.sync_queue.update(item.id, { sincronizado: 1, error_msg: null });
+          exitos++;
         } else {
-          // Error real de Supabase (campo inválido, etc.) → marcar como error
+          // Error real de Supabase (campo inválido, permisos, etc.) → marcar como error
           await db.sync_queue.update(item.id, { sincronizado: 2, error_msg: e.message });
           fallos++;
         }
@@ -8779,7 +8783,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.2.7 (2026-03-29)';
+const APP_VERSION = 'v1.2.8 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
