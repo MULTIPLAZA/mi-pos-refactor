@@ -8783,7 +8783,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.2.9 (2026-03-29)';
+const APP_VERSION = 'v1.3.0 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
@@ -9278,18 +9278,21 @@ async function iniciarApp(){
     if(mesasSalones.length > 0){
       goTo('scMesas');
       renderMesasScreen();
-          toast('Sesión restaurada');
+      toast('Sesión restaurada');
     } else {
       goTo('scSale');
-          toast('Sesión restaurada — '+turnoData.ventas.length+' venta'+(turnoData.ventas.length!==1?'s':''));
+      // Renderizar productos desde lo que ya está en memoria (IndexedDB)
+      renderCatPills();
+      filterP();
+      toast('Sesión restaurada — '+turnoData.ventas.length+' venta'+(turnoData.ventas.length!==1?'s':''));
     }
   } else {
     goTo('scClosed');
-    }
+  }
 
   // ── PASO 4: Refrescar productos/categorías ───────────────
   // Con internet: refresca desde Supabase (IndexedDB ya cargó en el arranque)
-  // Sin internet: IndexedDB ya está cargado desde el arranque — no hacer nada
+  // Sin internet: ya renderizó arriba desde IndexedDB — no hacer nada
   if(!USAR_DEMO && navigator.onLine){
     try {
       await Promise.all([
