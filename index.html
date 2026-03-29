@@ -57,38 +57,48 @@
   /* ── CONFIGURACIÓN ── */
   #scConfig, #scConfigImpresoras, #scConfigImpuestos, #scConfigGeneral, #scConfigSync { background: var(--bg); }
 
-  /* ── SYNC BADGE ────────────────────────────────────────── */
+  /* ── SYNC ICON BUTTON ──────────────────────────────────── */
   #syncBadge {
+    position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    font-family: 'Barlow', sans-serif;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: .3px;
-    padding: 4px 9px;
-    border-radius: 20px;
-    cursor: pointer;
-    transition: opacity .2s;
+    justify-content: center;
+    width: 36px; height: 36px;
+    background: transparent;
     border: none;
     outline: none;
-    white-space: nowrap;
-  }
-  #syncBadge.sync-ok      { background: rgba(76,175,80,.18);  color: #4caf50; }
-  #syncBadge.sync-pending { background: rgba(255,152,0,.18);  color: #ff9800; }
-  #syncBadge.sync-error   { background: rgba(229,57,53,.18);  color: #e53935; }
-  #syncBadge.sync-offline { background: rgba(150,150,150,.18);color: #888;    }
-  #syncBadge .sync-dot {
-    width: 7px; height: 7px;
+    cursor: pointer;
+    padding: 0;
     border-radius: 50%;
+    transition: background .15s;
     flex-shrink: 0;
   }
-  #syncBadge.sync-ok      .sync-dot { background: #4caf50; }
-  #syncBadge.sync-pending .sync-dot { background: #ff9800; animation: syncPulse 1.2s infinite; }
-  #syncBadge.sync-error   .sync-dot { background: #e53935; }
-  #syncBadge.sync-offline .sync-dot { background: #888; }
-  @keyframes syncPulse {
-    0%,100% { opacity:1; } 50% { opacity:.3; }
+  #syncBadge:active { background: rgba(255,255,255,.1); }
+  /* Ícono de nube — color según estado */
+  #syncBadge.sync-ok      .sync-cloud { color: rgba(255,255,255,.55); }
+  #syncBadge.sync-pending .sync-cloud { color: #ffb300; }
+  #syncBadge.sync-error   .sync-cloud { color: #e53935; }
+  #syncBadge.sync-offline .sync-cloud { color: rgba(255,255,255,.25); }
+  /* Badge numérico encima del ícono */
+  #syncBadge .sync-count {
+    position: absolute;
+    top: 2px; right: 2px;
+    min-width: 16px; height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 10px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+    pointer-events: none;
+  }
+  #syncBadge.sync-pending .sync-count { background: #ffb300; color: #000; }
+  #syncBadge.sync-error   .sync-count { background: #e53935; color: #fff; }
+  #syncBadge .sync-count.hidden { display: none; }
+  /* Animación pulso para pendientes */
+  #syncBadge.sync-pending .sync-cloud { animation: syncCloudPulse 2s ease-in-out infinite; }
+  @keyframes syncCloudPulse {
+    0%,100% { opacity:1; } 50% { opacity:.5; }
   }
 
   /* ── PANEL SYNC ─────────────────────────────────────────── */
@@ -2859,9 +2869,14 @@
       <span class="mob-ticket-nro" id="mobTicketNro">#0001</span>
     </div>
     <div class="hright" style="display:flex;align-items:center;gap:4px;">
-      <button id="syncBadge" class="sync-ok" onclick="goTo('scConfigSync')" title="Estado de sincronización">
-        <span class="sync-dot"></span>
-        <span id="syncBadgeTxt">Sync</span>
+      <button id="syncBadge" class="sync-ok" onclick="goTo('scConfigSync');renderSyncPanel()" title="Estado de sincronización">
+        <!-- Ícono nube upload -->
+        <svg class="sync-cloud" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+          <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+        </svg>
+        <!-- Badge numérico — oculto cuando todo OK -->
+        <span class="sync-count hidden" id="syncCount"></span>
       </button>
       <button class="hbtn"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></button>
       <button class="hbtn theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
@@ -8262,43 +8277,36 @@ window.addEventListener('offline', () => {
 /** Actualiza el badge de sync en el header */
 async function updSyncBadge(){
   const badge   = document.getElementById('syncBadge');
-  const badgeTxt= document.getElementById('syncBadgeTxt');
+  const countEl = document.getElementById('syncCount');
   const menuBdg = document.getElementById('syncMenuBadge');
-  if(!badge || !badgeTxt) return;
+  if(!badge || !countEl) return;
 
-  if(!navigator.onLine){
-    badge.className = 'sync-offline';
-    badgeTxt.textContent = 'Sin red';
-    if(menuBdg) { menuBdg.style.display = 'none'; }
-    return;
-  }
+  const setIcon = (estado, n) => {
+    badge.className = 'sync-' + estado;
+    if(n > 0){
+      countEl.textContent = n > 99 ? '99+' : n;
+      countEl.classList.remove('hidden');
+    } else {
+      countEl.classList.add('hidden');
+    }
+    if(menuBdg){
+      if(n > 0){ menuBdg.textContent = n; menuBdg.style.display = 'inline'; }
+      else { menuBdg.style.display = 'none'; }
+    }
+  };
 
-  if(!db){
-    badge.className = 'sync-ok';
-    badgeTxt.textContent = 'Sync';
-    return;
-  }
+  if(!navigator.onLine){ setIcon('offline', 0); return; }
+  if(!db)               { setIcon('ok', 0);      return; }
 
   try {
     const pendientes = await db.sync_queue.where('sincronizado').equals(0).count();
     const errores    = await db.sync_queue.where('sincronizado').equals(2).count();
 
-    if(errores > 0){
-      badge.className = 'sync-error';
-      badgeTxt.textContent = errores + ' error' + (errores !== 1 ? 'es' : '');
-      if(menuBdg){ menuBdg.textContent = errores; menuBdg.style.display = 'inline'; }
-    } else if(pendientes > 0){
-      badge.className = 'sync-pending';
-      badgeTxt.textContent = pendientes + ' pendiente' + (pendientes !== 1 ? 's' : '');
-      if(menuBdg){ menuBdg.textContent = pendientes; menuBdg.style.display = 'inline'; }
-    } else {
-      badge.className = 'sync-ok';
-      badgeTxt.textContent = 'Sincronizado';
-      if(menuBdg){ menuBdg.style.display = 'none'; }
-    }
+    if(errores > 0)         setIcon('error',   errores);
+    else if(pendientes > 0) setIcon('pending', pendientes);
+    else                    setIcon('ok',      0);
   } catch(e){
-    badge.className = 'sync-ok';
-    badgeTxt.textContent = 'Sync';
+    setIcon('ok', 0);
   }
 }
 
@@ -8763,7 +8771,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.2.2 (2026-03-29)';
+const APP_VERSION = 'v1.2.3 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
