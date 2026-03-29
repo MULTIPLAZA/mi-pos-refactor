@@ -8113,11 +8113,15 @@ async function dbSaveEgreso(egreso){
 // ── SYNC QUEUE ────────────────────────────────────────────
 async function dbQueueSync(tabla, operacion, datos){
   if(!db) return;
+  // Limpiar campos locales que Supabase rechazaría
+  const datosSupa = Object.assign({}, datos);
+  delete datosSupa.sincronizado;
+  delete datosSupa.updatedAt;
   await db.sync_queue.add({
     tabla,
     operacion,
-    datos:       JSON.stringify(datos),
-    timestamp:   new Date().toISOString(),
+    datos:        JSON.stringify(datosSupa),
+    timestamp:    new Date().toISOString(),
     sincronizado: 0,
   });
 }
@@ -8157,8 +8161,19 @@ async function syncConSupabase(){
         exitos++;
       } catch(e){
         console.log('[Sync] Error en item', item.id, e.message);
-        await db.sync_queue.update(item.id, { sincronizado: 2, error_msg: e.message });
-        fallos++;
+        // Error de red (sin internet) → dejar pendiente para reintentar
+        // Error de Supabase (4xx) → marcar como error permanente
+        const esErrorRed = e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('ERR_INTERNET') || !navigator.onLine;
+        if(esErrorRed){
+          // No cambiar estado — queda en sincronizado:0 para reintentarse
+          console.log('[Sync] Error de red, se reintentará cuando vuelva internet');
+          // Si estamos offline, cortar el loop — no tiene sentido seguir intentando
+          if(!navigator.onLine) break;
+        } else {
+          // Error real de Supabase (campo inválido, etc.) → marcar como error
+          await db.sync_queue.update(item.id, { sincronizado: 2, error_msg: e.message });
+          fallos++;
+        }
       }
     }
     console.log('[Sync] Completado — OK:', exitos, '| Errores:', fallos);
@@ -8748,7 +8763,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.2.1 (2026-03-28)';
+const APP_VERSION = 'v1.2.2 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
