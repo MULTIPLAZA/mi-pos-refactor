@@ -3504,7 +3504,8 @@ function updBtnGuardar(){
 }
 
 async function doOpenShift(){
-  const v = parseInt(document.getElementById('shiftDisp').textContent.replace(/[₲.,]/g,''))||0;
+  const v   = parseInt(document.getElementById('shiftDisp').textContent.replace(/[₲.,]/g,''))||0;
+  const btn = document.querySelector('#scClosed .btn-abrir-outline') || document.querySelector('[onclick*="doOpenShift"]');
 
   if(navigator.onLine){
     if(btn){ btn.textContent='Verificando...'; btn.disabled=true; }
@@ -8771,7 +8772,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.2.3 (2026-03-29)';
+const APP_VERSION = 'v1.2.4 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
