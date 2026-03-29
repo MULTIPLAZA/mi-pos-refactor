@@ -1,4 +1,4 @@
-const CACHE = 'ampersand-pos-v20260329-2018';
+const CACHE = 'ampersand-pos-v20260329-2019';
 
 const ASSETS = [
   '/',

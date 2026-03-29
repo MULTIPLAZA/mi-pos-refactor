@@ -8783,7 +8783,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.2.8 (2026-03-29)';
+const APP_VERSION = 'v1.2.9 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
@@ -8966,12 +8966,13 @@ async function licVerificarAhora(){
     localStorage.setItem(SK.fallos,'0');
     return true;
   } catch(e){
-    // Error de red — tolerar hasta 3 intentos fallidos consecutivos
+    // Error de red — siempre tolerar, nunca bloquear por falta de internet
     const fallos=parseInt(localStorage.getItem(SK.fallos)||'0')+1;
     localStorage.setItem(SK.fallos,String(fallos));
     console.warn('[Licencia] Fallo #'+fallos+': '+e.message);
-    if(fallos>=3) licMostrarBloqueo('SIN_CONEXION');
-    return true; // tolerar si no hay internet
+    // Solo bloquear si hay muchos fallos Y hay internet (error real, no de red)
+    if(fallos>=5 && navigator.onLine) licMostrarBloqueo('SIN_CONEXION');
+    return true; // siempre dejar pasar si es error de conectividad
   }
 }
 
@@ -8994,28 +8995,28 @@ async function licInit(){
     document.getElementById('scActivacion').style.display='flex';
     return false;
   }
-  // Siempre verificar al abrir si hay internet
-  // No esperar el timer de 24hs para detectar suspensión inmediata
-  if(navigator.onLine){
-    const ok = await licVerificarAhora();
-    if(!ok) return false;
-  } else {
-    // Sin internet: verificar si el timer expiró (tolerancia offline)
-    await licCheckPeriodico();
-  }
   const neg=localStorage.getItem(SK.negocio);
   if(neg&&typeof configData!=='undefined') configData.negocio=neg;
-  // Si faltan datos de terminal, intentar recuperar de Supabase
-  // SOLO si el dispositivo ya fue registrado antes (tiene config propia)
-  if(!localStorage.getItem('pos_terminal') || !localStorage.getItem('pos_sucursal')){
-    try{
-      await licGetDeviceIdAsync(); // asegurar que tenemos el ID correcto
-      const cfg = await recuperarConfigTerminalSupabase(); // solo devuelve config de ESTE device
-      if(cfg){
-        aplicarConfigTerminal(cfg);
-        console.log('[licInit] Terminal recuperada:', cfg.terminal, '/', cfg.sucursal);
-      }
-    }catch(e){ console.warn('[licInit] No se pudo recuperar config:', e.message); }
+
+  if(navigator.onLine){
+    // Con internet: verificar licencia en background, sin bloquear el arranque
+    // Si falla por red, licVerificarAhora ya tolera el error
+    licVerificarAhora().catch(e => console.warn('[Licencia] Verificación background:', e.message));
+    // Recuperar config de terminal si hace falta
+    if(!localStorage.getItem('pos_terminal') || !localStorage.getItem('pos_sucursal')){
+      try{
+        await licGetDeviceIdAsync();
+        const cfg = await recuperarConfigTerminalSupabase();
+        if(cfg){
+          aplicarConfigTerminal(cfg);
+          console.log('[licInit] Terminal recuperada:', cfg.terminal, '/', cfg.sucursal);
+        }
+      }catch(e){ console.warn('[licInit] No se pudo recuperar config:', e.message); }
+    }
+  } else {
+    // Sin internet: verificar solo si el timer expiró (tolerancia offline)
+    // No bloquear el arranque bajo ningún concepto
+    licCheckPeriodico().catch(()=>{});
   }
   return true;
 }
