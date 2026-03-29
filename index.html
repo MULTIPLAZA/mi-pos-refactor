@@ -3521,15 +3521,15 @@ async function doOpenShift(){
   turnoData.ingresos        = [];
   turnoData.supaId          = null;
   turnoData.dbId            = null;
-  // Persistir apertura en localStorage
-  turnoGuardar();
-  // Guardar apertura en Supabase (background)
+  // Guardar apertura en Supabase (background, no bloquea)
   supaInsertTurno('abierto', v);
-  // Esperar a que IndexedDB asigne el dbId antes de navegar
-  // para que renderVentasList filtre correctamente por turno_id
+  // Esperar a que IndexedDB asigne el dbId ANTES de guardar en localStorage
+  // para que turnoData.dbId quede persistido correctamente
   if(db){
     try { await dbAbrirTurno(v); } catch(e){}
   }
+  // Persistir en localStorage DESPUÉS de tener el dbId
+  turnoGuardar();
   goTo('scSale'); renderCatPills(); filterP(); toast('Turno abierto ✓');
 }
 
@@ -8840,7 +8840,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.3.3 (2026-03-29)';
+const APP_VERSION = 'v1.3.4 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
