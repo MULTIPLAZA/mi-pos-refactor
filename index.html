@@ -8171,7 +8171,10 @@ async function supaUpsertProducto(prod){
       licencia_email:  email,
       terminal:        localStorage.getItem('pos_terminal') || 'Principal',
       updated_at:      new Date().toISOString(),
+      imagen:          prod.imagen !== undefined ? (prod.imagen || null) : undefined,
     };
+    // Limpiar undefined para no enviar campos no deseados
+    if(row.imagen === undefined) delete row.imagen;
     const res = await fetch(SUPA_URL+'/rest/v1/pos_productos', {
       method:  'POST',
       headers: {
@@ -9201,7 +9204,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.4.4 (2026-03-29)';
+const APP_VERSION = 'v1.4.5 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
