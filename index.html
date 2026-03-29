@@ -8779,7 +8779,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.2.6 (2026-03-29)';
+const APP_VERSION = 'v1.2.7 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
@@ -9282,7 +9282,9 @@ async function iniciarApp(){
     goTo('scClosed');
     }
 
-  // ── PASO 4: Cargar productos/categorías en PARALELO ──────
+  // ── PASO 4: Refrescar productos/categorías ───────────────
+  // Con internet: refresca desde Supabase (IndexedDB ya cargó en el arranque)
+  // Sin internet: IndexedDB ya está cargado desde el arranque — no hacer nada
   if(!USAR_DEMO && navigator.onLine){
     try {
       await Promise.all([
@@ -9290,13 +9292,6 @@ async function iniciarApp(){
         supaLoadProductos(),
       ]);
     } catch(e){ console.warn('[App] Carga Supabase:', e.message); }
-  } else if(db){
-    try {
-      await Promise.all([
-        dbLoadCategorias(),
-        dbLoadProductos(),
-      ]);
-    } catch(e){ console.warn('[App] Carga DB:', e.message); }
   }
 
   // ── PASO 5: Sync background ───────────────────────────────
@@ -10444,15 +10439,27 @@ function toggleVentaCard(id){
 
 (async function(){
   applyTheme();
+
+  // Iniciar DB y verificar licencia EN PARALELO — no tienen dependencia
+  // La DB carga productos desde IndexedDB para que aparezcan de inmediato
+  // mientras licInit verifica con Supabase en background
+  let dbOk = false;
   try {
     await initDB();
-    await dbLoadCategorias();
-    await dbLoadProductos();
+    dbOk = true;
   } catch(e){
     console.log('[DB] Error al iniciar:', e.message);
   }
 
-  const ok = await licInit();
+  // Lanzar licInit y carga de IndexedDB en paralelo
+  const [ok] = await Promise.all([
+    licInit(),
+    dbOk ? Promise.all([
+      dbLoadCategorias().catch(e => console.log('[DB] Categorías:', e.message)),
+      dbLoadProductos().catch(e => console.log('[DB] Productos:', e.message)),
+    ]) : Promise.resolve(),
+  ]);
+
   if(ok) await iniciarApp();
 })();
 </script>
