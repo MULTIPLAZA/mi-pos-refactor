@@ -8840,7 +8840,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.3.4 (2026-03-29)';
+const APP_VERSION = 'v1.3.5 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
@@ -9284,8 +9284,19 @@ async function iniciarApp(){
   let turnoOk = false;
   try {
     const _raw = localStorage.getItem('pos_turno_activo');
-      turnoOk = turnoRestaurar();
-    } catch(e){ console.warn('[App] Turno:', e.message); }
+    turnoOk = turnoRestaurar();
+    // Si se restauró pero dbId es null, recuperarlo desde IndexedDB
+    if(turnoOk && !turnoData.dbId && db){
+      try {
+        const t = await db.turno.where('estado').equals('abierto').last();
+        if(t){
+          turnoData.dbId = t.id;
+          turnoGuardar();
+          console.log('[Turno] dbId recuperado desde IndexedDB:', t.id);
+        }
+      } catch(e){ console.warn('[Turno] Error recuperando dbId:', e.message); }
+    }
+  } catch(e){ console.warn('[App] Turno:', e.message); }
 
   // Si no hay turno en localStorage, buscar en Supabase (otra terminal abrió el turno)
   if(!turnoOk && navigator.onLine && !USAR_DEMO){
