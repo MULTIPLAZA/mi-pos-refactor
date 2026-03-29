@@ -1752,6 +1752,64 @@
   }
   .mesa-dot { display:none; }
   .mesas-empty { text-align:center; color:var(--muted); padding:60px 20px; font-size:14px; }
+
+  /* ── IMAGE CROPPER ─────────────────────────────────── */
+  #cropOverlay {
+    position:fixed; inset:0; background:rgba(0,0,0,.92);
+    display:none; flex-direction:column; align-items:center;
+    justify-content:center; z-index:9999; padding:16px;
+  }
+  #cropOverlay.open { display:flex; }
+  #cropWrapper {
+    position:relative; width:280px; height:280px;
+    overflow:hidden; border-radius:4px;
+    background:#111; touch-action:none; cursor:grab;
+    border:2px solid rgba(255,255,255,.2);
+  }
+  #cropWrapper:active { cursor:grabbing; }
+  #cropImg {
+    position:absolute; transform-origin:0 0;
+    user-select:none; pointer-events:none;
+    image-rendering:auto;
+  }
+  /* Marco de recorte */
+  #cropFrame {
+    position:absolute; inset:0; pointer-events:none;
+    border:2px solid rgba(255,255,255,.7);
+    box-shadow:0 0 0 9999px rgba(0,0,0,.45);
+  }
+  /* Líneas de tercios */
+  #cropFrame::before, #cropFrame::after {
+    content:''; position:absolute; background:rgba(255,255,255,.25);
+  }
+  #cropFrame::before { left:33.33%; width:1px; top:0; bottom:0; box-shadow:66px 0 0 rgba(255,255,255,.25); }
+  #cropFrame::after  { top:33.33%; height:1px; left:0; right:0; box-shadow:0 66px 0 rgba(255,255,255,.25); }
+
+  #cropZoomRow {
+    display:flex; align-items:center; gap:10px;
+    margin-top:14px; width:280px;
+  }
+  #cropZoomSlider {
+    flex:1; accent-color:var(--green);
+  }
+  #cropZoomLbl {
+    font-size:11px; color:#aaa; font-family:'Barlow',sans-serif;
+    min-width:36px; text-align:right;
+  }
+  .crop-btn-row {
+    display:flex; gap:10px; margin-top:14px; width:280px;
+  }
+  .crop-btn {
+    flex:1; padding:13px; border:none; border-radius:10px;
+    font-family:'Barlow',sans-serif; font-size:14px; font-weight:800;
+    cursor:pointer; letter-spacing:.3px;
+  }
+  .crop-btn.cancel { background:#222; color:#aaa; }
+  .crop-btn.confirm { background:var(--green); color:#fff; }
+  #cropHint {
+    font-size:11px; color:#666; margin-top:8px;
+    font-family:'Barlow',sans-serif; text-align:center;
+  }
   .mesas-fab { position:fixed; bottom:20px; right:20px; width:52px; height:52px; border-radius:50%; background:var(--green); border:none; color:#fff; font-size:26px; cursor:pointer; box-shadow:0 4px 16px rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; z-index:10; }
 
   /* Modal gestión mesas */
@@ -2549,6 +2607,28 @@
       GUARDAR ARTÍCULO
     </button>
   </div>
+</div>
+
+<!-- CROPPER DE IMAGEN -->
+<div id="cropOverlay">
+  <div style="font-size:13px;color:#aaa;font-family:'Barlow',sans-serif;margin-bottom:12px;letter-spacing:.3px;">
+    RECORTÁ LA IMAGEN
+  </div>
+  <div id="cropWrapper">
+    <img id="cropImg" src="" draggable="false">
+    <div id="cropFrame"></div>
+  </div>
+  <div id="cropZoomRow">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+    <input type="range" id="cropZoomSlider" min="100" max="400" value="100" oninput="cropZoom(this.value)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <span id="cropZoomLbl">1×</span>
+  </div>
+  <div class="crop-btn-row">
+    <button class="crop-btn cancel" onclick="cropCancelar()">Cancelar</button>
+    <button class="crop-btn confirm" onclick="cropConfirmar()">Usar foto</button>
+  </div>
+  <div id="cropHint">Arrastrá para reencuadrar · Usá el slider para hacer zoom</div>
 </div>
 
 <!-- MODAL PRECIO VARIABLE -->
@@ -3618,23 +3698,48 @@ function openCat(){
   document.getElementById('catOv').classList.add('open');
 }
 
-function renderP(list){
+async function _getImgSrc(p){
+  if(!p.imagen) return null;
+  // Si es base64 ya, devolver directo
+  if(p.imagen.startsWith('data:')) return p.imagen;
+  // Si hay internet, usar URL directa
+  if(navigator.onLine) return p.imagen;
+  // Sin internet: buscar en cache IndexedDB
+  if(db){
+    try {
+      const cached = await db.config.get('img_cache_'+p.imagen);
+      if(cached) return cached.valor;
+    } catch(e){}
+  }
+  return p.imagen; // intentar igual (puede estar en cache del navegador)
+}
+
+function _tileProd(p, imgSrc){
+  if(imgSrc){
+    return '<div class="ptile" style="background:'+getProductColor(p)+';position:relative;overflow:hidden;" onclick="addCart('+p.id+',this)">'+
+      '<img src="'+imgSrc+'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;" '+
+        'onerror="this.style.display='none'" loading="lazy">'+
+      '<div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.8));padding:8px 4px 5px;">'+
+        '<span class="pname" style="text-shadow:0 1px 3px rgba(0,0,0,.9);color:#fff;">'+p.name+'</span>'+
+      '</div>'+
+    '</div>';
+  }
+  if(p.itemLibre){
+    return '<div class="ptile" style="background:#37474f;border:2px dashed #78909c;box-sizing:border-box;" onclick="addCart('+p.id+',this)"><span class="pname">'+p.name+'</span></div>';
+  }
+  return '<div class="ptile" style="background:'+getProductColor(p)+'" onclick="addCart('+p.id+',this)"><span class="pname">'+p.name+'</span></div>';
+}
+
+async function renderP(list){
   const g=document.getElementById('pgrid');
-  if(!list.length){g.innerHTML='<div style="grid-column:span 3;padding:40px;text-align:center;color:#555;font-size:14px;">Sin resultados</div>';return;}
-  g.innerHTML=list.map(p=>{
-    if(p.imagen){
-      return '<div class="ptile" style="background:'+getProductColor(p)+';position:relative;overflow:hidden;" onclick="addCart('+p.id+',this)">'+
-        '<img src="'+p.imagen+'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;" onerror="this.remove()">'+
-        '<div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.75));padding:6px 4px 4px;">'+
-          '<span class="pname" style="text-shadow:0 1px 3px rgba(0,0,0,.9);">'+p.name+'</span>'+
-        '</div>'+
-      '</div>';
-    }
-    if(p.itemLibre){
-      return '<div class="ptile" style="background:#37474f;border:2px dashed #78909c;box-sizing:border-box;" onclick="addCart('+p.id+',this)"><span class="pname">'+p.name+'</span></div>';
-    }
-    return '<div class="ptile" style="background:'+getProductColor(p)+'" onclick="addCart('+p.id+',this)"><span class="pname">'+p.name+'</span></div>';
-  }).join('');
+  if(!g) return;
+  if(!list.length){
+    g.innerHTML='<div style="grid-column:span 3;padding:40px;text-align:center;color:#555;font-size:14px;">Sin resultados</div>';
+    return;
+  }
+  // Resolver imágenes (cache offline si hace falta)
+  const imgSrcs = await Promise.all(list.map(p => _getImgSrc(p)));
+  g.innerHTML = list.map((p, i) => _tileProd(p, imgSrcs[i])).join('');
 }
 let _filterPTimer = null;
 function filterP(){
@@ -5990,64 +6095,169 @@ PRODS.forEach((p,i) => {
 });
 nextProdId = PRODS.length + 1;
 
-// ── IMAGEN DE PRODUCTO — Supabase Storage ───────────────
-async function onArtImgChange(input){
+// ── IMAGEN DE PRODUCTO — Cropper + Supabase Storage ────
+let _cropFile = null;
+let _cropScale = 1;
+let _cropOffX = 0, _cropOffY = 0;
+let _cropDragging = false;
+let _cropLastX = 0, _cropLastY = 0;
+let _cropImgW = 0, _cropImgH = 0;
+const CROP_SIZE = 280; // px del área de recorte
+
+function onArtImgChange(input){
   const file = input.files[0];
   if(!file) return;
+  _cropFile = file;
+  const url = URL.createObjectURL(file);
+  const img = document.getElementById('cropImg');
+  img.onload = function(){
+    _cropImgW = img.naturalWidth;
+    _cropImgH = img.naturalHeight;
+    // Zoom inicial: que la imagen cubra el área de recorte
+    const minScale = Math.max(CROP_SIZE/_cropImgW, CROP_SIZE/_cropImgH);
+    _cropScale = minScale;
+    // Centrar
+    _cropOffX = (CROP_SIZE - _cropImgW * _cropScale) / 2;
+    _cropOffY = (CROP_SIZE - _cropImgH * _cropScale) / 2;
+    const slider = document.getElementById('cropZoomSlider');
+    // slider: 100 = minScale, 400 = minScale*4
+    slider.min = 100; slider.max = 400; slider.value = 100;
+    document.getElementById('cropZoomLbl').textContent = '1×';
+    _cropApply();
+    document.getElementById('cropOverlay').classList.add('open');
+  };
+  img.src = url;
+  input.value = ''; // reset para poder elegir la misma imagen
+}
 
-  // Mostrar preview local inmediatamente
-  const localUrl = URL.createObjectURL(file);
-  mostrarPreviewImagen(localUrl, true); // true = uploading
+function _cropApply(){
+  const img = document.getElementById('cropImg');
+  img.style.width  = (_cropImgW * _cropScale) + 'px';
+  img.style.height = (_cropImgH * _cropScale) + 'px';
+  img.style.left   = _cropOffX + 'px';
+  img.style.top    = _cropOffY + 'px';
+}
+
+function _cropClamp(){
+  const w = _cropImgW * _cropScale;
+  const h = _cropImgH * _cropScale;
+  if(w >= CROP_SIZE){ _cropOffX = Math.min(0, Math.max(CROP_SIZE - w, _cropOffX)); }
+  else { _cropOffX = (CROP_SIZE - w) / 2; }
+  if(h >= CROP_SIZE){ _cropOffY = Math.min(0, Math.max(CROP_SIZE - h, _cropOffY)); }
+  else { _cropOffY = (CROP_SIZE - h) / 2; }
+}
+
+function cropZoom(val){
+  const slider = document.getElementById('cropZoomSlider');
+  const minScale = Math.max(CROP_SIZE/_cropImgW, CROP_SIZE/_cropImgH);
+  const newScale = minScale * (val / 100);
+  // Zoom centrado en el punto medio del área
+  const cx = CROP_SIZE / 2;
+  const cy = CROP_SIZE / 2;
+  _cropOffX = cx - (cx - _cropOffX) * (newScale / _cropScale);
+  _cropOffY = cy - (cy - _cropOffY) * (newScale / _cropScale);
+  _cropScale = newScale;
+  _cropClamp();
+  _cropApply();
+  document.getElementById('cropZoomLbl').textContent = (val/100).toFixed(1) + '×';
+}
+
+// Drag — mouse
+(function(){
+  const wrap = document.getElementById ? null : null; // se inicializa en DOMContentLoaded
+  document.addEventListener('DOMContentLoaded', function(){
+    const w = document.getElementById('cropWrapper');
+    if(!w) return;
+    w.addEventListener('mousedown', function(e){ _cropDragging=true; _cropLastX=e.clientX; _cropLastY=e.clientY; e.preventDefault(); });
+    document.addEventListener('mousemove', function(e){
+      if(!_cropDragging) return;
+      _cropOffX += e.clientX - _cropLastX;
+      _cropOffY += e.clientY - _cropLastY;
+      _cropLastX=e.clientX; _cropLastY=e.clientY;
+      _cropClamp(); _cropApply();
+    });
+    document.addEventListener('mouseup', function(){ _cropDragging=false; });
+    // Touch
+    w.addEventListener('touchstart', function(e){ const t=e.touches[0]; _cropDragging=true; _cropLastX=t.clientX; _cropLastY=t.clientY; }, {passive:true});
+    w.addEventListener('touchmove', function(e){
+      if(!_cropDragging) return;
+      const t=e.touches[0];
+      _cropOffX += t.clientX - _cropLastX;
+      _cropOffY += t.clientY - _cropLastY;
+      _cropLastX=t.clientX; _cropLastY=t.clientY;
+      _cropClamp(); _cropApply();
+      e.preventDefault();
+    }, {passive:false});
+    w.addEventListener('touchend', function(){ _cropDragging=false; });
+  });
+})();
+
+function cropCancelar(){
+  document.getElementById('cropOverlay').classList.remove('open');
+  _cropFile = null;
+}
+
+async function cropConfirmar(){
+  // Renderizar el recorte en un canvas 400×400
+  const OUTPUT = 400;
+  const canvas = document.createElement('canvas');
+  canvas.width = OUTPUT; canvas.height = OUTPUT;
+  const ctx = canvas.getContext('2d');
+  const img  = document.getElementById('cropImg');
+  const ratio = OUTPUT / CROP_SIZE;
+  ctx.drawImage(
+    img,
+    -_cropOffX * ratio,
+    -_cropOffY * ratio,
+    _cropImgW * _cropScale * ratio,
+    _cropImgH * _cropScale * ratio
+  );
+  document.getElementById('cropOverlay').classList.remove('open');
+
+  // Mostrar preview mientras sube
+  const previewUrl = canvas.toDataURL('image/jpeg', 0.85);
+  mostrarPreviewImagen(previewUrl, true);
 
   try {
-    // Comprimir si es muy grande (max 800px, calidad 80%)
-    const compressed = await comprimirImagen(file, 800, 0.8);
-
-    // Subir a Supabase Storage
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.85));
     const email    = localStorage.getItem('lic_email') || 'demo';
-    const ext      = file.name.split('.').pop().toLowerCase() || 'jpg';
-    const filename = 'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)+'.'+ext;
+    const filename = 'prod_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)+'.jpg';
     const path     = email.replace(/[^a-z0-9]/gi,'_')+'/'+filename;
 
     const r = await fetch(
       SUPA_URL+'/storage/v1/object/productos/'+path,
       {
-        method: 'POST',
-        headers: {
+        method:'POST',
+        headers:{
           'apikey':        SUPA_ANON,
           'Authorization': 'Bearer '+SUPA_ANON,
-          'Content-Type':  compressed.type || 'image/jpeg',
-          'x-upsert':      'true'
+          'Content-Type':  'image/jpeg',
+          'x-upsert':      'true',
         },
-        body: compressed
+        body: blob,
       }
     );
+    if(!r.ok){ const t=await r.text(); throw new Error(t.substring(0,120)); }
 
-    if(!r.ok){
-      const t = await r.text();
-      throw new Error('Upload error: '+t.substring(0,100));
-    }
-
-    // Construir URL pública
     const publicUrl = SUPA_URL+'/storage/v1/object/public/productos/'+path;
-    artImagenBase64 = publicUrl; // guardamos la URL, no base64
+    artImagenBase64 = publicUrl;
     mostrarPreviewImagen(publicUrl, false);
-    console.log('[Imagen] Subida OK:', publicUrl);
 
+    // Cachear en IndexedDB para offline
+    if(db){
+      try {
+        await db.config.put({ clave:'img_cache_'+publicUrl, valor: previewUrl });
+        console.log('[Imagen] Cacheada en IndexedDB');
+      } catch(e){}
+    }
+    console.log('[Imagen] Subida OK:', publicUrl);
+    toast('✅ Imagen guardada');
   } catch(e){
-    console.error('[Imagen] Error Storage:', e.message);
-    toast('⚠️ Usando imagen local (ejecutá supabase_storage.sql)');
-    // Fallback: comprimir mucho y guardar como base64 pequeño
-    try {
-      const tiny = await comprimirImagen(file, 300, 0.6);
-      const reader = new FileReader();
-      reader.onload = function(ev){
-        artImagenBase64 = ev.target.result;
-        mostrarPreviewImagen(artImagenBase64, false);
-        console.log('[Imagen] Base64 fallback:', Math.round(ev.target.result.length/1024)+'KB');
-      };
-      reader.readAsDataURL(tiny);
-    } catch(e2){ console.error('[Imagen] Fallback error:', e2.message); }
+    console.warn('[Imagen] Error Storage:', e.message);
+    // Fallback: usar el base64 del canvas localmente
+    artImagenBase64 = previewUrl;
+    mostrarPreviewImagen(previewUrl, false);
+    toast('⚠️ Sin internet — imagen guardada localmente');
   }
 }
 
@@ -7802,6 +8012,30 @@ async function supaLoadProductos(){
     // Cargar descuentos en background
     try { await cargarDescuentosConfig(); } catch(ed){ console.warn('[Desc]', ed.message); }
 
+    // Cachear imágenes en IndexedDB para uso offline
+    if(db){
+      const prodsConImg = newProds.filter(p => p.imagen && p.imagen.startsWith('http'));
+      for(const p of prodsConImg){
+        try {
+          const cached = await db.config.get('img_cache_'+p.imagen);
+          if(!cached){
+            // Descargar y cachear como base64
+            const r = await fetch(p.imagen);
+            if(r.ok){
+              const blob = await r.blob();
+              const b64  = await new Promise(res => {
+                const fr = new FileReader();
+                fr.onload = () => res(fr.result);
+                fr.readAsDataURL(blob);
+              });
+              await db.config.put({ clave:'img_cache_'+p.imagen, valor: b64 });
+            }
+          }
+        } catch(ei){}
+      }
+      if(prodsConImg.length) console.log('[Imagen] Cache offline:', prodsConImg.length, 'imágenes');
+    }
+
     // Persistir en IndexedDB para uso offline
     if(db){
       try {
@@ -8943,7 +9177,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.4.0 (2026-03-29)';
+const APP_VERSION = 'v1.4.1 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
