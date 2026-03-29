@@ -1753,6 +1753,120 @@
   .mesa-dot { display:none; }
   .mesas-empty { text-align:center; color:var(--muted); padding:60px 20px; font-size:14px; }
 
+  /* ── MODIFICADORES MODAL ───────────────────────────── */
+  #modifOverlay {
+    position:fixed; inset:0; background:rgba(0,0,0,.75);
+    display:none; align-items:flex-end; justify-content:center;
+    z-index:8000; padding:0;
+  }
+  #modifOverlay.open { display:flex; }
+  #modifSheet {
+    background:var(--bg); width:100%; max-width:520px;
+    border-radius:16px 16px 0 0; padding:0 0 24px;
+    max-height:85vh; display:flex; flex-direction:column;
+    overflow:hidden;
+  }
+  #modifSheetHdr {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 16px 12px; border-bottom:1px solid var(--border);
+    flex-shrink:0;
+  }
+  #modifSheetTitle { font-size:17px; font-weight:800; color:var(--text); }
+  #modifSheetSub   { font-size:12px; color:var(--muted); margin-top:2px; }
+  #modifSheetBody  { flex:1; overflow-y:auto; padding:12px 16px; }
+  .modif-group { margin-bottom:16px; }
+  .modif-group-title {
+    font-size:11px; font-weight:700; color:var(--muted);
+    text-transform:uppercase; letter-spacing:.6px; margin-bottom:8px;
+    display:flex; align-items:center; gap:6px;
+  }
+  .modif-group-title .modif-req {
+    background:#e53935; color:#fff; font-size:9px; padding:1px 6px;
+    border-radius:4px; font-weight:800;
+  }
+  .modif-opt {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:11px 14px; background:var(--bg-card);
+    border-radius:8px; margin-bottom:6px; cursor:pointer;
+    border:2px solid transparent; transition:border-color .12s;
+  }
+  .modif-opt.sel { border-color:var(--green); }
+  .modif-opt-name { font-size:14px; font-weight:600; color:var(--text); }
+  .modif-opt-price { font-size:13px; color:var(--green); font-weight:700; }
+  .modif-opt-check {
+    width:22px; height:22px; border-radius:50%;
+    border:2px solid var(--border2); flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    transition:all .12s;
+  }
+  .modif-opt.sel .modif-opt-check {
+    background:var(--green); border-color:var(--green); color:#fff;
+  }
+  #modifSheetFooter {
+    padding:12px 16px 0; flex-shrink:0;
+    border-top:1px solid var(--border);
+  }
+  #modifSheetFooter .btn-agregar {
+    width:100%; padding:15px; background:var(--green); border:none;
+    border-radius:12px; color:#fff; font-family:'Barlow',sans-serif;
+    font-size:16px; font-weight:800; cursor:pointer; letter-spacing:.3px;
+  }
+  #modifSheetFooter .btn-agregar:disabled { opacity:.4; cursor:default; }
+
+  /* ── MITADES MODAL ──────────────────────────────────── */
+  #mitadOverlay {
+    position:fixed; inset:0; background:rgba(0,0,0,.75);
+    display:none; align-items:flex-end; justify-content:center;
+    z-index:8000;
+  }
+  #mitadOverlay.open { display:flex; }
+  #mitadSheet {
+    background:var(--bg); width:100%; max-width:520px;
+    border-radius:16px 16px 0 0; padding:0 0 24px;
+    max-height:85vh; display:flex; flex-direction:column;
+  }
+  #mitadSheetHdr {
+    padding:16px 16px 12px; border-bottom:1px solid var(--border);
+    flex-shrink:0;
+  }
+  #mitadSheetBody { flex:1; overflow-y:auto; padding:12px 16px; }
+  .mitad-preview {
+    display:flex; gap:8px; margin-bottom:16px;
+  }
+  .mitad-lado {
+    flex:1; background:var(--bg-card); border-radius:10px;
+    padding:12px; border:2px solid var(--border);
+    text-align:center; min-height:64px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+  }
+  .mitad-lado.sel { border-color:var(--green); }
+  .mitad-lado-lbl { font-size:10px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+  .mitad-lado-val { font-size:13px; font-weight:800; color:var(--text); }
+  .mitad-search {
+    width:100%; background:var(--bg-card); border:1.5px solid var(--border2);
+    border-radius:8px; color:var(--text); font-family:'Barlow',sans-serif;
+    font-size:14px; padding:10px 12px; margin-bottom:10px;
+    outline:none; box-sizing:border-box;
+  }
+  .mitad-pizza-opt {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 14px; background:var(--bg-card); border-radius:8px;
+    margin-bottom:6px; cursor:pointer; border:2px solid transparent;
+    transition:border-color .12s;
+  }
+  .mitad-pizza-opt.sel { border-color:var(--green); }
+  .mitad-pizza-name { font-size:14px; font-weight:700; color:var(--text); }
+  .mitad-pizza-price { font-size:12px; color:var(--muted); }
+  #mitadSheetFooter {
+    padding:12px 16px 0; border-top:1px solid var(--border); flex-shrink:0;
+  }
+  #mitadSheetFooter .btn-agregar {
+    width:100%; padding:15px; background:var(--green); border:none;
+    border-radius:12px; color:#fff; font-family:'Barlow',sans-serif;
+    font-size:16px; font-weight:800; cursor:pointer; letter-spacing:.3px;
+  }
+  #mitadSheetFooter .btn-agregar:disabled { opacity:.4; cursor:default; }
+
   /* ── IMAGE CROPPER ─────────────────────────────────── */
   #cropOverlay {
     position:fixed; inset:0; background:rgba(0,0,0,.92);
@@ -2171,7 +2285,7 @@
           </label>
         </div>
       </div>
-      <div class="general-field" style="border-bottom:none;">
+      <div class="general-field">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
           <div>
             <div style="font-size:14px;font-weight:600;color:var(--text);">Comandas</div>
@@ -2181,6 +2295,22 @@
             <input type="checkbox" id="cfgComandas" onchange="saveGeneralConfig()">
             <span class="toggle-slider"></span>
           </label>
+        </div>
+      </div>
+      <div class="general-field" style="border-bottom:none;">
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);">Precio pizza por mitad</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Cómo se calcula el precio cuando se vende una pizza en dos sabores</div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button id="cfgMitadMasCaro" onclick="selCfgMitad('mas_caro')"
+              style="flex:1;padding:10px;border-radius:8px;border:2px solid var(--border2);background:var(--bg-dark);color:var(--text);font-family:'Barlow',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">
+              El más caro
+            </button>
+            <button id="cfgMitadPromedio" onclick="selCfgMitad('promedio')"
+              style="flex:1;padding:10px;border-radius:8px;border:2px solid var(--border2);background:var(--bg-dark);color:var(--text);font-family:'Barlow',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">
+              Promedio
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -2392,8 +2522,8 @@
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
     <span>Categorías</span>
   </div>
-  <div class="art-menu-item" onclick="toast('Modificadores — próximamente')">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><circle cx="11" cy="14" r="3"/><line x1="11" y1="11" x2="11" y2="8"/></svg>
+  <div class="art-menu-item" onclick="goTo('scModificadores');renderModifList();">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
     <span>Modificadores</span>
   </div>
   <div class="art-menu-item" onclick="goTo('scDescuentos')">
@@ -2406,6 +2536,87 @@
       <button class="art-menu-btn" onclick="toast('Back Office — próximamente')">IR AL BACK OFFICE</button>
       <button class="art-menu-btn" onclick="goTo('scSale')">DE ACUERDO</button>
     </div>
+  </div>
+</div>
+
+<!-- ======== SCREEN: MODIFICADORES ======== -->
+<div id="scModificadores" class="screen">
+  <header class="header">
+    <button class="hbtn" onclick="goTo('scArticulos')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <div class="htitle"><span class="htitle-text">Modificadores</span></div>
+    <button class="hbtn" onclick="abrirNuevoModif()" style="color:var(--green);">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+  </header>
+  <div style="flex:1;overflow-y:auto;padding:12px;" id="modifListContainer">
+    <div style="text-align:center;color:var(--muted);padding:40px;">Cargando...</div>
+  </div>
+</div>
+
+<!-- ======== SCREEN: EDITAR MODIFICADOR ======== -->
+<div id="scModifEdit" class="screen">
+  <header class="header">
+    <button class="hbtn" onclick="goTo('scModificadores');renderModifList();"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <div class="htitle"><span class="htitle-text" id="modifEditTitle">Nuevo modificador</span></div>
+    <button class="hbtn" id="btnEliminarModif" style="display:none;color:#e57373;" onclick="eliminarModif()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+    </button>
+  </header>
+  <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;">
+
+    <div class="art-form-section">
+      <div class="art-form-field">
+        <span class="art-form-label">Nombre del modificador *</span>
+        <input class="art-form-input" id="modifNombre" type="text" placeholder="Ej: Tamaño, Extras, Punto de cocción">
+      </div>
+    </div>
+
+    <div class="art-form-section">
+      <div class="art-form-section-title">Tipo de selección</div>
+      <div style="display:flex;gap:8px;">
+        <button id="modifTipoUnico" onclick="selModifTipo('unico')"
+          style="flex:1;padding:12px;border-radius:8px;border:2px solid var(--border2);background:var(--bg-dark);color:var(--text);font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">
+          Única opción
+        </button>
+        <button id="modifTipoMultiple" onclick="selModifTipo('multiple')"
+          style="flex:1;padding:12px;border-radius:8px;border:2px solid var(--border2);background:var(--bg-dark);color:var(--text);font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">
+          Múltiple
+        </button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;" id="modifTipoHint">Única: el cliente elige una sola opción (ej: Tamaño)</div>
+    </div>
+
+    <div class="art-form-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="art-form-section-title" style="margin:0;">Obligatorio</div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="modifObligatorio">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">Si está activo, el cajero debe elegir antes de agregar al carrito</div>
+    </div>
+
+    <div class="art-form-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div class="art-form-section-title" style="margin:0;">Opciones</div>
+        <button onclick="agregarOpcionModif()" style="background:var(--green);border:none;border-radius:6px;color:#fff;font-family:'Barlow',sans-serif;font-size:12px;font-weight:800;padding:6px 12px;cursor:pointer;">+ Agregar</button>
+      </div>
+      <div id="modifOpcionesContainer"></div>
+    </div>
+
+    <div class="art-form-section">
+      <div class="art-form-section-title">Asignar a productos</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Seleccioná los productos que tendrán este modificador</div>
+      <div id="modifProductosContainer" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;"></div>
+    </div>
+
+  </div>
+  <div class="art-form-footer">
+    <button class="art-save-btn" onclick="guardarModif()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      GUARDAR MODIFICADOR
+    </button>
   </div>
 </div>
 
@@ -2606,6 +2817,57 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
       GUARDAR ARTÍCULO
     </button>
+  </div>
+</div>
+
+<!-- MODAL MODIFICADORES -->
+<div id="modifOverlay" onclick="modifOverlayClick(event)">
+  <div id="modifSheet">
+    <div id="modifSheetHdr">
+      <div>
+        <div id="modifSheetTitle">Opciones</div>
+        <div id="modifSheetSub"></div>
+      </div>
+      <button onclick="modifCancelar()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:4px;">✕</button>
+    </div>
+    <div id="modifSheetBody"></div>
+    <div id="modifSheetFooter">
+      <button class="btn-agregar" id="modifBtnAgregar" onclick="modifConfirmar()">Agregar al pedido</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MITADES PIZZA -->
+<div id="mitadOverlay" onclick="mitadOverlayClick(event)">
+  <div id="mitadSheet">
+    <div id="mitadSheetHdr">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:17px;font-weight:800;color:var(--text);">Pizza por mitades</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Elegí el segundo sabor</div>
+        </div>
+        <button onclick="mitadCancelar()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;">✕</button>
+      </div>
+      <div class="mitad-preview" style="margin-top:12px;">
+        <div class="mitad-lado sel">
+          <div class="mitad-lado-lbl">1° mitad</div>
+          <div class="mitad-lado-val" id="mitadLado1">—</div>
+        </div>
+        <div style="display:flex;align-items:center;color:var(--muted);font-weight:800;font-size:18px;">½</div>
+        <div class="mitad-lado" id="mitadLado2Div">
+          <div class="mitad-lado-lbl">2° mitad</div>
+          <div class="mitad-lado-val" id="mitadLado2">Elegir...</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);text-align:center;margin-top:4px;" id="mitadPrecioInfo"></div>
+    </div>
+    <div id="mitadSheetBody">
+      <input class="mitad-search" id="mitadSearch" placeholder="Buscar sabor..." oninput="renderMitadOpts()">
+      <div id="mitadOptsContainer"></div>
+    </div>
+    <div id="mitadSheetFooter">
+      <button class="btn-agregar" id="mitadBtnAgregar" onclick="mitadConfirmar()" disabled>Elegí el 2° sabor</button>
+    </div>
   </div>
 </div>
 
@@ -3200,9 +3462,10 @@
 
   <!-- FOOTER: CONFIRMAR PAGO -->
   <div class="cobrar-footer" style="display:flex;flex-direction:column;gap:8px;">
-    <button id="btnComandaCobro" onclick="imprimirComandaPreCobro()" style="display:none;background:var(--card2);border:1.5px solid var(--border2);border-radius:10px;color:var(--text);font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;padding:13px;cursor:pointer;align-items:center;justify-content:center;gap:10px;letter-spacing:.3px;">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></rect></svg>
+    <button id="btnComandaCobro" onclick="imprimirComandaPreCobro()" style="display:none;background:var(--card2);border:1.5px solid var(--border2);border-radius:10px;color:var(--text);font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;padding:13px;cursor:pointer;align-items:center;justify-content:center;gap:10px;letter-spacing:.3px;position:relative;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       COMANDA
+      <span id="comandaBadge" style="display:none;position:absolute;top:-8px;right:-8px;background:#e53935;color:#fff;font-size:11px;font-weight:900;min-width:20px;height:20px;border-radius:10px;padding:0 5px;align-items:center;justify-content:center;font-family:'Barlow',sans-serif;"></span>
     </button>
     <button class="btn-confirmar" onclick="confirmarPago()">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -3444,6 +3707,8 @@ function loadGeneralConfigInputs(){
     chkCom.checked = !!hab;
     configData.comandasHabilitadas = !!hab;
   }
+  // Cargar config precio mitad
+  if(typeof loadCfgMitad === 'function') loadCfgMitad();
 }
 
 function presupuestosHabilitados(){
@@ -3455,6 +3720,13 @@ function comandasHabilitadas(){
 }
 
 function updBtnComandaCobro(){
+  // Actualizar badge de ítems pendientes de enviar a cocina
+  const pendientes = cart.filter(i => !i.enviado).length;
+  const badgeEl = document.getElementById('comandaBadge');
+  if(badgeEl){
+    badgeEl.textContent = pendientes;
+    badgeEl.style.display = pendientes > 0 ? 'inline-flex' : 'none';
+  }
   const btn = document.getElementById('btnComandaCobro');
   if(btn) btn.style.display = comandasHabilitadas() ? 'flex' : 'none';
 }
@@ -3574,7 +3846,15 @@ function renderTkt(){
   if(!cart.length){tl.innerHTML='<div class="tempty"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg><p>Ticket vacío</p></div>';return;}
   tl.innerHTML=cart.map(i=>i.esDescuento
     ? `<div class="titem" style="border-left:2px solid #ef5350;"><div class="tiname" style="color:#ef9a9a;">${i.name}</div><div class="tictrl"><button class="qbtn" onclick="chgQty(${i.lineId},-1)">✕</button></div><div class="tiprice" style="color:#ef5350;">-${gs(i.montoDesc)}</div></div>`
-    : `<div class="titem"><div class="tiname">${i.name}${i.obs?'<div style="font-size:11px;color:#888;font-weight:400;text-transform:none;margin-top:2px;">'+i.obs+'</div>':''}</div><div class="tictrl"><button class="qbtn" onclick="chgQty(${i.lineId},-1)">−</button><span class="qnum">${i.qty}</span><button class="qbtn" onclick="chgQty(${i.lineId},1)">+</button></div><div class="tiprice">${gs(i.price*i.qty)}</div></div>`
+    : `<div class="titem" style="${i.enviado?'opacity:.6;':''}">`+
+        `<div class="tiname">`+
+          (i.enviado ? '<span style="font-size:9px;color:#4caf50;font-weight:700;letter-spacing:.3px;text-transform:uppercase;display:block;line-height:1.2;">✓ enviado</span>' : '')+
+          i.name+
+          (i.obs?'<div style="font-size:11px;color:#888;font-weight:400;text-transform:none;margin-top:2px;">'+i.obs+'</div>':'')+
+        `</div>`+
+        `<div class="tictrl"><button class="qbtn" onclick="chgQty(${i.lineId},-1)">−</button><span class="qnum">${i.qty}</span><button class="qbtn" onclick="chgQty(${i.lineId},1)">+</button></div>`+
+        `<div class="tiprice">${gs(i.price*i.qty)}</div>`+
+      `</div>`
   ).join('');
 }
 
@@ -3856,8 +4136,23 @@ function saveDetDesc(lineId, val){
 }
 function imprimirComandaPreCobro(){
   if(!cart.length){ toast('Sin productos'); return; }
+  // Solo imprimir ítems NO enviados aún a cocina
+  const pendientes = cart.filter(i => !i.enviado);
+  if(!pendientes.length){ toast('Todo ya fue enviado a cocina'); return; }
   const d = new Date();
-  imprimirComanda({ items:cart, fecha:d, nroTicket:typeof nroTicket!=='undefined'?nroTicket:ticketCounter, tipoPedido:tipoPedido||'llevar', mesa:mesaActual?mesaActual.nombre:null, factura:null });
+  imprimirComanda({
+    items: pendientes,
+    fecha: d,
+    nroTicket: typeof currentTicketNro !== 'undefined' && currentTicketNro !== null ? currentTicketNro : ticketCounter,
+    tipoPedido: tipoPedido||'llevar',
+    mesa: mesaActual ? mesaActual.nombre : null,
+    factura: null
+  });
+  // Marcar como enviados
+  cart.forEach(i => { i.enviado = true; });
+  updBtnComandaCobro();
+  updUI();
+  if(typeof renderTkt === 'function') renderTkt();
 }
 
 function generarRecibo(data){
@@ -4392,13 +4687,31 @@ function generarHTMLComanda(data, size){
 
   // Items — cantidad en grande, nombre en negrita con word-wrap
   data.items.filter(i=>!i.esDescuento).forEach(item=>{
-    const maxNom = w - 3; // descontar espacio de cantidad
-    const nombre = wrapText(item.name, maxNom, '   ');
-    lineas += '<p style="margin:3px 0;">'
-            + '<span style="font-size:14px;font-weight:900;">' + item.qty + '</span>'
-            + '<span style="font-size:11pt;font-weight:800;"> ' + nombre + '</span>'
-            + '</p>';
-    if(item.obs){
+    const maxNom = w - 3;
+
+    if(item._esMitad){
+      // Pizza por mitades — formato especial
+      lineas += '<p style="margin:3px 0;">'
+              + '<span style="font-size:14px;font-weight:900;">' + item.qty + '</span>'
+              + '<span style="font-size:11pt;font-weight:800;"> PIZZA MITAD</span>'
+              + '</p>';
+      lineas += '<p class="s" style="padding-left:16px;font-weight:800;">½ ' + (item._mitad1||'') + '</p>';
+      lineas += '<p class="s" style="padding-left:16px;font-weight:800;">½ ' + (item._mitad2||'') + '</p>';
+    } else {
+      const nombre = wrapText(item.name, maxNom, '   ');
+      lineas += '<p style="margin:3px 0;">'
+              + '<span style="font-size:14px;font-weight:900;">' + item.qty + '</span>'
+              + '<span style="font-size:11pt;font-weight:800;"> ' + nombre + '</span>'
+              + '</p>';
+    }
+    // Modificadores y observaciones
+    if(item.obs && !item._esMitad){
+      const obsLines = item.obs.split(' · ');
+      obsLines.forEach(ob => {
+        lineas += '<p class="s" style="padding-left:16px;font-weight:700;">→ '
+                + wrapText(ob, maxNom - 2, '  ') + '</p>';
+      });
+    } else if(item.obs && item._esMitad === undefined && item.obs){
       lineas += '<p class="s" style="padding-left:16px;font-weight:700;">→ '
               + wrapText(item.obs, maxNom - 2, '  ') + '</p>';
     }
@@ -7285,6 +7598,458 @@ function saveGeneralConfig(){
   updBtnComandaCobro();
 }
 
+// ══════════════════════════════════════════════════════
+// MODIFICADORES — Admin, Modal y Lógica
+// ══════════════════════════════════════════════════════
+
+let modificadores   = [];  // [{id, nombre, tipo, obligatorio, opciones:[]}]
+let modifEditId     = null;
+let modifTipoSel    = 'unico';
+let modifOpciones   = [];  // [{id?, nombre, precio_adicional}]
+let modifProdsSel   = new Set(); // ids de productos asignados
+
+// ── Cargar modificadores desde Supabase ──────────────
+async function cargarModificadores(){
+  const email = localStorage.getItem('lic_email');
+  if(!email || USAR_DEMO) return;
+  try {
+    const [rMod, rOpc, rProd] = await Promise.all([
+      supaGet('pos_modificadores', 'licencia_email=eq.'+encodeURIComponent(email)+'&activo=eq.true&order=orden.asc,id.asc'),
+      supaGet('pos_modificador_opciones', 'activo=eq.true&order=orden.asc,id.asc'),
+      supaGet('pos_producto_modificadores', 'select=producto_id,modificador_id'),
+    ]);
+    modificadores = rMod.map(m => ({
+      ...m,
+      opciones: rOpc.filter(o => o.modificador_id === m.id),
+      productos: rProd.filter(p => p.modificador_id === m.id).map(p => p.producto_id),
+    }));
+    console.log('[Modif] Cargados:', modificadores.length);
+  } catch(e){ console.warn('[Modif] Error cargando:', e.message); }
+}
+
+// ── Admin — Lista ─────────────────────────────────────
+function renderModifList(){
+  const cont = document.getElementById('modifListContainer');
+  if(!cont) return;
+  if(!modificadores.length){
+    cont.innerHTML = '<div style="text-align:center;color:var(--muted);padding:60px 20px;">'+
+      '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3;margin-bottom:12px;"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>'+
+      '<p style="font-size:15px;font-weight:700;margin:0;">Sin modificadores</p>'+
+      '<p style="font-size:13px;margin-top:6px;">Tocá + para crear el primero</p></div>';
+    return;
+  }
+  cont.innerHTML = modificadores.map(m => `
+    <div onclick="editarModif(${m.id})" style="background:var(--bg-card);border-radius:10px;padding:14px 16px;margin-bottom:8px;border:1px solid var(--border);cursor:pointer;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:var(--text);">${m.nombre}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px;">
+            ${m.tipo==='unico'?'Selección única':'Selección múltiple'} · 
+            ${m.obligatorio?'<span style="color:#ff9800;">Obligatorio</span>':'Opcional'} · 
+            ${m.opciones.length} opción${m.opciones.length!==1?'es':''}
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">
+            ${m.productos.length} producto${m.productos.length!==1?'s':''}
+          </div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Admin — Nuevo / Editar ────────────────────────────
+function abrirNuevoModif(){
+  modifEditId   = null;
+  modifTipoSel  = 'unico';
+  modifOpciones = [];
+  modifProdsSel = new Set();
+  document.getElementById('modifEditTitle').textContent = 'Nuevo modificador';
+  document.getElementById('modifNombre').value = '';
+  document.getElementById('modifObligatorio').checked = false;
+  document.getElementById('btnEliminarModif').style.display = 'none';
+  selModifTipo('unico');
+  renderModifOpciones();
+  renderModifProductos();
+  goTo('scModifEdit');
+}
+
+function editarModif(id){
+  const m = modificadores.find(x => x.id === id);
+  if(!m) return;
+  modifEditId   = id;
+  modifTipoSel  = m.tipo;
+  modifOpciones = m.opciones.map(o => ({...o}));
+  modifProdsSel = new Set(m.productos);
+  document.getElementById('modifEditTitle').textContent = 'Editar modificador';
+  document.getElementById('modifNombre').value = m.nombre;
+  document.getElementById('modifObligatorio').checked = !!m.obligatorio;
+  document.getElementById('btnEliminarModif').style.display = 'flex';
+  selModifTipo(m.tipo);
+  renderModifOpciones();
+  renderModifProductos();
+  goTo('scModifEdit');
+}
+
+function selModifTipo(tipo){
+  modifTipoSel = tipo;
+  const hints = { unico:'Única: el cliente elige una sola opción (ej: Tamaño)', multiple:'Múltiple: puede elegir varias (ej: Extras, Ingredientes)' };
+  document.getElementById('modifTipoHint').textContent = hints[tipo]||'';
+  ['unico','multiple'].forEach(t => {
+    const btn = document.getElementById('modifTipo'+t.charAt(0).toUpperCase()+t.slice(1));
+    if(btn) btn.style.borderColor = t===tipo ? 'var(--green)' : 'var(--border2)';
+  });
+}
+
+function agregarOpcionModif(){
+  modifOpciones.push({ nombre:'', precio_adicional:0 });
+  renderModifOpciones();
+  // Focus en el nuevo input
+  setTimeout(()=>{
+    const inputs = document.querySelectorAll('.modif-opc-nombre');
+    if(inputs.length) inputs[inputs.length-1].focus();
+  }, 50);
+}
+
+function renderModifOpciones(){
+  const cont = document.getElementById('modifOpcionesContainer');
+  if(!cont) return;
+  if(!modifOpciones.length){
+    cont.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:13px;padding:16px;">Sin opciones — tocá + Agregar</div>';
+    return;
+  }
+  cont.innerHTML = modifOpciones.map((o,i) => `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+      <input class="art-form-input modif-opc-nombre" placeholder="Nombre opción" value="${o.nombre||''}"
+        oninput="modifOpciones[${i}].nombre=this.value"
+        style="flex:2;margin:0;">
+      <input class="art-form-input" placeholder="+precio" type="number" value="${o.precio_adicional||0}"
+        oninput="modifOpciones[${i}].precio_adicional=parseInt(this.value)||0"
+        style="flex:1;margin:0;">
+      <button onclick="modifOpciones.splice(${i},1);renderModifOpciones();"
+        style="background:rgba(229,57,53,.12);border:none;border-radius:6px;color:#e53935;padding:8px 10px;cursor:pointer;flex-shrink:0;">✕</button>
+    </div>
+  `).join('');
+}
+
+function renderModifProductos(){
+  const cont = document.getElementById('modifProductosContainer');
+  if(!cont) return;
+  const prods = PRODS.filter(p => !p.itemLibre && p.activo !== false);
+  cont.innerHTML = prods.map(p => {
+    const sel = modifProdsSel.has(p.id);
+    return `<div onclick="toggleModifProd(${p.id})"
+      style="padding:10px;border-radius:8px;border:2px solid ${sel?'var(--green)':'var(--border)'};
+      background:${sel?'rgba(76,175,80,.08)':'var(--bg-card)'};cursor:pointer;font-size:12px;font-weight:700;
+      color:var(--text);text-align:center;">
+      ${sel?'✓ ':''} ${p.name}
+    </div>`;
+  }).join('');
+}
+
+function toggleModifProd(id){
+  if(modifProdsSel.has(id)) modifProdsSel.delete(id);
+  else modifProdsSel.add(id);
+  renderModifProductos();
+}
+
+async function guardarModif(){
+  const nombre = document.getElementById('modifNombre').value.trim();
+  if(!nombre){ toast('Ingresá el nombre del modificador'); return; }
+  const opcValidas = modifOpciones.filter(o => o.nombre.trim());
+  if(!opcValidas.length){ toast('Agregá al menos una opción'); return; }
+
+  const email = localStorage.getItem('lic_email');
+  const btn = document.querySelector('#scModifEdit .art-save-btn');
+  if(btn){ btn.disabled=true; btn.textContent='Guardando...'; }
+
+  try {
+    let modifId = modifEditId;
+    const modifData = { nombre, tipo:modifTipoSel, obligatorio:document.getElementById('modifObligatorio').checked, licencia_email:email, activo:true };
+
+    if(modifEditId){
+      // UPDATE
+      await supaFetch('PATCH', 'pos_modificadores', modifData, { id:'eq.'+modifEditId });
+    } else {
+      // INSERT
+      const r = await supaFetch('POST', 'pos_modificadores', modifData, null, 'return=representation');
+      const rows = await r.clone().json();
+      modifId = rows[0].id;
+    }
+
+    // Opciones: borrar las viejas e insertar las nuevas
+    await supaFetch('DELETE', 'pos_modificador_opciones', null, { modificador_id:'eq.'+modifId });
+    for(let i=0; i<opcValidas.length; i++){
+      await supaFetch('POST', 'pos_modificador_opciones', { modificador_id:modifId, nombre:opcValidas[i].nombre, precio_adicional:opcValidas[i].precio_adicional||0, orden:i, activo:true });
+    }
+
+    // Productos asignados
+    await supaFetch('DELETE', 'pos_producto_modificadores', null, { modificador_id:'eq.'+modifId });
+    for(const prodId of modifProdsSel){
+      await supaFetch('POST', 'pos_producto_modificadores', { producto_id:prodId, modificador_id:modifId });
+    }
+
+    await cargarModificadores();
+    toast('✅ Modificador guardado');
+    goTo('scModificadores');
+    renderModifList();
+  } catch(e){
+    toast('Error: '+e.message);
+    console.error('[Modif] Error guardando:', e.message);
+  } finally {
+    if(btn){ btn.disabled=false; btn.textContent='GUARDAR MODIFICADOR'; }
+  }
+}
+
+async function eliminarModif(){
+  if(!modifEditId || !confirm('¿Eliminar este modificador?')) return;
+  try {
+    await supaFetch('PATCH', 'pos_modificadores', { activo:false }, { id:'eq.'+modifEditId });
+    await cargarModificadores();
+    toast('Modificador eliminado');
+    goTo('scModificadores');
+    renderModifList();
+  } catch(e){ toast('Error: '+e.message); }
+}
+
+// ══════════════════════════════════════════════════════
+// MODAL MODIFICADORES — Al vender
+// ══════════════════════════════════════════════════════
+
+let _modifProdId      = null;
+let _modifSelecciones = {}; // { modificador_id: Set(opcion_id) | opcion_id }
+let _modifPendiente   = null; // producto pendiente de agregar
+
+function modifOverlayClick(e){
+  if(e.target === document.getElementById('modifOverlay')) modifCancelar();
+}
+
+function modifCancelar(){
+  document.getElementById('modifOverlay').classList.remove('open');
+  _modifProdId = null;
+  _modifPendiente = null;
+}
+
+function abrirModalModif(prod){
+  const modifs = modificadores.filter(m => m.productos.includes(prod.id));
+  if(!modifs.length) return false; // sin modificadores, agregar directo
+
+  _modifProdId      = prod.id;
+  _modifPendiente   = prod;
+  _modifSelecciones = {};
+
+  document.getElementById('modifSheetTitle').textContent = prod.name;
+  document.getElementById('modifSheetSub').textContent = modifs.length + ' grupo' + (modifs.length!==1?'s':'') + ' de opciones';
+
+  // Renderizar grupos
+  const body = document.getElementById('modifSheetBody');
+  body.innerHTML = modifs.map(m => `
+    <div class="modif-group">
+      <div class="modif-group-title">
+        ${m.nombre}
+        ${m.obligatorio?'<span class="modif-req">OBLIGATORIO</span>':''}
+        <span style="margin-left:auto;font-size:10px;color:var(--muted);">${m.tipo==='unico'?'Elegí 1':'Podés elegir varios'}</span>
+      </div>
+      ${m.opciones.map(o => `
+        <div class="modif-opt" id="modifOpt_${m.id}_${o.id}" onclick="toggleModifOpt(${m.id},${o.id},'${m.tipo}')">
+          <div>
+            <div class="modif-opt-name">${o.nombre}</div>
+            ${o.precio_adicional>0?`<div class="modif-opt-price">+${gs(o.precio_adicional)}</div>`:''}
+          </div>
+          <div class="modif-opt-check"></div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+
+  updModifBtnAgregar();
+  document.getElementById('modifOverlay').classList.add('open');
+  return true;
+}
+
+function toggleModifOpt(modifId, opcId, tipo){
+  if(tipo === 'unico'){
+    _modifSelecciones[modifId] = opcId;
+    // Deseleccionar las otras opciones del mismo grupo
+    const m = modificadores.find(x => x.id === modifId);
+    if(m) m.opciones.forEach(o => {
+      const el = document.getElementById('modifOpt_'+modifId+'_'+o.id);
+      if(el) el.classList.toggle('sel', o.id === opcId);
+    });
+  } else {
+    if(!_modifSelecciones[modifId]) _modifSelecciones[modifId] = new Set();
+    const set = _modifSelecciones[modifId];
+    if(set.has(opcId)) set.delete(opcId);
+    else set.add(opcId);
+    const el = document.getElementById('modifOpt_'+modifId+'_'+opcId);
+    if(el) el.classList.toggle('sel', set.has(opcId));
+  }
+  updModifBtnAgregar();
+}
+
+function updModifBtnAgregar(){
+  const modifs = modificadores.filter(m => m.productos.includes(_modifProdId));
+  const obligatoriosPendientes = modifs.filter(m => m.obligatorio && !_modifSelecciones[m.id]);
+  const btn = document.getElementById('modifBtnAgregar');
+  if(btn){
+    btn.disabled = obligatoriosPendientes.length > 0;
+    btn.textContent = obligatoriosPendientes.length > 0
+      ? 'Elegí: '+obligatoriosPendientes.map(m=>m.nombre).join(', ')
+      : 'Agregar al pedido';
+  }
+}
+
+function modifConfirmar(){
+  if(!_modifPendiente) return;
+  const prod = _modifPendiente;
+  const modifs = modificadores.filter(m => m.productos.includes(prod.id));
+
+  // Construir descripción y precio extra
+  let extras = [];
+  let precioExtra = 0;
+  modifs.forEach(m => {
+    const sel = _modifSelecciones[m.id];
+    if(!sel) return;
+    if(m.tipo === 'unico'){
+      const opc = m.opciones.find(o => o.id === sel);
+      if(opc){ extras.push(opc.nombre); precioExtra += opc.precio_adicional||0; }
+    } else {
+      sel.forEach(opcId => {
+        const opc = m.opciones.find(o => o.id === opcId);
+        if(opc){ extras.push(opc.nombre); precioExtra += opc.precio_adicional||0; }
+      });
+    }
+  });
+
+  const obs = extras.join(' · ');
+  const precioFinal = (prod.price||0) + precioExtra;
+
+  // Agregar al carrito con obs y precio ajustado
+  cart.push({
+    lineId:   Date.now()*1000+Math.floor(Math.random()*1000),
+    ...prod,
+    price:    precioFinal,
+    qty:      1,
+    obs:      obs,
+    enviado:  false,
+    _modifBase: prod.price, // precio original
+    _modifExtra: precioExtra,
+  });
+  updUI(); updBtnGuardar();
+  if(typeof renderTkt === 'function') renderTkt();
+  toast('+'+prod.name+(obs?' ('+obs+')':''));
+
+  document.getElementById('modifOverlay').classList.remove('open');
+  _modifPendiente = null;
+}
+
+// ══════════════════════════════════════════════════════
+// PIZZA POR MITADES
+// ══════════════════════════════════════════════════════
+
+let _mitadProd1   = null; // primer sabor (el que tocó el cajero)
+let _mitadProd2   = null; // segundo sabor elegido
+
+function mitadOverlayClick(e){
+  if(e.target === document.getElementById('mitadOverlay')) mitadCancelar();
+}
+function mitadCancelar(){
+  document.getElementById('mitadOverlay').classList.remove('open');
+  _mitadProd1 = null; _mitadProd2 = null;
+}
+
+function abrirModalMitad(prod){
+  _mitadProd1 = prod;
+  _mitadProd2 = null;
+  document.getElementById('mitadLado1').textContent = prod.name;
+  document.getElementById('mitadLado2').textContent = 'Elegir...';
+  document.getElementById('mitadLado2Div').classList.remove('sel');
+  document.getElementById('mitadSearch').value = '';
+  document.getElementById('mitadBtnAgregar').disabled = true;
+  document.getElementById('mitadBtnAgregar').textContent = 'Elegí el 2° sabor';
+  updMitadPrecioInfo();
+  renderMitadOpts();
+  document.getElementById('mitadOverlay').classList.add('open');
+}
+
+function renderMitadOpts(){
+  const q = document.getElementById('mitadSearch').value.toLowerCase();
+  const pizzas = PRODS.filter(p => p.mitad && p.activo !== false && !p.itemLibre);
+  const filtradas = q ? pizzas.filter(p => p.name.toLowerCase().includes(q)) : pizzas;
+
+  document.getElementById('mitadOptsContainer').innerHTML = filtradas.map(p => {
+    const sel = _mitadProd2 && _mitadProd2.id === p.id;
+    return `<div class="mitad-pizza-opt ${sel?'sel':''}" onclick="selMitad2(${p.id})">
+      <div class="mitad-pizza-name">${p.name}</div>
+      <div class="mitad-pizza-price">${gs(p.price)}</div>
+    </div>`;
+  }).join('') || '<div style="text-align:center;color:var(--muted);padding:20px;">Sin pizzas disponibles</div>';
+}
+
+function selMitad2(prodId){
+  _mitadProd2 = PRODS.find(p => p.id === prodId);
+  document.getElementById('mitadLado2').textContent = _mitadProd2.name;
+  document.getElementById('mitadLado2Div').classList.add('sel');
+  document.getElementById('mitadBtnAgregar').disabled = false;
+  document.getElementById('mitadBtnAgregar').textContent = 'Agregar pizza mitad';
+  updMitadPrecioInfo();
+  renderMitadOpts();
+}
+
+function calcPrecioMitad(p1, p2){
+  const cfg = localStorage.getItem('pos_precio_mitad') || 'mas_caro';
+  if(cfg === 'promedio') return Math.round((p1.price + p2.price) / 2);
+  return Math.max(p1.price, p2.price); // mas_caro (default)
+}
+
+function updMitadPrecioInfo(){
+  const el = document.getElementById('mitadPrecioInfo');
+  if(!el) return;
+  if(!_mitadProd2){ el.textContent = ''; return; }
+  const cfg = localStorage.getItem('pos_precio_mitad') || 'mas_caro';
+  const precio = calcPrecioMitad(_mitadProd1, _mitadProd2);
+  const modo = cfg === 'promedio' ? 'Promedio' : 'El más caro';
+  el.textContent = modo + ': ' + gs(precio);
+}
+
+function mitadConfirmar(){
+  if(!_mitadProd1 || !_mitadProd2) return;
+  const precio = calcPrecioMitad(_mitadProd1, _mitadProd2);
+  const nombre = _mitadProd1.name + ' / ' + _mitadProd2.name;
+  cart.push({
+    lineId:    Date.now()*1000+Math.floor(Math.random()*1000),
+    ..._mitadProd1,
+    name:      nombre,
+    price:     precio,
+    qty:       1,
+    obs:       '½ '+_mitadProd1.name+' + ½ '+_mitadProd2.name,
+    enviado:   false,
+    _esMitad:  true,
+    _mitad1:   _mitadProd1.name,
+    _mitad2:   _mitadProd2.name,
+  });
+  updUI(); updBtnGuardar();
+  if(typeof renderTkt === 'function') renderTkt();
+  toast('+'+nombre);
+  document.getElementById('mitadOverlay').classList.remove('open');
+  _mitadProd1 = null; _mitadProd2 = null;
+}
+
+// ── Config precio mitad ───────────────────────────────
+function selCfgMitad(val){
+  localStorage.setItem('pos_precio_mitad', val);
+  ['MasCaro','Promedio'].forEach(k => {
+    const btn = document.getElementById('cfgMitad'+k);
+    if(btn) btn.style.borderColor = (val === k.toLowerCase().replace('mascaro','mas_caro') || (k==='MasCaro' && val==='mas_caro')) ? 'var(--green)' : 'var(--border2)';
+  });
+  toast(val === 'mas_caro' ? 'Precio: el más caro' : 'Precio: promedio');
+}
+
+function loadCfgMitad(){
+  const val = localStorage.getItem('pos_precio_mitad') || 'mas_caro';
+  selCfgMitad(val);
+}
+
 function cerrarSesion(){
   if(confirm('¿Confirmar cierre de sesión?')){
     toast('Sesión cerrada');
@@ -9204,7 +9969,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.4.5 (2026-03-29)';
+const APP_VERSION = 'v1.6.0 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
@@ -9772,6 +10537,7 @@ async function iniciarApp(){
   setTimeout(syncVentasPendientes, 8000);
   setTimeout(mesasCargar, 6000); // Cargar mesas en background
   setTimeout(updSyncBadge, 1500); // Actualizar badge de sync al iniciar
+  setTimeout(cargarModificadores, 4000); // Cargar modificadores en background
 }
 
 // ── ARRANQUE ──────────────────────────────────────────────

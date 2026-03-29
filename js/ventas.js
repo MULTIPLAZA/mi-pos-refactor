@@ -42,9 +42,29 @@ function setShowTkt(v) { showTkt = v; }
 function addCart(id, tileEl){
   const p=PRODS.find(x=>x.id===id); if(!p)return;
   if(p.precioVariable){ addCartConPrecioVariable(id); return; }
-  const existing = cart.find(l=>l.id===id && !l.obs);
-  if(existing){ existing.qty++; }
-  else { cart.push({lineId: Date.now()*1000+Math.floor(Math.random()*1000), ...p, qty:1, obs:''}); }
+
+  // Pizza por mitades — abrir modal
+  if(p.mitad && typeof abrirModalMitad === 'function'){
+    abrirModalMitad(p);
+    return;
+  }
+
+  // Modificadores — abrir modal si el producto tiene modificadores asignados
+  if(typeof abrirModalModif === 'function' && typeof modificadores !== 'undefined'){
+    const tieneModif = modificadores.some(m => m.productos && m.productos.includes(p.id));
+    if(tieneModif){
+      abrirModalModif(p);
+      if(tileEl) animAddToCart(tileEl, getProductColor(p));
+      return;
+    }
+  }
+
+  const existing = cart.find(l=>l.id===id && !l.obs && !l.enviado);
+  if(existing){
+    existing.qty++;
+  } else {
+    cart.push({lineId: Date.now()*1000+Math.floor(Math.random()*1000), ...p, qty:1, obs:'', enviado:false});
+  }
   updUI(); updBtnGuardar(); toast('+'+p.name.substring(0,16));
   if(showTkt)renderTkt();
   if(tileEl) animAddToCart(tileEl, getProductColor(p));
@@ -118,7 +138,7 @@ function agregarMontoDelivery(){
   const monto=parseInt((inp||{}).value||0)||0;
   if(!monto||monto<=0){toast('Ingresá el monto del envío');inp&&inp.focus();return;}
   quitarItemDelivery();
-  cart.push({lineId:Date.now()*1000+999,id:'delivery_item',name:'Envío delivery',price:monto,qty:1,obs:'',iva:'10',esDelivery:true,color:'#e65100',colorPropio:true});
+  cart.push({lineId:Date.now()*1000+999,id:'delivery_item',name:'Envío delivery',price:monto,qty:1,obs:'',iva:'10',esDelivery:true,color:'#e65100',colorPropio:true,enviado:false});
   updUI(); updBtnGuardar(); toast('✓ Envío ₲'+monto.toLocaleString('es-PY')+' agregado'); if(inp)inp.value='';
 }
 
