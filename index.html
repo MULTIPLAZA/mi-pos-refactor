@@ -8082,7 +8082,8 @@ async function dbSaveVenta(data){
     sincronizado: 0,
   };
   const id = await db.ventas.add(venta);
-  await dbQueueSync('ventas', 'insert', { ...venta, id });
+  // NO encolar aquí — supaInsertVenta maneja el envío a Supabase
+  // y encola en sync_queue solo si falla o no hay internet
   return id;
 }
 
@@ -8115,11 +8116,13 @@ async function dbCerrarTurno(turnoDbId, totalContado, diferencia){
 
 async function dbSaveEgreso(egreso){
   const data = {
-    turno_id:    turnoData.dbId || null,
-    descripcion: egreso.desc,
-    monto:       egreso.monto,
-    fecha:       egreso.fecha ? egreso.fecha.toISOString() : new Date().toISOString(),
-    sincronizado: 0,
+    turno_id:       turnoData.dbId || null,
+    descripcion:    egreso.desc,
+    monto:          egreso.monto,
+    fecha:          egreso.fecha ? egreso.fecha.toISOString() : new Date().toISOString(),
+    terminal:       (typeof configData !== 'undefined' ? configData.terminal : null) || 'Principal',
+    licencia_email: localStorage.getItem('lic_email') || '',
+    sincronizado:   0,
   };
   const id = await db.egresos.add(data);
   await dbQueueSync('egresos', 'insert', { ...data, id });
@@ -8169,8 +8172,12 @@ async function syncConSupabase(){
 
         if(item.operacion === 'delete'){
           await supaFetch('DELETE', tabla, null, { id: 'eq.'+datos.id });
+        } else if(item.operacion === 'update'){
+          const { id: itemId, ...datosUpdate } = datos;
+          await supaFetch('PATCH', tabla, datosUpdate, { id: 'eq.'+itemId });
         } else {
-          await supaFetch('POST', tabla, datos);
+          // insert — usar upsert para evitar duplicados si se reintenta
+          await supaFetch('POST', tabla, datos, null, 'resolution=merge-duplicates');
         }
 
         await db.sync_queue.update(item.id, { sincronizado: 1, error_msg: null });
@@ -8213,7 +8220,7 @@ async function syncConSupabase(){
   syncEnProceso = false;
 }
 
-async function supaFetch(method, tabla, body, params){
+async function supaFetch(method, tabla, body, params, prefer){
   let url = SUPA_URL + '/rest/v1/' + tabla;
   if(params){
     const q = Object.entries(params).map(([k,v])=>k+'='+v).join('&');
@@ -8225,7 +8232,7 @@ async function supaFetch(method, tabla, body, params){
       'Content-Type':  'application/json',
       'apikey':        SUPA_ANON,
       'Authorization': 'Bearer ' + SUPA_ANON,
-      'Prefer':        'resolution=merge-duplicates',
+      'Prefer':        prefer || 'return=minimal',
     },
   };
   if(body) opts.body = JSON.stringify(body);
@@ -8772,7 +8779,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.2.4 (2026-03-29)';
+const APP_VERSION = 'v1.2.6 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
