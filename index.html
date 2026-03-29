@@ -3698,27 +3698,17 @@ function openCat(){
   document.getElementById('catOv').classList.add('open');
 }
 
-async function _getImgSrc(p){
+function _getImgSrcSync(p){
   if(!p.imagen) return null;
-  // Si es base64 ya, devolver directo
-  if(p.imagen.startsWith('data:')) return p.imagen;
-  // Si hay internet, usar URL directa
-  if(navigator.onLine) return p.imagen;
-  // Sin internet: buscar en cache IndexedDB
-  if(db){
-    try {
-      const cached = await db.config.get('img_cache_'+p.imagen);
-      if(cached) return cached.valor;
-    } catch(e){}
-  }
-  return p.imagen; // intentar igual (puede estar en cache del navegador)
+  return p.imagen; // URL de Supabase Storage o base64
 }
 
-function _tileProd(p, imgSrc){
+function _tileProd(p){
+  const imgSrc = _getImgSrcSync(p);
   if(imgSrc){
     return '<div class="ptile" style="background:'+getProductColor(p)+';position:relative;overflow:hidden;" onclick="addCart('+p.id+',this)">'+
       '<img src="'+imgSrc+'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;" '+
-        'onerror="this.style.display='none'" loading="lazy">'+
+        'onerror="this.style.display=\'none\'" loading="lazy">'+
       '<div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.8));padding:8px 4px 5px;">'+
         '<span class="pname" style="text-shadow:0 1px 3px rgba(0,0,0,.9);color:#fff;">'+p.name+'</span>'+
       '</div>'+
@@ -3730,16 +3720,14 @@ function _tileProd(p, imgSrc){
   return '<div class="ptile" style="background:'+getProductColor(p)+'" onclick="addCart('+p.id+',this)"><span class="pname">'+p.name+'</span></div>';
 }
 
-async function renderP(list){
+function renderP(list){
   const g=document.getElementById('pgrid');
   if(!g) return;
   if(!list.length){
     g.innerHTML='<div style="grid-column:span 3;padding:40px;text-align:center;color:#555;font-size:14px;">Sin resultados</div>';
     return;
   }
-  // Resolver imágenes (cache offline si hace falta)
-  const imgSrcs = await Promise.all(list.map(p => _getImgSrc(p)));
-  g.innerHTML = list.map((p, i) => _tileProd(p, imgSrcs[i])).join('');
+  g.innerHTML = list.map(p => _tileProd(p)).join('');
 }
 let _filterPTimer = null;
 function filterP(){
@@ -9177,7 +9165,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.4.1 (2026-03-29)';
+const APP_VERSION = 'v1.4.3 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
