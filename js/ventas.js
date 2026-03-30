@@ -43,27 +43,22 @@ function addCart(id, tileEl){
   const p=PRODS.find(x=>x.id===id); if(!p)return;
   if(p.precioVariable){ addCartConPrecioVariable(id); return; }
 
-  // Pizza por mitades — abrir modal
-  if(p.mitad && typeof abrirModalMitad === 'function'){
-    abrirModalMitad(p);
+  const tieneModif = typeof modificadores !== 'undefined' &&
+    modificadores.some(m => m.productos && m.productos.includes(p.id));
+
+  // Si tiene mitad o modificadores — abrir flujo unificado
+  if((p.mitad || tieneModif) && typeof abrirFlujoPizza === 'function'){
+    abrirFlujoPizza(p, tieneModif);
+    if(tileEl) animAddToCart(tileEl, getProductColor(p));
     return;
   }
 
-  // Modificadores — abrir modal si el producto tiene modificadores asignados
-  if(typeof abrirModalModif === 'function' && typeof modificadores !== 'undefined'){
-    const tieneModif = modificadores.some(m => m.productos && m.productos.includes(p.id));
-    if(tieneModif){
-      abrirModalModif(p);
-      if(tileEl) animAddToCart(tileEl, getProductColor(p));
-      return;
-    }
-  }
-
+  // Producto simple
   const existing = cart.find(l=>l.id===id && !l.obs && !l.enviado);
   if(existing){
     existing.qty++;
   } else {
-    cart.push({lineId: Date.now()*1000+Math.floor(Math.random()*1000), ...p, qty:1, obs:'', enviado:false});
+    cart.push({lineId:Date.now()*1000+Math.floor(Math.random()*1000), ...p, qty:1, obs:'', enviado:false});
   }
   updUI(); updBtnGuardar(); toast('+'+p.name.substring(0,16));
   if(showTkt)renderTkt();
