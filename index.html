@@ -8099,8 +8099,18 @@ function modifConfirmar(){
     precio = cfg === 'promedio'
       ? Math.round((prod.price + _flujo.prod2.price) / 2)
       : Math.max(prod.price, _flujo.prod2.price);
-    nombre = prod.name + ' / ' + _flujo.prod2.name;
-    obs    = '½ '+prod.name+' + ½ '+_flujo.prod2.name;
+    // Nombre limpio: quitar palabras comunes como "PIZZA" del segundo sabor
+    const n1 = prod.name;
+    const n2 = _flujo.prod2.name;
+    // Extraer solo el sabor (quitar prefijo común entre los dos nombres)
+    const words1 = n1.split(' ');
+    const words2 = n2.split(' ');
+    let prefixLen = 0;
+    while(prefixLen < words1.length && prefixLen < words2.length &&
+          words1[prefixLen] === words2[prefixLen]) prefixLen++;
+    const sabor2 = prefixLen > 0 ? words2.slice(prefixLen).join(' ') || n2 : n2;
+    nombre = n1 + ' / ' + sabor2;
+    obs    = ''; // las mitades ya están en el nombre, no repetir en obs
     esMitad = true;
   }
 
@@ -8134,7 +8144,7 @@ function modifConfirmar(){
     enviado:  false,
     _esMitad: esMitad,
     _mitad1:  esMitad ? prod.name : undefined,
-    _mitad2:  esMitad ? _flujo.prod2.name : undefined,
+    _mitad2:  esMitad && _flujo.prod2 ? _flujo.prod2.name : undefined,
   });
 
   updUI(); updBtnGuardar();
@@ -10093,7 +10103,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.6.1 (2026-03-29)';
+const APP_VERSION = 'v1.6.2 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
