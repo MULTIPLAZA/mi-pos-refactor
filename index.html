@@ -10159,12 +10159,15 @@ const BTPrinter = {
     var pd2      = function(x){ return String(x).padStart(2,'0'); };
     var fechaStr = pd2(fechaObj.getDate())+'/'+pd2(fechaObj.getMonth()+1)+'/'+fechaObj.getFullYear();
     var horaStr  = pd2(fechaObj.getHours())+':'+pd2(fechaObj.getMinutes());
-    // Si es factura, mostrar nro de factura en el header
+    // Si es factura, mostrar nro de factura en dos líneas para no cortar
     var esFacturaBTPS = data.factura && data.factura.timbrado && (data.factura.nro_factura || data.factura.nroFactura);
-    var nroLabel = esFacturaBTPS
-      ? 'Factura #' + (data.factura.nro_factura || data.factura.nroFactura)
-      : 'Ticket #' + nro;
-    txt += pad(nroLabel, fechaStr + ' ' + horaStr) + n;
+    if(esFacturaBTPS){
+      var nroFact = data.factura.nro_factura || data.factura.nroFactura;
+      txt += 'Factura: ' + nroFact + n;
+      txt += 'Fecha:   ' + fechaStr + '  ' + horaStr + n;
+    } else {
+      txt += pad('Ticket #' + nro, fechaStr + ' ' + horaStr) + n;
+    }
     if (data.obs) txt += 'Obs: ' + data.obs + n;
     txt += sep2 + n;
 
@@ -10373,7 +10376,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.7.9 (2026-03-31)';
+const APP_VERSION = 'v1.8.0 (2026-03-31)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
