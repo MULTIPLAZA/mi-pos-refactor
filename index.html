@@ -10162,9 +10162,19 @@ const BTPrinter = {
     // Si es factura, mostrar nro de factura en dos líneas para no cortar
     var esFacturaBTPS = data.factura && data.factura.timbrado && (data.factura.nro_factura || data.factura.nroFactura);
     if(esFacturaBTPS){
-      var nroFact = data.factura.nro_factura || data.factura.nroFactura;
-      txt += 'Factura: ' + nroFact + n;
-      txt += 'Fecha:   ' + fechaStr + '  ' + horaStr + n;
+      var f0      = data.factura;
+      var tc      = (typeof getTimbradoActivo === 'function') ? getTimbradoActivo() : null;
+      var vi      = f0.fecha_desde || (tc && (tc.vig_inicio || tc.fecha_desde)) || '';
+      var vf      = f0.fecha_hasta || (tc && (tc.vig_fin    || tc.fecha_hasta)) || '';
+      var nroFact = f0.nro_factura || f0.nroFactura;
+      txt += '[CENTER][BOLD]FACTURA CONTADO[/BOLD][/CENTER]' + n;
+      txt += sep2 + n;
+      txt += 'Timbrado: ' + f0.timbrado + n;
+      if(vi) txt += 'Inicio:   ' + (vi.includes('-') ? vi.split('-').reverse().join('/') : vi) + n;
+      if(vf && vf !== '2999-12-31') txt += 'Vto:      ' + (vf.includes('-') ? vf.split('-').reverse().join('/') : vf) + n;
+      if(f0.sucursal_nro && f0.punto_exp) txt += 'Suc: ' + f0.sucursal_nro + '  P.Exp: ' + f0.punto_exp + n;
+      txt += '[BOLD]' + pad('Nro:', nroFact) + '[/BOLD]' + n;
+      txt += 'Fecha:    ' + fechaStr + '  ' + horaStr + n;
     } else {
       txt += pad('Ticket #' + nro, fechaStr + ' ' + horaStr) + n;
     }
@@ -10220,41 +10230,31 @@ const BTPrinter = {
       txt += pad('Vuelto', gs(data.vuelto) + ' Gs.') + n;
     }
 
-    // ── FACTURA ───────────────────────────────────────────
+    // ── DATOS CLIENTE E IVA (solo en factura) ────────────
     if (data.factura && data.factura.timbrado) {
       var f = data.factura;
-      // Intentar obtener vigencia del timbrado activo en caché
-      var timCache = (typeof getTimbradoActivo === 'function') ? getTimbradoActivo() : null;
-      var vigInicio = f.fecha_desde || (timCache && (timCache.vig_inicio || timCache.fecha_desde)) || '';
-      var vigFin    = f.fecha_hasta || (timCache && (timCache.vig_fin    || timCache.fecha_hasta)) || '';
-
-      txt += sep + n;
-      txt += '[CENTER][BOLD]FACTURA CONTADO[/BOLD][/CENTER]' + n;
-      txt += sep2 + n;
-      txt += 'Timbrado: ' + f.timbrado + n;
-      if (vigInicio) txt += 'Inicio: ' + vigInicio + n;
-      if (vigFin && vigFin !== '2999-12-31') txt += 'Vto: ' + vigFin + n;
-      if (f.nro_factura || f.nroFactura) txt += '[BOLD]Nro: ' + (f.nro_factura || f.nroFactura) + '[/BOLD]' + n;
-      if (f.sucursal_nro && f.punto_exp) txt += 'Suc: ' + f.sucursal_nro + '  P.Exp: ' + f.punto_exp + n;
       txt += sep2 + n;
       txt += 'Cliente: ' + (f.nombre || 'CONSUMIDOR FINAL') + n;
-      txt += 'RUC: '     + (f.ruc    || '0000000-0') + n;
-      if (f.direccion) txt += 'Dir: ' + f.direccion + n;
+      txt += 'RUC:     ' + (f.ruc    || '0000000-0') + n;
+      if (f.direccion) txt += 'Dir:     ' + f.direccion + n;
       txt += sep2 + n;
-      // IVA desglose correcto
+      // IVA desglose
       var grav10 = 0, grav5 = 0, exento = 0;
       (data.items || []).filter(function(i){ return !i.esDescuento; }).forEach(function(item){
         var sub = item.desc > 0 ? Math.round(item.price * item.qty * (1 - item.desc/100)) : item.price * item.qty;
-        if (item.iva === '5')          grav5   += sub;
-        else if (item.iva === 'exento') exento  += sub;
-        else                            grav10  += sub;
+        if (item.iva === '5')           grav5  += sub;
+        else if (item.iva === 'exento') exento += sub;
+        else                            grav10 += sub;
       });
       var iva10 = Math.round(grav10 * 10 / 110);
       var iva5  = Math.round(grav5  * 5  / 105);
       if (grav10 > 0) { txt += pad('Gravado 10%', gs(grav10)) + n; txt += pad('IVA 10%', gs(iva10)) + n; }
       if (grav5  > 0) { txt += pad('Gravado 5%',  gs(grav5))  + n; txt += pad('IVA 5%',  gs(iva5))  + n; }
-      if (exento > 0)   txt += pad('Exento', gs(exento)) + n;
+      if (exento > 0)   txt += pad('Exento',       gs(exento)) + n;
       txt += '[BOLD]' + pad('TOTAL', gs(data.total) + ' Gs.') + '[/BOLD]' + n;
+      txt += sep2 + n;
+      txt += 'ORIGINAL: CLIENTE' + n;
+      txt += 'DUPLICADO: ARCHIVO TRIBUTARIO' + n;
     } else {
       txt += sep2 + n;
       txt += ctr('Comprobante no valido para el IVA') + n;
@@ -10376,7 +10376,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.8.0 (2026-03-31)';
+const APP_VERSION = 'v1.8.1 (2026-03-31)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
