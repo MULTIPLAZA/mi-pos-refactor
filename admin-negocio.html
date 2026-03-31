@@ -1083,8 +1083,10 @@ async function impConfirmar(){
       // INSERT: primero obtener el MAX id actual para generar IDs correlativos
       if(inserts.length){
         // Obtener el id máximo actual de la tabla para este licencia
-        var maxRow=await sg('pos_productos','licencia_email=ilike.'+encodeURIComponent(SE)+'&select=id&order=id.desc&limit=1');
-        var nextId=(maxRow.length && maxRow[0].id ? parseInt(maxRow[0].id) : 0) + 1;
+        var maxRow=await sg('pos_productos','select=id&order=id.desc&limit=1');
+        var maxId=maxRow.length && maxRow[0].id ? parseInt(maxRow[0].id) : 0;
+        var nextId=maxId + 1;
+        console.log('[Import] maxRow:', JSON.stringify(maxRow), '→ nextId:', nextId);
         var ahora=new Date().toISOString();
         var payload=inserts.map(function(r,ri){
           return {
@@ -1103,6 +1105,7 @@ async function impConfirmar(){
             updated_at:ahora
           };
         });
+        console.log('[Import] payload[0]:', JSON.stringify(payload[0]));
         await supaPost('pos_productos',payload,'id');
         ok+=inserts.length;
       }
