@@ -1080,18 +1080,33 @@ async function impConfirmar(){
         await supaPatch('pos_productos','id=eq.'+r.id+'&licencia_email=ilike.'+encodeURIComponent(SE),upd);
         ok++;
       }
-      // INSERT en lote (upsert por id para evitar duplicados)
+      // INSERT: primero obtener el MAX id actual para generar IDs correlativos
       if(inserts.length){
-        var payload=inserts.map(function(r){
-          return {nombre:r.nombre.toUpperCase(),categoria:r.categoria,precio:r.precio,
-            precio_variable:r.precio_variable,costo:r.costo,iva:r.iva,comanda:r.comanda,
-            codigo:r.codigo,color:r.color||'#546e7a',
-            activo:true,licencia_email:SE,updated_at:new Date().toISOString()};
+        // Obtener el id máximo actual de la tabla para este licencia
+        var maxRow=await sg('pos_productos','licencia_email=ilike.'+encodeURIComponent(SE)+'&select=id&order=id.desc&limit=1');
+        var nextId=(maxRow.length && maxRow[0].id ? parseInt(maxRow[0].id) : 0) + 1;
+        var ahora=new Date().toISOString();
+        var payload=inserts.map(function(r,ri){
+          return {
+            id: nextId + ri,
+            nombre:r.nombre.toUpperCase(),
+            categoria:r.categoria||'Sin categoría',
+            precio:r.precio||0,
+            precio_variable:r.precio_variable||false,
+            costo:r.costo||0,
+            iva:r.iva||'10',
+            comanda:r.comanda||false,
+            codigo:r.codigo||'',
+            color:r.color||'#546e7a',
+            activo:true,
+            licencia_email:SE,
+            updated_at:ahora
+          };
         });
-        await supaPost('pos_productos',payload,null);
+        await supaPost('pos_productos',payload,'id');
         ok+=inserts.length;
       }
-    }catch(e){err+=batch.length;errs.push(e.message.substring(0,80));}
+    }catch(e){err+=batch.length;errs.push(e.message.substring(0,200));console.error('[Import error]',e.message);}
     if(btn) btn.textContent='Importando '+ok+'/'+validos.length+'...';
   }
   document.getElementById('impPreviewSection').style.display='none';
