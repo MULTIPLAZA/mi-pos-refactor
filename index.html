@@ -7351,12 +7351,27 @@ function buildCierreTicket(size){
   var rendicion    = 0; // monto rendido/retirado
   var diferencia   = rendicion - saldoCaja;
 
-  // Formas de pago
+  // Formas de pago — desglosar divPagos si existe
   var metodos = {};
+  var acumMetodoCierre = function(m, monto){
+    m = (m||'EFECTIVO').toUpperCase().trim();
+    if(!metodos[m]) metodos[m]={total:0,ops:0};
+    metodos[m].total += monto;
+    metodos[m].ops++;
+  };
   turnoData.ventas.forEach(function(v){
-    var m=(v.metodo||'EFECTIVO').toUpperCase();
-    if(!metodos[m])metodos[m]={total:0,ops:0};
-    metodos[m].total+=v.total; metodos[m].ops++;
+    if(v.divPagos && v.divPagos.length >= 2){
+      v.divPagos.forEach(function(p){ acumMetodoCierre(p.metodo, p.monto||0); });
+    } else if(v.metodo && v.metodo.includes(' + ')){
+      var partes = v.metodo.split(' + ');
+      var montoParte = Math.round(v.total / partes.length);
+      partes.forEach(function(p, i){
+        var monto = i===partes.length-1 ? v.total-montoParte*(partes.length-1) : montoParte;
+        acumMetodoCierre(p, monto);
+      });
+    } else {
+      acumMetodoCierre(v.metodo, v.total);
+    }
   });
 
   // Helper: línea separadora
@@ -7550,16 +7565,150 @@ async function confirmarCierre(){
   setTimeout(function(){
     try{ iframeCierre.style.height = (iframeCierre.contentWindow.document.body.scrollHeight+20)+'px'; }catch(e){}
   }, 200);
+  // Guardar datos para buildCierreBTPS ANTES de limpiar turnoData
+  cierreData = {
+    fechaApertura: turnoData.fechaApertura,
+    totalVentas:   turnoData.ventas.reduce(function(s,v){return s+v.total;},0),
+    totalEgresos:  turnoData.egresos.filter(function(e){return !e.anulada;}).reduce(function(s,e){return s+e.monto;},0),
+    totalIngresos: (turnoData.ingresos||[]).reduce(function(s,i){return s+i.monto;},0),
+    efInicial:     turnoData.efectivoInicial,
+    cantVentas:    turnoData.ventas.length,
+    egresos:       turnoData.egresos.filter(function(e){return !e.anulada;}),
+    metodos:       (function(){
+      var m={};
+      var acum=function(met,monto){met=(met||'EFECTIVO').toUpperCase().trim();if(!m[met])m[met]={total:0,ops:0};m[met].total+=monto;m[met].ops++;};
+      turnoData.ventas.forEach(function(v){
+        if(v.divPagos&&v.divPagos.length>=2){ v.divPagos.forEach(function(p){acum(p.metodo,p.monto||0);}); }
+        else if(v.metodo&&v.metodo.includes(' + ')){ var pts=v.metodo.split(' + '),mp=Math.round(v.total/pts.length);pts.forEach(function(p,i){acum(p,i===pts.length-1?v.total-mp*(pts.length-1):mp);}); }
+        else{ acum(v.metodo,v.total); }
+      });
+      return m;
+    })(),
+  };
   turnoBorrar();
   turnoData = { fechaApertura: null, efectivoInicial: 0, ventas: [], egresos: [], ingresos: [] };
   cierreMetodos = {};
   goTo('scPreviewCierre');
 }
 
+function buildCierreBTPS(){
+  // Construir texto BTPS del cierre con los datos guardados en cierreTextoPlano
+  // pero con formato de impresora térmica
+  if(!cierreTextoPlano){ return null; }
+  var size = getPaperSize('ticket') || '58';
+  var cols = size==='80' ? 48 : 32;
+  var sep  = '='.repeat(cols);
+  var sep2 = '-'.repeat(cols);
+  var n    = '\n';
+  var gn2  = function(v){ return Math.round(v||0).toLocaleString('es-PY'); };
+  var pad  = function(l,r){ var sp=Math.max(1,cols-String(l).length-String(r).length); return String(l)+' '.repeat(sp)+String(r); };
+
+  var negocio  = configData.negocio  || 'MI NEGOCIO';
+  var ruc      = configData.ruc      || '';
+  var dir      = configData.direccion|| '';
+  var terminal = configData.terminal || 'CAJA1';
+  var pad2     = function(n){ return String(n).padStart(2,'0'); };
+  var fmtDT    = function(d){ return d ? pad2(new Date(d).getDate())+'/'+pad2(new Date(d).getMonth()+1)+'/'+new Date(d).getFullYear()+' '+pad2(new Date(d).getHours())+':'+pad2(new Date(d).getMinutes()) : '-'; };
+  var ahora    = new Date();
+
+  var totalVentas   = cierreData ? cierreData.totalVentas   : 0;
+  var totalEgresos  = cierreData ? cierreData.totalEgresos  : 0;
+  var totalIngresos = cierreData ? cierreData.totalIngresos : 0;
+  var efInicial     = cierreData ? cierreData.efInicial     : 0;
+  var saldoCaja     = efInicial + totalVentas + totalIngresos - totalEgresos;
+  var totalContado  = Object.values(cierreMetodos).reduce(function(s,d){return s+d.contado;},0);
+  var saldoEsp      = calcSaldoEsperado ? calcSaldoEsperado() : saldoCaja;
+  var diff          = totalContado > 0 ? totalContado - saldoEsp : null;
+
+  var txt = '';
+  txt += '[CENTER][BOLD]' + negocio.toUpperCase() + '[/BOLD][/CENTER]' + n;
+  if(ruc) txt += '[CENTER]RUC: ' + ruc + '[/CENTER]' + n;
+  if(dir) txt += '[CENTER]' + dir + '[/CENTER]' + n;
+  txt += sep + n;
+  txt += '[CENTER][BOLD]CIERRE DE CAJA[/BOLD][/CENTER]' + n;
+  txt += sep + n;
+  txt += pad('Terminal:', terminal) + n;
+  txt += pad('Apertura:', fmtDT(cierreData && cierreData.fechaApertura)) + n;
+  txt += pad('Cierre:', fmtDT(ahora)) + n;
+  txt += sep2 + n;
+  txt += '[BOLD]RESUMEN[/BOLD]' + n;
+  txt += sep2 + n;
+  txt += pad('Ef. Inicial:', gn2(efInicial)) + n;
+  txt += pad('Total ventas:', gn2(totalVentas)) + n;
+  if(totalEgresos > 0) txt += pad('Total egresos:', gn2(totalEgresos)) + n;
+  if(totalIngresos > 0) txt += pad('Total ingresos:', gn2(totalIngresos)) + n;
+  txt += '[BOLD]' + pad('SALDO EN CAJA:', gn2(saldoCaja)) + '[/BOLD]' + n;
+  txt += sep2 + n;
+  txt += '[BOLD]FORMAS DE PAGO[/BOLD]' + n;
+  txt += sep2 + n;
+
+  // Usar los metodos ya calculados (ya desglosan divPagos)
+  if(cierreData && cierreData.metodos){
+    Object.entries(cierreData.metodos).sort(function(a,b){return b[1].total-a[1].total;}).forEach(function(e){
+      txt += pad(e[0] + ' ('+e[1].ops+'op):', gn2(e[1].total)) + n;
+    });
+  }
+  txt += '[BOLD]' + pad('TOTAL:', gn2(totalVentas)) + '[/BOLD]' + n;
+  txt += sep2 + n;
+
+  if(cierreData && cierreData.egresos && cierreData.egresos.length){
+    txt += '[BOLD]EGRESOS[/BOLD]' + n;
+    txt += sep2 + n;
+    cierreData.egresos.forEach(function(e){
+      txt += pad('  '+String(e.desc||'').substring(0, cols-14), gn2(e.monto)) + n;
+    });
+    txt += sep2 + n;
+  }
+
+  if(totalContado > 0){
+    txt += '[BOLD]CONTEO[/BOLD]' + n;
+    txt += sep2 + n;
+    Object.entries(cierreMetodos).forEach(function(e){
+      var m=e[0], d=e[1];
+      if(d.contado>0){
+        var dif=d.contado-d.esperado;
+        var difStr=dif===0?' OK':dif>0?' +'+gn2(dif):' -'+gn2(Math.abs(dif));
+        txt += pad(m+':', gn2(d.contado)) + n;
+        txt += '  Esperado: '+gn2(d.esperado)+'  '+difStr + n;
+      }
+    });
+    if(diff !== null){
+      var dLabel = diff===0 ? 'CUADRE EXACTO' : diff>0 ? 'SOBRANTE: +'+gn2(diff) : 'FALTANTE: -'+gn2(Math.abs(diff));
+      txt += '[CENTER][BOLD]' + dLabel + '[/BOLD][/CENTER]' + n;
+    }
+    txt += sep2 + n;
+  }
+
+  txt += pad('Cant. ventas:', String(cierreData ? cierreData.cantVentas : 0)) + n;
+  txt += sep + n;
+  txt += '[CENTER]*** FIN CIERRE ***[/CENTER]' + n;
+  txt += '[FEED:4]' + n;
+  txt += '[CUT]';
+  return txt;
+}
+
+// Variable para guardar datos del cierre para BTPS
+var cierreData = null;
+
 function imprimirCierre(){
   // NO regenerar — turnoData ya fue borrado en confirmarCierre
-  // Usar cierreTicketHTML generado con datos correctos
   if(!cierreTicketHTML){ toast('Sin datos de cierre'); return; }
+
+  // Si hay BTPS configurado, imprimir via servidor
+  var btpsMac  = localStorage.getItem('btps_mac');
+  var btpsTipo = localStorage.getItem('printerType_ticket');
+  if(btpsMac || btpsTipo === 'btps'){
+    var txt = buildCierreBTPS();
+    if(txt){
+      BTPrinter.print(txt).then(function(r){
+        if(r.status === 'ok') toast('✓ Cierre impreso');
+        else toast('Error: ' + (r.message||'Error al imprimir'));
+      });
+      return;
+    }
+  }
+
+  // Fallback — ventana del navegador
   var isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true;
   if(isPWA){
     var iframe = document.getElementById('printFrame');
@@ -10194,7 +10343,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.7.3 (2026-03-31)';
+const APP_VERSION = 'v1.7.4 (2026-03-31)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
