@@ -4171,6 +4171,14 @@ function imprimirComandaPreCobro(){
   });
   // Marcar como enviados
   cart.forEach(i => { i.enviado = true; });
+  // Persistir estado enviado en pendientes para que sobreviva al cambiar de ticket
+  if(typeof currentTicketNro !== 'undefined' && currentTicketNro !== null && typeof pendientes !== 'undefined'){
+    const idx = pendientes.findIndex(p => p.nro === currentTicketNro);
+    if(idx >= 0){
+      pendientes[idx].cart = JSON.parse(JSON.stringify(cart));
+      try { localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); } catch(e){}
+    }
+  }
   updBtnComandaCobro();
   updUI();
   if(typeof renderTkt === 'function') renderTkt();
@@ -4983,8 +4991,9 @@ function imprimirComanda(data){
     const n    = '\n';
 
     const d     = data.fecha ? (data.fecha instanceof Date ? data.fecha : new Date(data.fecha)) : new Date();
-    const hora  = d.toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'});
-    const fecha = d.toLocaleDateString('es-PY');
+    // Formato 24hs para evitar caracteres especiales de AM/PM en impresoras térmicas
+    const hora  = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    const fecha = String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
     const nro   = String(data.nroTicket||'').padStart(4,'0');
 
     const tipoPedido = (data.tipoPedido||'llevar').toLowerCase();
@@ -10161,7 +10170,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.6.9 (2026-03-31)';
+const APP_VERSION = 'v1.7.0 (2026-03-31)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
