@@ -4683,15 +4683,12 @@ function generarHTMLFactura(data, size){
   lineas += '<p class="hr"></p>';
 
   // Footer
-  lineas += '<p class="s">TICKET NRO: '+String(data.nroTicket||0).padStart(6,'0')+'</p>';
-  if(data.nroOrden) lineas += '<p class="s">ORDEN NRO: '+String(data.nroOrden).padStart(4,'0')+'</p>';
-  lineas += '<p class="s">NRO. TRANSACCION: '+String(data.nroTicket||0).padStart(3,'0')+'</p>';
+  if(nroF) lineas += '<p class="s">FACTURA NRO: <b>'+nroF+'</b></p>';
   lineas += '<p class="s">ATENDIDO POR: '+(configData.terminal||'admin')+'</p>';
   lineas += '<p class="s">ORIGINAL: CLIENTE</p>';
   lineas += '<p class="s">DUPLICADO: ARCHIVO TRIBUTARIO</p>';
   lineas += '<p class="hr"></p>';
   lineas += '<p class="s">LOS DATOS IMPRESOS REQUIEREN DE CUIDADOS ESPECIALES.</p>';
-  if(data.nroOrden) lineas += '<p class="c s">Orden Nro: '+String(data.nroOrden).padStart(4,'0')+'</p>';
   if(configData.pie_recibo) lineas += '<p class="c s">'+configData.pie_recibo+'</p>';
   lineas += '<p class="c s b">*** GRACIAS POR SU PREFERENCIA ***</p>';
   return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
@@ -10158,9 +10155,16 @@ const BTPrinter = {
     // ── DATOS DEL TICKET ─────────────────────────────────
     var nro      = String(data.nroTicket || '').padStart(4, '0');
     var fechaObj = data.fecha ? (data.fecha instanceof Date ? data.fecha : new Date(data.fecha)) : new Date();
-    var fechaStr = fechaObj.toLocaleDateString('es-PY');
-    var horaStr  = fechaObj.toLocaleTimeString('es-PY', {hour:'2-digit', minute:'2-digit'});
-    txt += pad('Ticket #' + nro, fechaStr + ' ' + horaStr) + n;
+    // Formato manual dd/mm/yyyy HH:MM para evitar caracteres especiales AM/PM
+    var pd2      = function(x){ return String(x).padStart(2,'0'); };
+    var fechaStr = pd2(fechaObj.getDate())+'/'+pd2(fechaObj.getMonth()+1)+'/'+fechaObj.getFullYear();
+    var horaStr  = pd2(fechaObj.getHours())+':'+pd2(fechaObj.getMinutes());
+    // Si es factura, mostrar nro de factura en el header
+    var esFacturaBTPS = data.factura && data.factura.timbrado && (data.factura.nro_factura || data.factura.nroFactura);
+    var nroLabel = esFacturaBTPS
+      ? 'Factura #' + (data.factura.nro_factura || data.factura.nroFactura)
+      : 'Ticket #' + nro;
+    txt += pad(nroLabel, fechaStr + ' ' + horaStr) + n;
     if (data.obs) txt += 'Obs: ' + data.obs + n;
     txt += sep2 + n;
 
@@ -10369,7 +10373,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.7.8 (2026-03-31)';
+const APP_VERSION = 'v1.7.9 (2026-03-31)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
