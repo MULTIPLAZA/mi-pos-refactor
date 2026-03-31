@@ -5045,11 +5045,8 @@ function imprimirComanda(data){
     // Línea de espaciado + nro bien centrado + negrita
     txt += n;
     txt += sep + n;
-    txt += '[CENTER][BOLD]- - - ORDEN NRO - - -[/BOLD][/CENTER]' + n;
-    // Número con espacios entre dígitos para que se vea más grande
-    var nroGrande = ('# ' + nro).split('').join(' ');
-    txt += '[CENTER][BOLD]' + nroGrande + '[/BOLD][/CENTER]' + n;
-    txt += '[CENTER][BOLD]' + nroGrande + '[/BOLD][/CENTER]' + n;
+    txt += '[CENTER]ORDEN NRO[/CENTER]' + n;
+    txt += '[CENTER][BOLD]# ' + nro + '[/BOLD][/CENTER]' + n;
     txt += sep + n;
     txt += n;
 
@@ -7680,6 +7677,35 @@ function buildCierreBTPS(){
   }
 
   txt += pad('Cant. ventas:', String(cierreData ? cierreData.cantVentas : 0)) + n;
+  txt += sep2 + n;
+
+  // Rendicion del cajero y diferencia
+  txt += '[BOLD]RENDICION DEL CAJERO[/BOLD]' + n;
+  txt += sep2 + n;
+  txt += pad('Saldo esperado:', gn2(saldoCaja)) + n;
+  if(totalContado > 0){
+    txt += pad('Total contado:', gn2(totalContado)) + n;
+    var diferencia = totalContado - saldoCaja;
+    if(diferencia === 0){
+      txt += '[CENTER][BOLD]*** CUADRE EXACTO ***[/BOLD][/CENTER]' + n;
+    } else if(diferencia > 0){
+      txt += '[BOLD]' + pad('SOBRANTE:', '+' + gn2(diferencia)) + '[/BOLD]' + n;
+    } else {
+      txt += '[BOLD]' + pad('FALTANTE:', '-' + gn2(Math.abs(diferencia))) + '[/BOLD]' + n;
+    }
+  } else {
+    txt += pad('Total contado:', '(sin conteo)') + n;
+    txt += pad('Diferencia:', '(sin conteo)') + n;
+  }
+  txt += sep2 + n;
+
+  // Firma del cajero
+  txt += 'OBS: ' + n;
+  txt += sep2 + n;
+  txt += n;
+  txt += n;
+  txt += '[CENTER]______________________________[/CENTER]' + n;
+  txt += '[CENTER]Firma / Aclaracion / CI[/CENTER]' + n;
   txt += sep + n;
   txt += '[CENTER]*** FIN CIERRE ***[/CENTER]' + n;
   txt += '[FEED:4]' + n;
@@ -10343,7 +10369,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.7.4 (2026-03-31)';
+const APP_VERSION = 'v1.7.6 (2026-03-31)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
