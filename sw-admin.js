@@ -1,4 +1,4 @@
-const CACHE = 'ampersand-admin-v1774972321';
+const CACHE = 'ampersand-admin-v1774973019';
 const ASSETS = ['/admin-negocio.html', '/manifest-admin.json', '/icon.png', '/icon-192.png'];
 
 self.addEventListener('install', e => {

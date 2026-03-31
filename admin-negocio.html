@@ -1053,6 +1053,40 @@ function impLimpiar(){
   impReset();
 }
 
+async function sincronizarCategorias(nombresCateg){
+  // Traer categorías existentes
+  try{
+    var existentes=await sg('pos_categorias','licencia_email=ilike.'+encodeURIComponent(SE)+'&select=id,nombre&order=id.desc&limit=500');
+    var nombresExistentes=existentes.map(function(c){return (c.nombre||'').toUpperCase();});
+    var maxCatId=existentes.length?Math.max.apply(null,existentes.map(function(c){return c.id||0;})):0;
+
+    // Filtrar solo las categorías nuevas
+    var nuevas=nombresCateg.filter(function(n){
+      return n && n!=='SIN CATEGORÍA' && !nombresExistentes.includes(n.toUpperCase());
+    });
+    // Deduplicar
+    nuevas=nuevas.filter(function(n,i,arr){return arr.indexOf(n)===i;});
+    if(!nuevas.length){console.log('[Import] Sin categorías nuevas');return;}
+
+    var colores=['#e53935','#8e24aa','#1e88e5','#00897b','#f57c00','#6d4c41','#546e7a','#43a047','#c0ca33','#fdd835'];
+    var ahora=new Date().toISOString();
+    var payload=nuevas.map(function(nombre,i){
+      return {
+        id: maxCatId + 1 + i,
+        nombre: nombre,
+        color: colores[i % colores.length],
+        licencia_email: SE,
+        updated_at: ahora
+      };
+    });
+    await supaPost('pos_categorias', payload, 'id');
+    console.log('[Import] Categorías creadas:', nuevas);
+    toast('✓ Categorías creadas: '+nuevas.join(', '));
+  }catch(e){
+    console.warn('[Import] Error sincronizando categorías:', e.message);
+  }
+}
+
 async function impConfirmar(){
   var validos=_imp.rows.filter(function(r){return r._valido;});
   if(!validos.length){toast('Sin productos válidos');return;}
@@ -1125,6 +1159,11 @@ async function impConfirmar(){
       '<button onclick="impLimpiar()" style="background:var(--card2);border:1px solid var(--border);border-radius:7px;color:var(--text2);font-family:Barlow,sans-serif;font-size:13px;font-weight:700;padding:9px 18px;cursor:pointer">Nueva importación</button>'+
       '<button onclick="goTo(\'productos\')" style="background:var(--green);border:none;border-radius:7px;color:#fff;font-family:Barlow,sans-serif;font-size:13px;font-weight:700;padding:9px 18px;cursor:pointer">Ver productos</button>'+
     '</div>';
+  // Sincronizar categorías nuevas en pos_categorias
+  var categsImportadas=validos.map(function(r){return (r.categoria||'').toUpperCase();})
+    .filter(function(c,i,arr){return c&&c!=='SIN CATEGORÍA'&&arr.indexOf(c)===i;});
+  if(categsImportadas.length) await sincronizarCategorias(categsImportadas);
+
   _imp.rows=[];
   if(btn){btn.disabled=false;btn.textContent='Importar ahora';}
   try{allPrds=await sg('pos_productos','licencia_email=ilike.'+encodeURIComponent(SE)+'&activo=eq.true&order=nombre.asc&limit=500');}catch(e){}
