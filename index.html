@@ -4706,10 +4706,10 @@ function generarHTMLComanda(data, size){
   const nro   = String(data.nroTicket||0).padStart(4,'0');
 
   const tipoPedido = (data.tipoPedido||'llevar').toLowerCase();
-  const esMesa     = tipoPedido==='local' || tipoPedido==='mesa' || !!data.mesa;
   const esDelivery = tipoPedido==='delivery';
+  const esMesa     = tipoPedido==='local' || tipoPedido==='mesa' || !!data.mesa;
   const tipoLabel  = esDelivery          ? '*** DELIVERY ***'
-                   : esMesa && data.mesa ? '*** MESA ' + data.mesa.toUpperCase() + ' ***'
+                   : data.mesa           ? '*** MESA ' + data.mesa.toUpperCase() + ' ***'
                    : esMesa              ? '*** LOCAL ***'
                    :                      '*** PARA LLEVAR ***';
 
@@ -5018,10 +5018,10 @@ function imprimirComanda(data){
     const nro   = String(data.nroTicket||'').padStart(4,'0');
 
     const tipoPedido = (data.tipoPedido||'llevar').toLowerCase();
-    const esMesa     = tipoPedido==='local' || tipoPedido==='mesa' || !!data.mesa;
     const esDelivery = tipoPedido==='delivery';
+    const esMesa     = tipoPedido==='local' || tipoPedido==='mesa' || !!data.mesa;
     const tipoLabel  = esDelivery          ? '*** DELIVERY ***'
-                     : esMesa && data.mesa ? '*** MESA ' + data.mesa.toUpperCase() + ' ***'
+                     : data.mesa           ? '*** MESA ' + data.mesa.toUpperCase() + ' ***'
                      : esMesa              ? '*** LOCAL ***'
                      :                      '*** PARA LLEVAR ***';
 
@@ -10369,7 +10369,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.7.6 (2026-03-31)';
+const APP_VERSION = 'v1.7.7 (2026-03-31)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
