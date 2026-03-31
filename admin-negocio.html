@@ -859,6 +859,7 @@ async function renderImportar(){
 
 function impColHTML(){
   var cols = [
+    {n:'id',              r:false, d:'ID del producto (dejar vacío para nuevos)'},
     {n:'nombre',          r:true,  d:'Nombre del producto'},
     {n:'categoria',       r:false, d:'Categoría (ej: Pizzas)'},
     {n:'precio',          r:true,  d:'Precio de venta'},
@@ -880,9 +881,9 @@ function impColHTML(){
 }
 
 function descargarPlantilla(tipo){
-  var headers = ['nombre','categoria','precio','costo','iva','stock','stock_min','comanda','precio_variable','codigo','color'];
-  var ej1 = ['PIZZA MUZZA','Pizzas','65000','25000','10','50','5','SI','NO','','#e53935'];
-  var ej2 = ['COCA COLA','Bebidas','8000','4000','10','100','10','NO','NO','7891234567890','#1565c0'];
+  var headers = ['id','nombre','categoria','precio','costo','iva','stock','stock_min','comanda','precio_variable','codigo','color'];
+  var ej1 = ['','PIZZA MUZZA','Pizzas','65000','25000','10','50','5','SI','NO','','#e53935'];
+  var ej2 = ['','COCA COLA','Bebidas','8000','4000','10','100','10','NO','NO','7891234567890','#1565c0'];
 
   if(tipo === 'csv'){
     var csv = headers.join(',') + '\n' + ej1.join(',') + '\n' + ej2.join(',');
@@ -966,12 +967,13 @@ function impValidarYMostrar(rows){
   };
   var validados=rows.map(function(row,idx){
     var fila=idx+2;
+    var id=parseInt((row.id||row.Id||row.ID||'').toString().trim())||null;
     var nombre=(row.nombre||row.Nombre||row.NOMBRE||'').toString().trim();
     var precioStr=(row.precio||row.Precio||row.PRECIO||'0').toString().replace(/\s/g,'').replace(',','.');
     var precio=parseFloat(precioStr)||0;
     var errFila=[];
     if(!nombre) errFila.push('Falta nombre');
-    if(precio<=0) errFila.push('Precio inválido');
+    if(!id && precio<=0) errFila.push('Precio inválido');
     var iva=(row.iva||row.IVA||row.Iva||'10').toString().trim().toLowerCase();
     if(!['10','5','exento','0'].includes(iva)) iva='10';
     if(iva==='0') iva='exento';
@@ -986,8 +988,8 @@ function impValidarYMostrar(rows){
     var cod=(row.codigo||row.Codigo||row.CODIGO||'').toString().trim();
     var col=(row.color||row.Color||'').toString().trim()||'';
     if(errFila.length) _imp.errores.push('Fila '+fila+': '+errFila.join(', '));
-    return {_fila:fila,_valido:errFila.length===0,_errores:errFila,
-      nombre,categoria:cat,precio:pv?0:precio,costo,iva,comanda,precio_variable:pv,
+    return {_fila:fila,_valido:errFila.length===0,_errores:errFila,_esUpdate:!!id,
+      id,nombre,categoria:cat,precio:pv?0:precio,costo,iva,comanda,precio_variable:pv,
       stock,stock_min:stockMin,codigo:cod,color:col};
   });
   _imp.rows=validados;
@@ -1003,7 +1005,9 @@ function impValidarYMostrar(rows){
   }
   document.getElementById('impPreviewBody').innerHTML=validados.map(function(r){
     var est=r._valido
-      ?'<span style="color:var(--green);font-size:11px;font-weight:700">OK</span>'
+      ?(r._esUpdate
+        ?'<span style="color:var(--blue);font-size:11px;font-weight:700">UPDATE</span>'
+        :'<span style="color:var(--green);font-size:11px;font-weight:700">NUEVO</span>')
       :'<span style="color:var(--red);font-size:11px;font-weight:700" title="'+r._errores.join(', ')+'">Error</span>';
     return '<tr style="opacity:'+(r._valido?'1':'.5')+'">'+
       '<td>'+est+'</td>'+
@@ -1047,14 +1051,30 @@ async function impConfirmar(){
   var lote=20;
   for(var i=0;i<validos.length;i+=lote){
     var batch=validos.slice(i,i+lote);
+    // Separar updates de inserts
+    var updates=batch.filter(function(r){return r._esUpdate;});
+    var inserts=batch.filter(function(r){return !r._esUpdate;});
     try{
-      var payload=batch.map(function(r){
-        return {nombre:r.nombre.toUpperCase(),categoria:r.categoria,precio:r.precio,precio_variable:r.precio_variable,
-          costo:r.costo,iva:r.iva,comanda:r.comanda,codigo:r.codigo,color:r.color||'#546e7a',
-          activo:true,licencia_email:SE,updated_at:new Date().toISOString()};
-      });
-      await supaPost('pos_productos',payload,'nombre,licencia_email');
-      ok+=batch.length;
+      // UPDATE uno a uno por id
+      for(var j=0;j<updates.length;j++){
+        var r=updates[j];
+        var upd={nombre:r.nombre.toUpperCase(),categoria:r.categoria,precio:r.precio,
+          precio_variable:r.precio_variable,costo:r.costo,iva:r.iva,comanda:r.comanda,
+          codigo:r.codigo,color:r.color||'#546e7a',updated_at:new Date().toISOString()};
+        await supaPatch('pos_productos','id=eq.'+r.id+'&licencia_email=ilike.'+encodeURIComponent(SE),upd);
+        ok++;
+      }
+      // INSERT en lote (upsert por id para evitar duplicados)
+      if(inserts.length){
+        var payload=inserts.map(function(r){
+          return {nombre:r.nombre.toUpperCase(),categoria:r.categoria,precio:r.precio,
+            precio_variable:r.precio_variable,costo:r.costo,iva:r.iva,comanda:r.comanda,
+            codigo:r.codigo,color:r.color||'#546e7a',
+            activo:true,licencia_email:SE,updated_at:new Date().toISOString()};
+        });
+        await supaPost('pos_productos',payload,null);
+        ok+=inserts.length;
+      }
     }catch(e){err+=batch.length;errs.push(e.message.substring(0,80));}
     if(btn) btn.textContent='Importando '+ok+'/'+validos.length+'...';
   }
@@ -1077,7 +1097,7 @@ async function impConfirmar(){
 }
 
 async function renderProductos(){
-  document.getElementById('content').innerHTML='<div class="ph"><div><div class="pt">Productos</div><div class="ps">Catálogo sincronizado</div></div></div><div class="card"><div class="card-h"><span class="card-t" id="pCount">—</span><input class="c-srch" placeholder="Buscar..." oninput="filtrP(this.value)"></div><table><thead><tr><th>Producto</th><th>Categoría</th><th>IVA</th><th style="text-align:right">Precio</th></tr></thead><tbody id="pBody"><tr><td colspan="4" class="loading"><span class="sp"></span></td></tr></tbody></table></div>';
+  document.getElementById('content').innerHTML='<div class="ph"><div><div class="pt">Productos</div><div class="ps">Catálogo sincronizado</div></div><div class="dbar"><button onclick="exportarCatalogo()" style="background:var(--b2);border:1px solid var(--blue);border-radius:7px;color:var(--blue);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Exportar con IDs</button><button onclick="goTo('importar')" style="background:var(--g2);border:1px solid var(--green);border-radius:7px;color:var(--green);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Importar</button></div></div><div class="card"><div class="card-h"><span class="card-t" id="pCount">—</span><input class="c-srch" placeholder="Buscar..." oninput="filtrP(this.value)"></div><table><thead><tr><th>Producto</th><th>Categoría</th><th>IVA</th><th style="text-align:right">Precio</th></tr></thead><tbody id="pBody"><tr><td colspan="4" class="loading"><span class="sp"></span></td></tr></tbody></table></div>';
   try{
     allPrds=await sg('pos_productos','licencia_email=ilike.'+encodeURIComponent(SE)+'&activo=eq.true&order=nombre.asc&limit=500');
     renderPT(allPrds);
@@ -1088,6 +1108,42 @@ function renderPT(p){
   if(!document.getElementById('pCount')) return;
   document.getElementById('pCount').textContent=p.length+' productos';
   document.getElementById('pBody').innerHTML=p.length?p.map(function(x){return '<tr><td><div style="display:flex;align-items:center;gap:8px"><div style="width:24px;height:24px;border-radius:5px;background:'+(x.color||'#546e7a')+';flex-shrink:0"></div><span style="font-weight:600">'+x.nombre+'</span></div></td><td>'+(x.categoria||'—')+'</td><td><span class="tag tag-gr">IVA '+(x.iva==='exento'?'Exento':x.iva+'%')+'</span></td><td style="text-align:right;font-weight:700">'+(x.precio_variable?'<span style="color:var(--orange)">Variable</span>':gs(x.precio))+'</td></tr>';}).join(''):'<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted)">Sin productos</td></tr>';
+}
+
+async function exportarCatalogo(){
+  toast('Preparando exportación...');
+  var prods = allPrds.length ? allPrds : await sg('pos_productos','licencia_email=ilike.'+encodeURIComponent(SE)+'&activo=eq.true&order=nombre.asc&limit=2000');
+  if(!prods.length){ toast('Sin productos para exportar'); return; }
+  var headers = ['id','nombre','categoria','precio','costo','iva','stock','stock_min','comanda','precio_variable','codigo','color'];
+  var rows = prods.map(function(p){
+    return [
+      p.id||'',
+      p.nombre||'',
+      p.categoria||'',
+      p.precio||0,
+      p.costo||0,
+      p.iva||'10',
+      p.stock||0,
+      p.stock_min||0,
+      p.comanda?'SI':'NO',
+      p.precio_variable?'SI':'NO',
+      p.codigo||'',
+      p.color||''
+    ];
+  });
+  if(typeof XLSX !== 'undefined'){
+    var wb = XLSX.utils.book_new();
+    var ws = XLSX.utils.aoa_to_sheet([headers].concat(rows));
+    ws['!cols'] = headers.map(function(h){return {wch:h==='nombre'?30:h==='id'?8:16};});
+    XLSX.utils.book_append_sheet(wb, ws, 'Productos');
+    XLSX.writeFile(wb, 'catalogo_productos.xlsx');
+    toast('Catálogo exportado con '+prods.length+' productos');
+  } else {
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    s.onload=function(){ exportarCatalogo(); };
+    document.head.appendChild(s);
+  }
 }
 
 function filtrP(q){if(!allPrds.length) return;var f=q.toLowerCase();renderPT(!q?allPrds:allPrds.filter(function(p){return (p.nombre||'').toLowerCase().includes(f)||(p.categoria||'').toLowerCase().includes(f);}));}
