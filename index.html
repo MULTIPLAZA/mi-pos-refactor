@@ -3385,7 +3385,9 @@
     <button class="cbk" onclick="goTo('scSale')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
     <button class="cdividir" onclick="goDividir()">DIVIDIR</button>
     <button class="cdividir" onclick="abrirDescTicket()" id="btnDescTicket" style="background:var(--orange);color:#fff;">% DESC</button>
-    <button class="cdividir" onclick="imprimirComandaPreCobro()" style="background:#1565c0;color:#fff;" title="Imprimir comanda cocina">🍳</button>
+    <button class="cdividir" onclick="imprimirComandaPreCobro()" style="background:#1565c0;color:#fff;position:relative;" title="Imprimir comanda cocina">
+      🍳<span id="comandaBadge2" style="display:none;position:absolute;top:-4px;right:-4px;background:#e53935;color:#fff;font-size:10px;font-weight:900;min-width:16px;height:16px;border-radius:8px;padding:0 3px;align-items:center;justify-content:center;font-family:'Barlow',sans-serif;line-height:16px;"></span>
+    </button>
   </div>
   <div class="cbody">
     <div class="ctotal" id="ctotal">₲0</div>
@@ -3733,10 +3735,17 @@ function comandasHabilitadas(){
 function updBtnComandaCobro(){
   // Actualizar badge de ítems pendientes de enviar a cocina
   const pendientes = cart.filter(i => !i.enviado).length;
+  // Badge en pantalla de cobro
   const badgeEl = document.getElementById('comandaBadge');
   if(badgeEl){
     badgeEl.textContent = pendientes;
     badgeEl.style.display = pendientes > 0 ? 'inline-flex' : 'none';
+  }
+  // Badge en botón 🍳 de pantalla de venta
+  const badge2 = document.getElementById('comandaBadge2');
+  if(badge2){
+    badge2.textContent = pendientes;
+    badge2.style.display = pendientes > 0 ? 'inline-flex' : 'none';
   }
   const btn = document.getElementById('btnComandaCobro');
   if(btn) btn.style.display = comandasHabilitadas() ? 'flex' : 'none';
@@ -3845,6 +3854,7 @@ function updUI(){
   if(tabTotal) tabTotal.textContent=gs(t);
   if(typeof renderTabletTicket==='function') renderTabletTicket();
   updTabTicketHeader();
+  updBtnComandaCobro(); // actualizar badge de comanda pendiente
 }
 function toggleTicket(){
   showTkt=!showTkt;
@@ -6393,13 +6403,14 @@ function addDescuento(descId){
     lineId:      Date.now()*1000+Math.floor(Math.random()*1000),
     id:          descId,
     name:        d.name,
-    price:       -monto, // negativo internamente para el cálculo
+    price:       -monto,
     qty:         1,
     obs:         '',
     color:       '#e53935',
     esDescuento: true,
     montoDesc:   monto,
-    iva:         'exento'
+    iva:         'exento',
+    enviado:     true, // descuentos no van a comanda
   });
 
   updUI();
@@ -7063,7 +7074,7 @@ function pmOK(){
     if(!desc){ toast('Ingresá una descripción'); if(li)li.focus(); return; }
   }
   const nombre = esLibre ? desc.toUpperCase() : p.name;
-  cart.push({ lineId: Date.now()*1000+Math.floor(Math.random()*1000), ...p, name: nombre, price: precio, qty:1, obs:'' });
+  cart.push({ lineId: Date.now()*1000+Math.floor(Math.random()*1000), ...p, name: nombre, price: precio, qty:1, obs:'', enviado:false });
   document.getElementById('precioModalOv').classList.remove('open');
   updUI(); updBtnGuardar();
   toast('+'+nombre.substring(0,16)+' · '+gs(precio));
@@ -9969,8 +9980,27 @@ const BTPrinter = {
     txt += sep + n;
 
     // ── PAGO ──────────────────────────────────────────────
-    var metodo = (data.metodo || 'EFECTIVO').toUpperCase();
-    txt += pad(metodo, gs(data.total) + ' Gs.') + n;
+    if (data.divPagos && data.divPagos.length >= 2) {
+      // Pago dividido — desglosar cada método
+      data.divPagos.forEach(function(p) {
+        txt += pad(p.metodo.toUpperCase(), gs(p.monto) + ' Gs.') + n;
+      });
+    } else {
+      var metodo = (data.metodo || 'EFECTIVO').toUpperCase();
+      if (metodo.includes(' + ')) {
+        // String compuesto viejo — dividir en partes iguales
+        var partes = metodo.split(' + ');
+        var montoParte = Math.round(data.total / partes.length);
+        partes.forEach(function(m, i) {
+          var monto = i === partes.length - 1
+            ? data.total - montoParte * (partes.length - 1)
+            : montoParte;
+          txt += pad(m, gs(monto) + ' Gs.') + n;
+        });
+      } else {
+        txt += pad(metodo, gs(data.total) + ' Gs.') + n;
+      }
+    }
     if (data.vuelto && data.vuelto > 0) {
       txt += pad('Vuelto', gs(data.vuelto) + ' Gs.') + n;
     }
@@ -10131,7 +10161,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.6.6 (2026-03-29)';
+const APP_VERSION = 'v1.6.9 (2026-03-31)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
