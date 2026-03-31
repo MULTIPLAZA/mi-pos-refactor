@@ -4285,10 +4285,30 @@ function htmlToPreview(html, size){
     .join('\n');
 }
 
-// Imprimir comanda del último recibo
+// Imprimir comanda del último recibo — solo ítems no enviados
 function imprimirComandaActual(){
   if(!ultimoReciboData) return;
-  imprimirComanda(ultimoReciboData);
+  // Filtrar ítems no enviados usando el cart actual (que tiene el estado real)
+  const itemsNoEnviados = (ultimoReciboData.items || []).filter(i => !i.enviado);
+  if(!itemsNoEnviados.length){
+    toast('Todo ya fue enviado a cocina');
+    return;
+  }
+  // Marcar como enviados en ultimoReciboData
+  ultimoReciboData.items.forEach(i => { i.enviado = true; });
+  // También marcar en cart si los ítems coinciden por lineId
+  if(typeof cart !== 'undefined'){
+    cart.forEach(i => { i.enviado = true; });
+    // Persistir en pendientes si hay ticket activo
+    if(typeof currentTicketNro !== 'undefined' && currentTicketNro !== null){
+      const ticketIdx = pendientes.findIndex(p => p.nro === currentTicketNro);
+      if(ticketIdx >= 0){
+        pendientes[ticketIdx].cart = JSON.parse(JSON.stringify(cart));
+        try { localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); } catch(e){}
+      }
+    }
+  }
+  imprimirComanda({...ultimoReciboData, items: itemsNoEnviados});
 }
 
 
@@ -10171,7 +10191,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.7.1 (2026-03-31)';
+const APP_VERSION = 'v1.7.2 (2026-03-31)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
