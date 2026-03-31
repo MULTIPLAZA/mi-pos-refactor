@@ -45,7 +45,7 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:var(--text);min-
 .fi label{font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;}
 .fi input{width:100%;background:var(--input-bg);border:1.5px solid var(--input-border);border-radius:8px;color:var(--text);font-family:'Barlow',sans-serif;font-size:15px;padding:11px 14px;outline:none;}
 .fi input:focus{border-color:var(--green);}
-.btn-p{width:100%;background:var(--green);border:none;border-radius:8px;color:var(--text);font-family:'Barlow',sans-serif;font-size:14px;font-weight:800;letter-spacingletter-spacing:.8px;text-transform:uppercase;padding:13px;cursor:pointer;}
+.btn-p{width:100%;background:var(--green);border:none;border-radius:8px;color:var(--text);font-family:'Barlow',sans-serif;font-size:14px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;padding:13px;cursor:pointer;}
 .l-err{color:var(--red);font-size:12px;text-align:center;margin-top:8px;display:none;}
 
 /* APP */
@@ -837,6 +837,7 @@ async function renderImportar(){
           '<div style="font-size:12px;color:var(--muted);margin-top:4px">o hacé clic para seleccionar</div>' +
         '</div>' +
         '<input type="file" id="impFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="impLeerArchivo(this)">' +
+        '<div style="margin-top:10px;font-size:12px;color:var(--muted);text-align:center">💡 Si el archivo tiene columna <code style="background:var(--card2);border:1px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--blue)">id</code>, esas filas se actualizarán. Sin id = producto nuevo.</div>' +
       '</div>' +
     '</div>' +
     '<div id="impPreviewSection" style="display:none">' +
@@ -849,7 +850,7 @@ async function renderImportar(){
           '</div>' +
         '</div>' +
         '<div id="impErrores" style="display:none;padding:12px 18px;background:rgba(239,83,80,.06);border-bottom:1px solid var(--border)"></div>' +
-        '<div style="overflow-x:auto"><table><thead><tr><th>Estado</th><th>Nombre</th><th>Cat.</th><th>Precio</th><th>Costo</th><th>IVA</th><th>Comanda</th><th>Stock</th></tr></thead><tbody id="impPreviewBody"></tbody></table></div>' +
+        '<div style="overflow-x:auto"><table><thead><tr><th>Estado</th><th>ID</th><th>Nombre</th><th>Cat.</th><th>Precio</th><th>Costo</th><th>IVA</th><th>Comanda</th><th>Stock</th></tr></thead><tbody id="impPreviewBody"></tbody></table></div>' +
       '</div>' +
     '</div>' +
     '<div id="impResultSection" style="display:none">' +
@@ -859,7 +860,7 @@ async function renderImportar(){
 
 function impColHTML(){
   var cols = [
-    {n:'id',              r:false, d:'ID del producto (dejar vacío para nuevos)'},
+    {n:'id',              r:false, d:'ID único del producto — usalo para actualizar existentes; vacío = nuevo producto'},
     {n:'nombre',          r:true,  d:'Nombre del producto'},
     {n:'categoria',       r:false, d:'Categoría (ej: Pizzas)'},
     {n:'precio',          r:true,  d:'Precio de venta'},
@@ -973,7 +974,9 @@ function impValidarYMostrar(rows){
     var precio=parseFloat(precioStr)||0;
     var errFila=[];
     if(!nombre) errFila.push('Falta nombre');
-    if(!id && precio<=0) errFila.push('Precio inválido');
+    // Con ID (UPDATE): precio 0 es válido (no se sobreescribe si no querés)
+    // Sin ID (INSERT): precio es obligatorio
+    if(!id && precio<=0 && !pv) errFila.push('Precio inválido (requerido para productos nuevos)');
     var iva=(row.iva||row.IVA||row.Iva||'10').toString().trim().toLowerCase();
     if(!['10','5','exento','0'].includes(iva)) iva='10';
     if(iva==='0') iva='exento';
@@ -994,8 +997,14 @@ function impValidarYMostrar(rows){
   });
   _imp.rows=validados;
   var total=validados.length, validos=validados.filter(function(r){return r._valido;}).length, inv=total-validos;
+  var updates=validados.filter(function(r){return r._valido&&r._esUpdate;}).length;
+  var nuevos=validos-updates;
   document.getElementById('impPreviewSection').style.display='block';
-  document.getElementById('impPreviewTitle').textContent=total+' productos · '+validos+' válidos'+(inv?' · '+inv+' con error':'');
+  document.getElementById('impPreviewTitle').textContent=
+    total+' productos · '+
+    (updates?updates+' UPDATE · ':'')+
+    (nuevos?nuevos+' NUEVO · ':'')+
+    (inv?inv+' con error':'').replace(/ · $/,'');
   if(_imp.errores.length){
     var ed=document.getElementById('impErrores');
     ed.style.display='block';
@@ -1011,6 +1020,8 @@ function impValidarYMostrar(rows){
       :'<span style="color:var(--red);font-size:11px;font-weight:700" title="'+r._errores.join(', ')+'">Error</span>';
     return '<tr style="opacity:'+(r._valido?'1':'.5')+'">'+
       '<td>'+est+'</td>'+
+      '<td style="font-size:11px;color:'+(r._esUpdate?'var(--blue)':'var(--muted)')+'">'+
+        (r._esUpdate?'#'+r.id:'—')+'</td>'+
       '<td style="font-weight:600">'+r.nombre+'</td>'+
       '<td>'+r.categoria+'</td>'+
       '<td style="text-align:right;font-weight:700">'+(r.precio_variable?'<span style="color:var(--orange)">Variable</span>':gs(r.precio))+'</td>'+
@@ -1058,9 +1069,14 @@ async function impConfirmar(){
       // UPDATE uno a uno por id
       for(var j=0;j<updates.length;j++){
         var r=updates[j];
-        var upd={nombre:r.nombre.toUpperCase(),categoria:r.categoria,precio:r.precio,
-          precio_variable:r.precio_variable,costo:r.costo,iva:r.iva,comanda:r.comanda,
-          codigo:r.codigo,color:r.color||'#546e7a',updated_at:new Date().toISOString()};
+        // Construir objeto de update — si precio es 0, no sobreescribir el precio actual
+        var upd={nombre:r.nombre.toUpperCase(),categoria:r.categoria,
+          precio_variable:r.precio_variable,iva:r.iva,comanda:r.comanda,
+          updated_at:new Date().toISOString()};
+        if(r.precio>0) upd.precio=r.precio;
+        if(r.costo>0) upd.costo=r.costo;
+        if(r.codigo) upd.codigo=r.codigo;
+        if(r.color) upd.color=r.color;
         await supaPatch('pos_productos','id=eq.'+r.id+'&licencia_email=ilike.'+encodeURIComponent(SE),upd);
         ok++;
       }
@@ -1097,7 +1113,7 @@ async function impConfirmar(){
 }
 
 async function renderProductos(){
-  document.getElementById('content').innerHTML='<div class="ph"><div><div class="pt">Productos</div><div class="ps">Catálogo sincronizado</div></div><div class="dbar"><button onclick="exportarCatalogo()" style="background:var(--b2);border:1px solid var(--blue);border-radius:7px;color:var(--blue);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Exportar con IDs</button><button onclick="goTo('importar')" style="background:var(--g2);border:1px solid var(--green);border-radius:7px;color:var(--green);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Importar</button></div></div><div class="card"><div class="card-h"><span class="card-t" id="pCount">—</span><input class="c-srch" placeholder="Buscar..." oninput="filtrP(this.value)"></div><table><thead><tr><th>Producto</th><th>Categoría</th><th>IVA</th><th style="text-align:right">Precio</th></tr></thead><tbody id="pBody"><tr><td colspan="4" class="loading"><span class="sp"></span></td></tr></tbody></table></div>';
+  document.getElementById('content').innerHTML='<div class="ph"><div><div class="pt">Productos</div><div class="ps">Catálogo sincronizado</div></div><div class="dbar"><button onclick="exportarCatalogo()" style="background:var(--b2);border:1px solid var(--blue);border-radius:7px;color:var(--blue);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Exportar con IDs</button><button onclick="goTo(\'importar\')" style="background:var(--g2);border:1px solid var(--green);border-radius:7px;color:var(--green);font-family:Barlow,sans-serif;font-size:12px;font-weight:700;padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Importar</button></div></div><div class="card"><div class="card-h"><span class="card-t" id="pCount">—</span><input class="c-srch" placeholder="Buscar..." oninput="filtrP(this.value)"></div><table><thead><tr><th>Producto</th><th>Categoría</th><th>IVA</th><th style="text-align:right">Precio</th></tr></thead><tbody id="pBody"><tr><td colspan="4" class="loading"><span class="sp"></span></td></tr></tbody></table></div>';
   try{
     allPrds=await sg('pos_productos','licencia_email=ilike.'+encodeURIComponent(SE)+'&activo=eq.true&order=nombre.asc&limit=500');
     renderPT(allPrds);
