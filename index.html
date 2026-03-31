@@ -5045,8 +5045,11 @@ function imprimirComanda(data){
     // Línea de espaciado + nro bien centrado + negrita
     txt += n;
     txt += sep + n;
-    txt += '[CENTER][BOLD]  ORDEN NRO:  [/BOLD][/CENTER]' + n;
-    txt += '[CENTER][DBLH]# ' + nro + '[/DBLH][/CENTER]' + n;
+    txt += '[CENTER][BOLD]- - - ORDEN NRO - - -[/BOLD][/CENTER]' + n;
+    // Número con espacios entre dígitos para que se vea más grande
+    var nroGrande = ('# ' + nro).split('').join(' ');
+    txt += '[CENTER][BOLD]' + nroGrande + '[/BOLD][/CENTER]' + n;
+    txt += '[CENTER][BOLD]' + nroGrande + '[/BOLD][/CENTER]' + n;
     txt += sep + n;
     txt += n;
 
@@ -10191,7 +10194,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.7.2 (2026-03-31)';
+const APP_VERSION = 'v1.7.3 (2026-03-31)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
