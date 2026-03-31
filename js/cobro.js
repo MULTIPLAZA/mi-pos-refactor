@@ -616,6 +616,8 @@ function getFacturaData() {
     tipo_timbrado: tim ? tim.tipo : 'autoimpresor',
     sucursal_nro:  tim ? pad3(tim.sucursal) : '',
     punto_exp:     tim ? pad3(tim.punto_exp) : '',
+    fecha_desde:   tim ? (tim.vig_inicio || tim.fecha_desde || '') : '',
+    fecha_hasta:   tim ? (tim.vig_fin    || tim.fecha_hasta || '') : '',
   };
 }
 
