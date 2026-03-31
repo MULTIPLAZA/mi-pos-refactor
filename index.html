@@ -4421,6 +4421,32 @@ function padR(s,n){ s=String(s); return s.length>=n?s.substring(0,n):' '.repeat(
 function center(s,n){ s=String(s); const p=Math.max(0,n-s.length); const l=Math.floor(p/2); return ' '.repeat(l)+s+' '.repeat(p-l); }
 
 // ── TICKET (no factura) ───────────────────────────────────
+// Helper — líneas de forma de pago desglosadas
+function lineasPago(data, gn){
+  let lineas = '';
+  if(data.divPagos && data.divPagos.length >= 2){
+    // Pago dividido — mostrar cada método por separado
+    data.divPagos.forEach(p => {
+      lineas += '<p class="row s"><span class="l1">'+p.metodo.toUpperCase()+':</span><span class="l2">'+gn(p.monto)+'</span></p>';
+    });
+  } else {
+    // Pago simple — o string compuesto viejo (ej: "EFECTIVO + POS")
+    const metodo = (data.metodo||'EFECTIVO').toUpperCase();
+    if(metodo.includes(' + ')){
+      // Dividir string compuesto en partes iguales
+      const partes = metodo.split(' + ');
+      const montoParte = Math.round(data.total / partes.length);
+      partes.forEach((m, i) => {
+        const monto = i === partes.length-1 ? data.total - montoParte*(partes.length-1) : montoParte;
+        lineas += '<p class="row s"><span class="l1">'+m+':</span><span class="l2">'+gn(monto)+'</span></p>';
+      });
+    } else {
+      lineas += '<p class="row s"><span class="l1">'+metodo+':</span><span class="l2">'+gn(data.total)+'</span></p>';
+    }
+  }
+  return lineas;
+}
+
 function generarHTMLTicket(data, size){
   const cols = size==='58' ? 32 : 42;
   const sep  = '-'.repeat(cols);
@@ -4501,7 +4527,8 @@ function generarHTMLTicket(data, size){
   // Forma de pago
   lineas += '<p class="row s"><span class="l1">FORMA DE PAGO</span><span class="l2">IMPORTE</span></p>';
   lineas += '<p class="hr"></p>';
-  lineas += '<p class="row s"><span class="l1">'+data.metodo+':</span><span class="l2">'+gn(data.total)+'</span></p>';
+  lineas += lineasPago(data, gn);
+  if(data.efectivo && data.efectivo!=='₲0') lineas += '<p class="row s"><span class="l1">EFECTIVO ENTREGADO:</span><span class="l2">'+data.efectivo+'</span></p>';
   if(data.vuelto) lineas += '<p class="row s"><span class="l1">VUELTO:</span><span class="l2">'+data.vuelto+'</span></p>';
   lineas += '<p class="hr"></p>';
 
@@ -4609,7 +4636,8 @@ function generarHTMLFactura(data, size){
   // Forma de pago
   lineas += '<p class="row s"><span class="l1">FORMA DE PAGO</span><span class="l2">IMPORTE</span></p>';
   lineas += '<p class="hr"></p>';
-  lineas += '<p class="row s"><span class="l1">'+data.metodo+':</span><span class="l2">'+gn(total)+'</span></p>';
+  lineas += lineasPago(data, gn);
+  if(data.efectivo && data.efectivo!=='₲0') lineas += '<p class="row s"><span class="l1">EFECTIVO ENTREGADO:</span><span class="l2">'+data.efectivo+'</span></p>';
   if(data.vuelto) lineas += '<p class="row s"><span class="l1">VUELTO:</span><span class="l2">'+data.vuelto+'</span></p>';
   lineas += '<p class="hr"></p>';
 
@@ -10107,7 +10135,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.6.3 (2026-03-29)';
+const APP_VERSION = 'v1.6.4 (2026-03-29)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
