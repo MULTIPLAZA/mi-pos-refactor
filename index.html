@@ -4158,25 +4158,26 @@ function saveDetDesc(lineId, val){
 function imprimirComandaPreCobro(){
   if(!cart.length){ toast('Sin productos'); return; }
   // Solo imprimir ítems NO enviados aún a cocina
-  const pendientes = cart.filter(i => !i.enviado);
-  if(!pendientes.length){ toast('Todo ya fue enviado a cocina'); return; }
+  const itemsPendientes = cart.filter(i => !i.enviado);
+  if(!itemsPendientes.length){ toast('Todo ya fue enviado a cocina'); return; }
   const d = new Date();
   imprimirComanda({
-    items: pendientes,
+    items: itemsPendientes,
     fecha: d,
     nroTicket: typeof currentTicketNro !== 'undefined' && currentTicketNro !== null ? currentTicketNro : ticketCounter,
     tipoPedido: tipoPedido||'llevar',
     mesa: mesaActual ? mesaActual.nombre : null,
     factura: null
   });
-  // Marcar como enviados
+  // Marcar como enviados en memoria
   cart.forEach(i => { i.enviado = true; });
-  // Persistir estado enviado en pendientes para que sobreviva al cambiar de ticket
-  if(typeof currentTicketNro !== 'undefined' && currentTicketNro !== null && typeof pendientes !== 'undefined'){
-    const idx = pendientes.findIndex(p => p.nro === currentTicketNro);
-    if(idx >= 0){
-      pendientes[idx].cart = JSON.parse(JSON.stringify(cart));
+  // Persistir en localStorage — usar el array global 'pendientes' (tickets guardados)
+  if(typeof currentTicketNro !== 'undefined' && currentTicketNro !== null){
+    const ticketIdx = pendientes.findIndex(p => p.nro === currentTicketNro);
+    if(ticketIdx >= 0){
+      pendientes[ticketIdx].cart = JSON.parse(JSON.stringify(cart));
       try { localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); } catch(e){}
+      console.log('[Comanda] Estado enviado guardado en ticket #'+currentTicketNro);
     }
   }
   updBtnComandaCobro();
@@ -4720,7 +4721,7 @@ function generarHTMLComanda(data, size){
   lineas += '<p class="hr"></p>';
 
   // Nro orden — LO MÁS GRANDE — lo que cocina ve primero
-  lineas += '<p class="c" style="font-size:36px;font-weight:900;letter-spacing:4px;line-height:1.1;margin:4px 0;">'
+  lineas += '<p class="c" style="font-size:52px;font-weight:900;letter-spacing:6px;line-height:1;margin:4px 0;">'
           + '# ' + nro + '</p>';
 
   // Separador
@@ -5023,10 +5024,10 @@ function imprimirComanda(data){
     // Nro de orden — lo más grande posible
     // Línea de espaciado + nro bien centrado + negrita
     txt += n;
-    txt += '[CENTER][BOLD]================================[/BOLD][/CENTER]' + n;
+    txt += sep + n;
     txt += '[CENTER][BOLD]  ORDEN NRO:  [/BOLD][/CENTER]' + n;
-    txt += '[CENTER][BOLD]# ' + nro + '[/BOLD][/CENTER]' + n;
-    txt += '[CENTER][BOLD]================================[/BOLD][/CENTER]' + n;
+    txt += '[CENTER][DBLH]# ' + nro + '[/DBLH][/CENTER]' + n;
+    txt += sep + n;
     txt += n;
 
     // Hora y fecha
@@ -10170,7 +10171,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.7.0 (2026-03-31)';
+const APP_VERSION = 'v1.7.1 (2026-03-31)';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
