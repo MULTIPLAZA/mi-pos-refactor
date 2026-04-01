@@ -10,6 +10,20 @@
 // ============================================================
 
 // gs, toast, goTo → disponibles globalmente desde js/ui.js
+// Parchear goTo para trackear pantalla actual y manejar historial
+(function patchGoTo(){
+  if(typeof goTo === 'function' && !goTo._parchado){
+    var _orig = goTo;
+    window.goTo = function(sc){
+      _orig(sc);
+      if(window._goToWrapper) window._goToWrapper(sc);
+    };
+    window.goTo._parchado = true;
+  } else if(typeof goTo === 'undefined'){
+    // ui.js aún no cargó — reintentar después
+    setTimeout(patchGoTo, 50);
+  }
+})();
 
 // ── ESTADO ──────────────────────────────────────────────────
 // Declaradas con var para que sean globales y visibles
