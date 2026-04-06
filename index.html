@@ -4617,6 +4617,9 @@ function generarHTMLTicket(data, size){
   if(data.nroOrden) lineas += '<p class="c s">Orden Nro: '+String(data.nroOrden).padStart(4,'0')+'</p>';
   if(configData.pie_recibo) lineas += '<p class="c s">'+configData.pie_recibo+'</p>';
   lineas += '<p class="c s b">*** GRACIAS POR SU PREFERENCIA ***</p>';
+  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
   return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
 }
 
@@ -4735,6 +4738,9 @@ function generarHTMLFactura(data, size){
   lineas += '<p class="s">LOS DATOS IMPRESOS REQUIEREN DE CUIDADOS ESPECIALES.</p>';
   if(configData.pie_recibo) lineas += '<p class="c s">'+configData.pie_recibo+'</p>';
   lineas += '<p class="c s b">*** GRACIAS POR SU PREFERENCIA ***</p>';
+  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
   return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
 }
 
@@ -4781,26 +4787,22 @@ function generarHTMLComanda(data, size){
   // Separador superior
   lineas += '<p class="hr"></p>';
 
-  // Nro orden — LO MÁS GRANDE — lo que cocina ve primero
-  lineas += '<p class="c" style="font-size:52px;font-weight:900;letter-spacing:6px;line-height:1;margin:4px 0;">'
+  // Nro orden — tamaño visible pero no exagerado
+  lineas += '<p class="c" style="font-size:28px;font-weight:900;letter-spacing:3px;line-height:1.1;margin:2px 0;">'
           + '# ' + nro + '</p>';
 
-  // Separador
-  lineas += '<p class="hr"></p>';
-
   // Hora y fecha
-  lineas += '<p class="c b" style="font-size:14px;margin:2px 0;">' + hora + '  ' + fecha + '</p>';
+  lineas += '<p class="c b" style="font-size:12px;margin:2px 0;">' + hora + '  ' + fecha + '</p>';
   lineas += '<p class="hr"></p>';
 
   // Tipo de pedido — muy visible
-  const bgTipo = esDelivery ? 'background:#000;color:#fff;' : 'background:#000;color:#fff;';
-  lineas += '<p class="c" style="font-size:14px;font-weight:900;'+bgTipo+'padding:4px 0;margin:2px 0;">'
+  lineas += '<p class="c" style="font-size:13px;font-weight:900;background:#000;color:#fff;padding:3px 0;margin:2px 0;">'
           + tipoLabel + '</p>';
 
   // Cliente si tiene
   const cliente = (data.factura && data.factura.nombre) || data.cliente || '';
-  if(cliente) lineas += '<p class="c b s" style="margin-top:2px;">Cliente: '+cliente+'</p>';
-  if(data.obs) lineas += '<p class="c b s">OBS: '+data.obs+'</p>';
+  if(cliente) lineas += '<p class="c b s" style="margin-top:2px;word-break:break-word;">Cliente: '+cliente+'</p>';
+  if(data.obs) lineas += '<p class="c b s;word-break:break-word;">OBS: '+data.obs+'</p>';
 
   lineas += '<p class="hr"></p>';
 
@@ -4837,6 +4839,9 @@ function generarHTMLComanda(data, size){
   });
 
   lineas += '<p class="hr"></p>';
+  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
 
   return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
 }
