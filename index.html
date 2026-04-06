@@ -8631,37 +8631,53 @@ async function conectarBluetooth(tipo){
   }
 }
 async function usarImpresoraUSBLocal(tipo){
-  // Verificar servidor activo
   toast('Buscando servidor USB...');
   var s = await USBPrinter.status();
   if(!s){
     toast('\u26a0\ufe0f Servidor no encontrado. \u00bfEst\u00e1 corriendo ampersand-print-server?');
     return;
   }
-  // Listar impresoras y pedir al usuario que elija
   var lista = await USBPrinter.listarImpresoras();
   if(!lista || lista.length === 0){
-    toast('\u26a0\ufe0f No se encontraron impresoras en Windows');
+    toast('\u26a0\ufe0f No se encontraron puertos/impresoras');
     return;
   }
-  // Mostrar selector simple
-  var opts = lista.map(function(n,i){ return (i+1)+'. '+n; }).join('\n');
-  var elegida = window.prompt('Seleccion\u00e1 el n\u00famero de impresora:\n\n'+opts);
+  // Separar puertos directos e impresoras instaladas
+  var puertos = lista.filter(function(x){ return x.tipo === 'puerto'; });
+  var impresoras = lista.filter(function(x){ return x.tipo === 'impresora'; });
+  var opts = '';
+  var items = [];
+  if(puertos.length){
+    opts += 'PUERTOS DIRECTOS (recomendado para Generic Text Only):\n';
+    puertos.forEach(function(p,i){
+      opts += (items.length+1)+'. '+p.nombre+'\n';
+      items.push(p);
+    });
+  }
+  if(impresoras.length){
+    opts += '\nIMPRESORAS WINDOWS:\n';
+    impresoras.forEach(function(p){
+      opts += (items.length+1)+'. '+p.nombre+'\n';
+      items.push(p);
+    });
+  }
+  var elegida = window.prompt('Seleccion\u00e1 el n\u00famero:\n\n'+opts+'\nPara Generic Text Only USB elegí USB001 o USB002');
   var idx = parseInt(elegida) - 1;
-  if(isNaN(idx) || idx < 0 || idx >= lista.length) return;
-  var nombre = lista[idx];
-  var r = await USBPrinter.seleccionar(nombre);
+  if(isNaN(idx) || idx < 0 || idx >= items.length) return;
+  var item = items[idx];
+  var r = await USBPrinter.seleccionar(item);
   if(r.status !== 'ok'){
     toast('Error: '+r.mensaje); return;
   }
-  printers[tipo].name   = nombre;
+  printers[tipo].name   = item.nombre;
   printers[tipo].type   = 'usblocal';
   printers[tipo].device = null;
   localStorage.setItem('printerType_'+tipo, 'usblocal');
-  localStorage.setItem('printerName_'+tipo, nombre);
-  localStorage.setItem('usblocal_printer', nombre);
+  localStorage.setItem('printerName_'+tipo, item.nombre);
+  localStorage.setItem('usblocal_printer', item.valor);
+  localStorage.setItem('usblocal_printer_nombre', item.nombre);
   updPrinterUI(tipo);
-  toast('\u2713 Impresora USB configurada: '+nombre);
+  toast('\u2713 Configurada: '+item.nombre);
 }
 
 async function usarImpresoraPC(tipo){
@@ -10423,8 +10439,9 @@ const USBPrinter = {
     if(!s){ this._updUI(false); return; }
     this._updUI(true);
     // Re-seleccionar impresora guardada
-    var nombre = localStorage.getItem('usblocal_printer');
-    if(nombre) await this.seleccionar(nombre);
+    var valor = localStorage.getItem('usblocal_printer');
+    var nombre = localStorage.getItem('usblocal_printer_nombre') || valor;
+    if(valor) await this.seleccionar({valor: valor, nombre: nombre});
   },
 
   _updUI(conectada) {
