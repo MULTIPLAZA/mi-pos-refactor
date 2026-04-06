@@ -9001,7 +9001,7 @@ function htmlATextoPlano(htmlContent, cols){
       .replace(/[\u00C1\u00E1]/g,'A').replace(/[\u00C9\u00E9]/g,'E')
       .replace(/[\u00CD\u00ED]/g,'I').replace(/[\u00D3\u00F3]/g,'O')
       .replace(/[\u00DA\u00FA]/g,'U').replace(/[\u00D1\u00F1]/g,'N')
-      .replace(/[\u20B2]/g,'Gs').replace(/[^\x00-\x7E]/g,'?');
+      .replace(/\u20B2/g,'Gs').replace(/[\u0080-\uFFFF]/g,'?');
   }
 
   parrafos.forEach(function(p){
@@ -9057,8 +9057,6 @@ function limpiarParaImpresora(html){
     .replace(/\u00D1/g, 'N').replace(/\u00F1/g, 'n')
     .replace(/\u00BF/g, '?').replace(/\u00A1/g, '!')
     .replace(/[\u0080-\uFFFF]/g, '?');
-}
-
 }
 
 function abrirDialogoImpresion(htmlContent, widthPx){
