@@ -5035,7 +5035,9 @@ function imprimirRecibo(){
   } else if(p && p.type === 'bt' && p.device){
     imprimirBluetooth(p.device, html, size);
   } else {
-    imprimirDirecto(html, size);
+    // PC/USB — usar el mismo flujo que la primera impresion
+    const widthPx = size === '58' ? '200px' : '280px';
+    abrirDialogoImpresion(html, widthPx);
   }
 }
 
@@ -8680,27 +8682,14 @@ async function usarImpresoraUSBLocal(tipo){
   toast('\u2713 Configurada: '+item.nombre);
 }
 
-async function usarImpresoraPC(tipo){
-  if(!navigator.serial){
-    toast('⚠️ Web Serial no soportado — usá Chrome 89+ en PC');
-    return;
-  }
-  try {
-    var port = await navigator.serial.requestPort();
-    await port.open({ baudRate: 9600 });
-    await port.close();
-    printers[tipo].name   = 'USB Serial';
-    printers[tipo].type   = 'serial';
-    printers[tipo].device = port;
-    localStorage.setItem('printerType_'+tipo, 'serial');
-    localStorage.setItem('printerName_'+tipo, 'USB Serial');
-    updPrinterUI(tipo);
-    toast('\u2713 Impresora USB conectada para '+tipo);
-  } catch(e) {
-    if(e.name !== 'NotFoundError'){
-      toast('Error al conectar puerto: '+e.message);
-    }
-  }
+function usarImpresoraPC(tipo){
+  printers[tipo].name   = 'Impresora del sistema';
+  printers[tipo].type   = 'pc';
+  printers[tipo].device = null;
+  localStorage.setItem('printerType_'+tipo, 'pc');
+  localStorage.setItem('printerName_'+tipo, 'Impresora del sistema');
+  updPrinterUI(tipo);
+  toast('\u2713 Configurada PC/USB para '+tipo);
 }
 
 
