@@ -818,7 +818,7 @@ async function loadDashData(f){
         if(!Array.isArray(items)) return;
         items.forEach(function(it){
           if(it.esDescuento) return;
-          var cat=it.category||it.categoria||'Sin categoría';
+          var cat=it.cat||it.category||it.categoria||'Sin categoría';
           var nom=it.name||it.nombre||'—';
           var qty=it.qty||1;
           var sub=(it.price||0)*qty;
@@ -984,20 +984,21 @@ async function _render7Dias(hoy,fmt,p2,textColor,gridColor,fontFam){
 }
 
 async function _renderInsights(hoy,fmt,p2){
-  var diasNom=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  var diasNom=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
   var $$=function(id){return document.getElementById(id);};
   var hace30=new Date(hoy); hace30.setDate(hoy.getDate()-30);
   try{
     var vH=await sg('pos_ventas',
       'licencia_email=ilike.'+encodeURIComponent(SE)+
       '&fecha=gte.'+fmt(hace30)+'T00:00:00&fecha=lte.'+fmt(hoy)+'T23:59:59&limit=2000');
-    // Día más activo
+    // Día más activo — mismo mapeo que heatmap: lun=0 ... dom=6
     var diaMap=new Array(7).fill(0), diaCount=new Array(7).fill(0);
     var hrMap=new Array(24).fill(0), hrCount=new Array(24).fill(0);
     var diasVistos={};
     vH.forEach(function(x){
       var d=new Date(x.fecha);
-      var dow=d.getDay(), hr=d.getHours();
+      var dow=(d.getDay()||7)-1; // lun=0, mar=1 ... dom=6
+      var hr=d.getHours();
       var dayKey=fmt(d);
       if(!diasVistos[dayKey]) diasVistos[dayKey]=dow;
       diaMap[dow]+=(x.total||0);
