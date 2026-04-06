@@ -2143,6 +2143,10 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           PC / USB
         </button>
+        <button class="printer-btn" onclick="usarImpresoraUSBLocal('ticket')" style="background:rgba(255,152,0,.12);border-color:#ff9800;color:#ff9800;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><path d="M12 22V8"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/><path d="M12 8V2"/><path d="M9 5l3-3 3 3"/></svg>
+          USB LOCAL
+        </button>
         <button class="printer-btn danger" id="ticketPrinterDisconnect" style="display:none;" onclick="desconectarImpresora('ticket')">QUITAR</button>
       </div>
       <div style="margin-top:14px;">
@@ -2177,6 +2181,10 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           PC / USB
         </button>
+        <button class="printer-btn" onclick="usarImpresoraUSBLocal('comanda')" style="background:rgba(255,152,0,.12);border-color:#ff9800;color:#ff9800;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><path d="M12 22V8"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/><path d="M12 8V2"/><path d="M9 5l3-3 3 3"/></svg>
+          USB LOCAL
+        </button>
         <button class="printer-btn danger" id="comandaPrinterDisconnect" style="display:none;" onclick="desconectarImpresora('comanda')">QUITAR</button>
       </div>
       <div style="margin-top:14px;">
@@ -2197,7 +2205,7 @@
     </div>
     <div class="print-info-box" style="margin-top:0;border-left-color:#1565c0;">
       <div class="print-info-title">💻 PC / Notebook</div>
-      <div class="print-info-text">Seleccioná <strong>PC / USB</strong> — usa la impresora configurada en Windows. Compatible con cualquier térmica de 58 o 80 mm.</div>
+      <div class="print-info-text">Seleccioná <strong>PC / USB</strong> — conectá el puerto COM de tu impresora térmica. Imprime automático sin diálogo, igual que Bluetooth. Requiere Chrome 89+.</div>
     </div>
     <div style="height:16px;"></div>
   </div>
@@ -3968,7 +3976,7 @@ function renderCatPills(){
   }).join('');
 }
 function renderCategoriasVenta(){
-  if(document.getElementById('catOv')?.classList.contains('open')) openCat();
+  var _catOv=document.getElementById('catOv'); if(_catOv && _catOv.classList.contains('open')) openCat();
 }
 function closeCat(e){ if(e.target===document.getElementById('catOv'))document.getElementById('catOv').classList.remove('open'); }
 function pickCat(el){
@@ -4147,7 +4155,7 @@ function detChgQty(lineId, delta){
 }
 function toggleDetObs(lineId){ const box=document.getElementById('detObs_'+lineId); if(!box)return; box.classList.toggle('open'); if(box.classList.contains('open'))box.querySelector('input').focus(); }
 function saveDetObs(lineId, val){ const item=cart.find(l=>l.lineId===lineId); if(item)item.obs=val; const btn=document.querySelector('#detItem_'+lineId+' .det-obs-toggle'); if(btn)btn.lastChild.textContent=val?' Obs: '+val.substring(0,20):' Observación'; }
-function toggleDetDesc(lineId){ const el=document.getElementById('detDesc_'+lineId); if(!el)return; const open=el.style.display==='block'; el.style.display=open?'none':'block'; if(!open)setTimeout(()=>el.querySelector('input')?.focus(),50); }
+function toggleDetDesc(lineId){ const el=document.getElementById('detDesc_'+lineId); if(!el)return; const open=el.style.display==='block'; el.style.display=open?'none':'block'; if(!open)setTimeout(function(){var _i=el.querySelector('input');if(_i)_i.focus();},50); }
 function saveDetDesc(lineId, val){
   const item=cart.find(i=>i.lineId===lineId); if(!item)return;
   item.desc=Math.min(100,Math.max(0,parseFloat(val)||0)); updUI();
@@ -4320,7 +4328,7 @@ function imprimirComandaActual(){
 let ultimoReciboData = null;
 
 // Obtener tamaño de papel configurado
-function getPaperSize(tipo){ return printers[tipo]?.size || localStorage.getItem('printerSize_'+tipo) || '58'; }
+function getPaperSize(tipo){ return (printers[tipo] && printers[tipo].size) || localStorage.getItem('printerSize_'+tipo) || '58'; }
 
 // CSS base para impresión térmica
 function getCSSTermico(size){
@@ -4507,7 +4515,7 @@ function generarHTMLTicket(data, size){
   // Datos ticket
   lineas += '<p class="s">TICKET NRO: '+String(data.nroTicket||0).padStart(6,'0')+'</p>';
   lineas += '<p class="s">FECHA: '+fecha+' - HORA: '+hora+'</p>';
-  lineas += '<p class="s">CLIENTE: '+(data.factura?.nombre||'SIN NOMBRE')+'</p>';
+  lineas += '<p class="s">CLIENTE: '+((data.factura && data.factura.nombre)||'SIN NOMBRE')+'</p>';
   if(data.tipoPedido && data.tipoPedido!=='llevar' && data.tipoPedido!=='local'){
     lineas += '<p class="s b">TIPO: '+data.tipoPedido.toUpperCase()+'</p>';
   }
@@ -4624,8 +4632,8 @@ function generarHTMLFactura(data, size){
   const timActivo = getTimbradoActivo();
   lineas += '<p class="s">TIMBRADO Nro: <b>'+tim+'</b></p>';
   // Vigencia del timbrado
-  const vigInicio = timActivo?.vig_inicio || timActivo?.fecha_desde || '';
-  const vigFin    = timActivo?.vig_fin    || timActivo?.fecha_hasta || '';
+  const vigInicio = (timActivo && timActivo.vig_inicio) || (timActivo && timActivo.fecha_desde) || '';
+  const vigFin    = (timActivo && timActivo.vig_fin)    || (timActivo && timActivo.fecha_hasta) || '';
   if(vigInicio) lineas += '<p class="s">INICIO: '+(vigInicio.includes('-')?vigInicio.split('-').reverse().join('/'):vigInicio)+'</p>';
   if(vigFin && vigFin!=='2999-12-31') lineas += '<p class="s">VENCIMIENTO: '+(vigFin.includes('-')?vigFin.split('-').reverse().join('/'):vigFin)+'</p>';
   // Punto de expedición
@@ -4754,7 +4762,7 @@ function generarHTMLComanda(data, size){
           + tipoLabel + '</p>';
 
   // Cliente si tiene
-  const cliente = data.factura?.nombre || data.cliente || '';
+  const cliente = (data.factura && data.factura.nombre) || data.cliente || '';
   if(cliente) lineas += '<p class="c b s" style="margin-top:2px;">Cliente: '+cliente+'</p>';
   if(data.obs) lineas += '<p class="c b s">OBS: '+data.obs+'</p>';
 
@@ -5634,7 +5642,7 @@ async function emitirFacturaPostCobro(ventaId){
         </div>
         <div>
           <div style="font-size:16px;font-weight:800;color:var(--text);">Emitir factura</div>
-          <div style="font-size:12px;color:#2196f3;">Timbrado ${tim?.nro||'—'} · Próx. nro: ${nroPreview}</div>
+          <div style="font-size:12px;color:#2196f3;">Timbrado ${(tim && tim.nro)||'—'} · Próx. nro: ${nroPreview}</div>
         </div>
       </div>
 
@@ -5672,11 +5680,11 @@ async function emitirFacturaPostCobro(ventaId){
       </div>
     </div>`;
   document.body.appendChild(ov);
-  setTimeout(()=>{ document.getElementById('fpRuc')?.focus(); }, 300);
+  setTimeout(function(){ var _el=document.getElementById('fpRuc'); if(_el)_el.focus(); }, 300);
 }
 
 async function fpBuscarRuc(){
-  const ruc = document.getElementById('fpRuc')?.value.trim();
+  var _fpRuc=document.getElementById('fpRuc'); const ruc = _fpRuc ? _fpRuc.value.trim() : '';
   if(!ruc) return;
   const st = document.getElementById('fpRucStatus');
   if(st) st.textContent = 'Consultando...';
@@ -5697,12 +5705,13 @@ async function fpBuscarRuc(){
 }
 
 async function fpConfirmar(ventaId){
-  const ruc    = document.getElementById('fpRuc')?.value.trim();
-  const nombre = document.getElementById('fpNombre')?.value.trim();
-  const dir    = document.getElementById('fpDir')?.value.trim() || '';
+  var _elRuc=document.getElementById('fpRuc'), _elNom=document.getElementById('fpNombre'), _elDir=document.getElementById('fpDir');
+  const ruc    = _elRuc ? _elRuc.value.trim() : '';
+  const nombre = _elNom ? _elNom.value.trim() : '';
+  const dir    = _elDir ? _elDir.value.trim() : '';
 
-  if(!ruc){   toast('⚠️ RUC / C.I. es obligatorio'); document.getElementById('fpRuc')?.focus(); return; }
-  if(!nombre){ toast('⚠️ Razón social es obligatoria'); document.getElementById('fpNombre')?.focus(); return; }
+  if(!ruc){   toast('⚠️ RUC / C.I. es obligatorio'); if(_elRuc)_elRuc.focus(); return; }
+  if(!nombre){ toast('⚠️ Razón social es obligatoria'); if(_elNom)_elNom.focus(); return; }
 
   if(!db) return toast('Sin base de datos local');
 
@@ -5737,7 +5746,7 @@ async function fpConfirmar(ventaId){
     avanzarNroFactura(tim);
 
     // Cerrar modal y refrescar
-    document.getElementById('facPostOv')?.remove();
+    var _facPost=document.getElementById('facPostOv'); if(_facPost)_facPost.remove();
     toast('🧾 Factura '+nroFact+' emitida');
     await renderVentasList();
   } catch(e){
@@ -5764,7 +5773,7 @@ function marcarPresupuesto(idx, esPresupuesto){
     }
   }
   // Refrescar lista de ventas si está visible
-  if(document.getElementById('scVentas')?.classList.contains('active')){
+  var _scV=document.getElementById('scVentas'); if(_scV && _scV.classList.contains('active')){
     renderVentasList();
   }
 }
@@ -7836,12 +7845,15 @@ function goToConfig(){
 }
 
 function saveGeneralConfig(){
-  configData.negocio   = document.getElementById('cfgNegocio')?.value  || configData.negocio;
-  configData.direccion = document.getElementById('cfgDireccion')?.value || configData.direccion;
-  configData.telefono  = document.getElementById('cfgTelefono')?.value  || configData.telefono;
-  configData.ruc       = document.getElementById('cfgRuc')?.value       || configData.ruc;
-  configData.presupuestosHabilitados = !!(document.getElementById('cfgPresupuestos')?.checked);
-  configData.comandasHabilitadas     = !!(document.getElementById('cfgComandas')?.checked);
+  var _cfgNeg=document.getElementById('cfgNegocio'),   _cfgDir=document.getElementById('cfgDireccion');
+  var _cfgTel=document.getElementById('cfgTelefono'),   _cfgRuc=document.getElementById('cfgRuc');
+  var _cfgPre=document.getElementById('cfgPresupuestos'),_cfgCom=document.getElementById('cfgComandas');
+  configData.negocio   = (_cfgNeg  ? _cfgNeg.value   : null) || configData.negocio;
+  configData.direccion = (_cfgDir  ? _cfgDir.value   : null) || configData.direccion;
+  configData.telefono  = (_cfgTel  ? _cfgTel.value   : null) || configData.telefono;
+  configData.ruc       = (_cfgRuc  ? _cfgRuc.value   : null) || configData.ruc;
+  configData.presupuestosHabilitados = !!(_cfgPre ? _cfgPre.checked : false);
+  configData.comandasHabilitadas     = !!(_cfgCom ? _cfgCom.checked : false);
   // Persistir en localStorage
   localStorage.setItem('an', configData.negocio);
   localStorage.setItem('ad', configData.direccion);
@@ -8582,14 +8594,61 @@ async function conectarBluetooth(tipo){
     if(e.name !== 'NotFoundError') toast('Error BT: ' + e.message);
   }
 }
-function usarImpresoraPC(tipo){
-  printers[tipo].name   = 'Impresora del sistema';
-  printers[tipo].type   = 'pc';
+async function usarImpresoraUSBLocal(tipo){
+  // Verificar servidor activo
+  toast('Buscando servidor USB...');
+  var s = await USBPrinter.status();
+  if(!s){
+    toast('\u26a0\ufe0f Servidor no encontrado. \u00bfEst\u00e1 corriendo ampersand-print-server?');
+    return;
+  }
+  // Listar impresoras y pedir al usuario que elija
+  var lista = await USBPrinter.listarImpresoras();
+  if(!lista || lista.length === 0){
+    toast('\u26a0\ufe0f No se encontraron impresoras en Windows');
+    return;
+  }
+  // Mostrar selector simple
+  var opts = lista.map(function(n,i){ return (i+1)+'. '+n; }).join('\n');
+  var elegida = window.prompt('Seleccion\u00e1 el n\u00famero de impresora:\n\n'+opts);
+  var idx = parseInt(elegida) - 1;
+  if(isNaN(idx) || idx < 0 || idx >= lista.length) return;
+  var nombre = lista[idx];
+  var r = await USBPrinter.seleccionar(nombre);
+  if(r.status !== 'ok'){
+    toast('Error: '+r.mensaje); return;
+  }
+  printers[tipo].name   = nombre;
+  printers[tipo].type   = 'usblocal';
   printers[tipo].device = null;
-  localStorage.setItem('printerType_'+tipo, 'pc');
-  localStorage.setItem('printerName_'+tipo, 'Impresora del sistema');
+  localStorage.setItem('printerType_'+tipo, 'usblocal');
+  localStorage.setItem('printerName_'+tipo, nombre);
+  localStorage.setItem('usblocal_printer', nombre);
   updPrinterUI(tipo);
-  toast('Configurada impresora PC/USB para '+tipo);
+  toast('\u2713 Impresora USB configurada: '+nombre);
+}
+
+async function usarImpresoraPC(tipo){
+  if(!navigator.serial){
+    toast('⚠️ Web Serial no soportado — usá Chrome 89+ en PC');
+    return;
+  }
+  try {
+    var port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 9600 });
+    await port.close();
+    printers[tipo].name   = 'USB Serial';
+    printers[tipo].type   = 'serial';
+    printers[tipo].device = port;
+    localStorage.setItem('printerType_'+tipo, 'serial');
+    localStorage.setItem('printerName_'+tipo, 'USB Serial');
+    updPrinterUI(tipo);
+    toast('\u2713 Impresora USB conectada para '+tipo);
+  } catch(e) {
+    if(e.name !== 'NotFoundError'){
+      toast('Error al conectar puerto: '+e.message);
+    }
+  }
 }
 
 
@@ -8722,6 +8781,18 @@ function imprimirTicketConf(htmlContent, tipo){
   if(p && p.type === 'bt' && p.needsReconnect){
     toast('⚠️ Reconectá la impresora Bluetooth primero');
     goTo('scConfigImpresoras');
+    return;
+  }
+
+  // ── MODO USB Serial (Web Serial API) ─────────────────────────────────────
+  if(p && p.type === 'serial' && p.device){
+    imprimirSerial(p.device, htmlContent, size);
+    return;
+  }
+
+  // ── MODO USB Local (servidor local 9200) ──────────────────────────────────
+  if(p && p.type === 'usblocal'){
+    imprimirUSBLocal(htmlContent, size);
     return;
   }
 
@@ -8874,6 +8945,224 @@ async function imprimirAndroidNativo(htmlContent, size){
   // Llamar al puente Java — esto ejecuta la impresión Bluetooth nativa
   const resultado = window.AndroidPrint.print(base64);
   return resultado;
+}
+
+// ── FUNCIÓN: imprimirUSBLocal (via servidor local 9200) ──────────────────────
+async function imprimirUSBLocal(htmlContent, size){
+  var ESC=0x1B, GS=0x1D;
+  var CMD = {
+    init:[ESC,0x40], left:[ESC,0x61,0x00], center:[ESC,0x61,0x01],
+    boldOn:[ESC,0x45,0x01], boldOff:[ESC,0x45,0x00],
+    dblWideOn:[ESC,0x21,0x20], dblWideOff:[ESC,0x21,0x00],
+    smallOn:[ESC,0x21,0x01], smallOff:[ESC,0x21,0x00],
+    cut:[GS,0x56,0x41,0x10], feed:[ESC,0x64,0x03],
+  };
+  var cols = size==='58' ? 32 : 42;
+
+  function enc(str){
+    var out=[];
+    for(var i=0;i<str.length;i++){
+      var c=str.charCodeAt(i);
+      if(c<128) out.push(c);
+      else if(c===0xC1||c===0xE1) out.push(0xC1);
+      else if(c===0xC9||c===0xE9) out.push(0xC9);
+      else if(c===0xCD||c===0xED) out.push(0xCD);
+      else if(c===0xD3||c===0xF3) out.push(0xD3);
+      else if(c===0xDA||c===0xFA) out.push(0xDA);
+      else if(c===0xD1||c===0xF1) out.push(0xD1);
+      else out.push(0x3F);
+    }
+    return out;
+  }
+  function line(str){ return enc(str).concat([0x0A]); }
+  function sep(){ return line('-'.repeat(cols)); }
+  function rline(l,r){
+    var ls=String(l), rs=String(r);
+    var sp=Math.max(1,cols-ls.length-rs.length);
+    return line(ls+' '.repeat(sp)+rs);
+  }
+
+  var tmp=document.createElement('div');
+  var htmlParsear=htmlContent;
+  var bm=htmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  if(bm) htmlParsear=bm[1];
+  tmp.innerHTML=htmlParsear;
+
+  var parrafos=Array.from(tmp.querySelectorAll('p'));
+  var bytes=[ESC,0x40,ESC,0x74,0x02];
+
+  parrafos.forEach(function(p){
+    var cls=p.className||'';
+    var text=(p.innerText||p.textContent||'').trim();
+    if(!text && !cls.includes('hr')) return;
+    if(cls.includes('hr')){ bytes=bytes.concat(sep()); return; }
+
+    var isCenter=cls.includes('c');
+    var isBold=cls.includes('b');
+    var isLarge=cls.includes('l');
+    var isSmall=cls.includes('s')&&!cls.includes('s b')&&!cls.includes('c s');
+
+    if(isCenter) bytes=bytes.concat(CMD.center); else bytes=bytes.concat(CMD.left);
+    if(isLarge)  bytes=bytes.concat(CMD.dblWideOn,CMD.boldOn);
+    else if(isBold) bytes=bytes.concat(CMD.boldOn);
+    if(isSmall) bytes=bytes.concat(CMD.smallOn);
+
+    if(cls.includes('row')){
+      var spans=p.querySelectorAll('span');
+      if(spans.length>=2){
+        var l=(spans[0].innerText||spans[0].textContent||'').trim();
+        var r=(spans[spans.length-1].innerText||spans[spans.length-1].textContent||'').trim();
+        bytes=bytes.concat(CMD.left);
+        if(isBold||isLarge) bytes=bytes.concat(CMD.boldOn);
+        if(isLarge) bytes=bytes.concat(CMD.dblWideOn);
+        bytes=bytes.concat(rline(l,r));
+        bytes=bytes.concat(CMD.boldOff,CMD.dblWideOff,CMD.smallOff);
+        return;
+      }
+    }
+    if(cls.includes('it-det')||cls.includes('if-det')){
+      var spans=p.querySelectorAll('span');
+      if(spans.length>=2){
+        bytes=bytes.concat(CMD.left,CMD.smallOn);
+        var parts=Array.from(spans).map(function(s){return (s.innerText||s.textContent||'').trim();});
+        if(parts.length===3){ bytes=bytes.concat(rline('  '+parts[0],parts[2])); }
+        else { bytes=bytes.concat(line('  '+parts.join('  '))); }
+        bytes=bytes.concat(CMD.smallOff);
+        return;
+      }
+    }
+    if(cls.includes('it-nom')||cls.includes('if-nom')){
+      bytes=bytes.concat(CMD.left,CMD.boldOn,line(text),CMD.boldOff);
+      return;
+    }
+    bytes=bytes.concat(line(text),CMD.boldOff,CMD.dblWideOff,CMD.smallOff);
+  });
+  bytes=bytes.concat(CMD.feed,CMD.cut);
+
+  var r = await USBPrinter.imprimirBytes(bytes);
+  if(r.status === 'ok'){
+    toast('\u2713 Impreso por USB');
+  } else {
+    toast('\u26a0\ufe0f Error USB: '+(r.mensaje||'desconocido'));
+  }
+}
+
+// ── FUNCIÓN: imprimirSerial (Web Serial API — USB térmicas) ─────────────────
+async function imprimirSerial(port, htmlContent, size){
+  var ESC=0x1B, GS=0x1D;
+  var CMD = {
+    init:       [ESC,0x40],
+    left:       [ESC,0x61,0x00],
+    center:     [ESC,0x61,0x01],
+    boldOn:     [ESC,0x45,0x01],
+    boldOff:    [ESC,0x45,0x00],
+    dblWideOn:  [ESC,0x21,0x20],
+    dblWideOff: [ESC,0x21,0x00],
+    smallOn:    [ESC,0x21,0x01],
+    smallOff:   [ESC,0x21,0x00],
+    cut:        [GS,0x56,0x41,0x10],
+    feed:       [ESC,0x64,0x03],
+  };
+  var cols = size==='58' ? 32 : 42;
+
+  function enc(str){
+    var out=[];
+    for(var i=0;i<str.length;i++){
+      var c=str.charCodeAt(i);
+      if(c<128)                       out.push(c);
+      else if(c===0xC1||c===0xE1)     out.push(0xC1);
+      else if(c===0xC9||c===0xE9)     out.push(0xC9);
+      else if(c===0xCD||c===0xED)     out.push(0xCD);
+      else if(c===0xD3||c===0xF3)     out.push(0xD3);
+      else if(c===0xDA||c===0xFA)     out.push(0xDA);
+      else if(c===0xD1||c===0xF1)     out.push(0xD1);
+      else out.push(0x3F);
+    }
+    return out;
+  }
+  function line(str){ return enc(str).concat([0x0A]); }
+  function sep(){ return line('-'.repeat(cols)); }
+  function rline(l,r){
+    var ls=String(l), rs=String(r);
+    var sp=Math.max(1,cols-ls.length-rs.length);
+    return line(ls+' '.repeat(sp)+rs);
+  }
+
+  var tmp=document.createElement('div');
+  var htmlParsear=htmlContent;
+  var bm=htmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  if(bm) htmlParsear=bm[1];
+  tmp.innerHTML=htmlParsear;
+
+  var parrafos=Array.from(tmp.querySelectorAll('p'));
+  var bytes=[ESC,0x40, ESC,0x74,0x02]; // init + latin-1
+
+  parrafos.forEach(function(p){
+    var cls=p.className||'';
+    var text=(p.innerText||p.textContent||'').trim();
+    if(!text && !cls.includes('hr')) return;
+    if(cls.includes('hr')){ bytes=bytes.concat(sep()); return; }
+
+    var isCenter=cls.includes('c');
+    var isBold=cls.includes('b');
+    var isLarge=cls.includes('l');
+    var isSmall=cls.includes('s')&&!cls.includes('s b')&&!cls.includes('c s');
+
+    if(isCenter) bytes=bytes.concat(CMD.center); else bytes=bytes.concat(CMD.left);
+    if(isLarge)  bytes=bytes.concat(CMD.dblWideOn,CMD.boldOn);
+    else if(isBold) bytes=bytes.concat(CMD.boldOn);
+    if(isSmall) bytes=bytes.concat(CMD.smallOn);
+
+    if(cls.includes('row')){
+      var spans=p.querySelectorAll('span');
+      if(spans.length>=2){
+        var l=(spans[0].innerText||spans[0].textContent||'').trim();
+        var r=(spans[spans.length-1].innerText||spans[spans.length-1].textContent||'').trim();
+        bytes=bytes.concat(CMD.left);
+        if(isBold||isLarge) bytes=bytes.concat(CMD.boldOn);
+        if(isLarge) bytes=bytes.concat(CMD.dblWideOn);
+        bytes=bytes.concat(rline(l,r));
+        bytes=bytes.concat(CMD.boldOff,CMD.dblWideOff,CMD.smallOff);
+        return;
+      }
+    }
+    if(cls.includes('it-det')||cls.includes('if-det')){
+      var spans=p.querySelectorAll('span');
+      if(spans.length>=2){
+        bytes=bytes.concat(CMD.left,CMD.smallOn);
+        var parts=Array.from(spans).map(function(s){return (s.innerText||s.textContent||'').trim();});
+        if(parts.length===3){ bytes=bytes.concat(rline('  '+parts[0],parts[2])); }
+        else { bytes=bytes.concat(line('  '+parts.join('  '))); }
+        bytes=bytes.concat(CMD.smallOff);
+        return;
+      }
+    }
+    if(cls.includes('it-nom')||cls.includes('if-nom')){
+      bytes=bytes.concat(CMD.left,CMD.boldOn,line(text),CMD.boldOff);
+      return;
+    }
+    bytes=bytes.concat(line(text),CMD.boldOff,CMD.dblWideOff,CMD.smallOff);
+  });
+  bytes=bytes.concat(CMD.feed,CMD.cut);
+
+  try {
+    await port.open({ baudRate: 9600 });
+    var writer=port.writable.getWriter();
+    await writer.write(new Uint8Array(bytes));
+    writer.releaseLock();
+    await port.close();
+    toast('\u2713 Impreso por USB');
+  } catch(e) {
+    // Puerto ya abierto — intentar directo
+    try {
+      var writer=port.writable.getWriter();
+      await writer.write(new Uint8Array(bytes));
+      writer.releaseLock();
+      toast('\u2713 Impreso por USB');
+    } catch(e2){
+      toast('Error USB: '+e2.message);
+    }
+  }
 }
 
 async function imprimirBluetooth(device, htmlContent, size){
@@ -9230,7 +9519,7 @@ async function supaLoadProductos(){
       } catch(ed){ console.warn('[DB] Cache productos:', ed.message); }
     }
   } catch(e){
-    if(!e.message?.includes('Failed to fetch'))
+    if(!(e.message && e.message.includes('Failed to fetch')))
       console.warn('[Supabase] Productos:', e.message);
     // PRODS queda intacto — no se limpió
   }
@@ -10044,6 +10333,72 @@ async function limpiarSyncQueue(){
 // MÓDULO: BluetoothPrinter — puente HTTP con BT Print Server
 // Servidor local en http://127.0.0.1:8080
 // ══════════════════════════════════════════════════════════════════
+// ── USB Print Server (local — puerto 9200) ──────────────────────────────────
+const USBPrinter = {
+  BASE: 'http://127.0.0.1:9200',
+  TIMEOUT_MS: 4000,
+
+  async _fetch(path, opts) {
+    var ctrl = new AbortController();
+    var tid  = setTimeout(function(){ ctrl.abort(); }, this.TIMEOUT_MS);
+    try {
+      var r = await fetch(this.BASE + path, Object.assign({}, opts, { signal: ctrl.signal }));
+      clearTimeout(tid);
+      return r;
+    } catch(e) { clearTimeout(tid); throw e; }
+  },
+
+  async status() {
+    try { var r = await this._fetch('/status'); return await r.json(); }
+    catch(e) { return null; }
+  },
+
+  async listarImpresoras() {
+    try { var r = await this._fetch('/impresoras'); return await r.json(); }
+    catch(e) { return []; }
+  },
+
+  async seleccionar(nombre) {
+    try {
+      var r = await this._fetch('/seleccionar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: nombre })
+      });
+      return await r.json();
+    } catch(e) { return { status: 'error', mensaje: 'Servidor no disponible' }; }
+  },
+
+  async imprimirBytes(bytes) {
+    try {
+      var r = await this._fetch('/imprimir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: new Uint8Array(bytes)
+      });
+      return await r.json();
+    } catch(e) { return { status: 'error', mensaje: 'Servidor no disponible' }; }
+  },
+
+  async iniciar() {
+    var tipo = localStorage.getItem('printerType_ticket');
+    if(tipo !== 'usblocal') return;
+    var s = await this.status();
+    if(!s){ this._updUI(false); return; }
+    this._updUI(true);
+    // Re-seleccionar impresora guardada
+    var nombre = localStorage.getItem('usblocal_printer');
+    if(nombre) await this.seleccionar(nombre);
+  },
+
+  _updUI(conectada) {
+    var st = document.getElementById('usblocalStatus');
+    var nm = document.getElementById('usblocalName');
+    if(st){ st.textContent = conectada ? '● Servidor activo' : '● Servidor no encontrado'; st.style.color = conectada ? 'var(--green)' : '#ef5350'; }
+    if(nm){ nm.textContent = conectada ? (localStorage.getItem('usblocal_printer') || 'USB Local') : 'Sin impresora'; }
+  }
+};
+
 const BTPrinter = {
   BASE: 'http://127.0.0.1:8080',
   TIMEOUT_MS: 5000,
@@ -10768,7 +11123,7 @@ function doDesactivar(){
 // ── FUNCIÓN CENTRAL DE INICIO ─────────────────────────────
 async function iniciarApp(){
   // Iniciar BT Print Server (verificar y reconectar si hay MAC guardada)
-  setTimeout(() => { BTPrinter.iniciar(); btpsCargarMacGuardada(); }, 2000);
+  setTimeout(() => { BTPrinter.iniciar(); btpsCargarMacGuardada(); USBPrinter.iniciar(); }, 2000);
 
   // Reconectar automáticamente cuando la app vuelve al foco
   document.addEventListener('visibilitychange', function(){
@@ -11042,8 +11397,9 @@ function aplicarConfigTerminal(cfg){
 let ventasTabActual = 'vendidas';
 
 function guardarDepositoId(){
-  const depId = parseInt(document.getElementById('cfgDepId')?.value)||0;
-  const sucId = parseInt(document.getElementById('cfgSucId')?.value)||0;
+  var _cfgDep=document.getElementById('cfgDepId'), _cfgSuc=document.getElementById('cfgSucId');
+  const depId = parseInt((_cfgDep ? _cfgDep.value : '')||0);
+  const sucId = parseInt((_cfgSuc ? _cfgSuc.value : '')||0);
   if(!depId){ toast('Ingresá el ID del depósito'); return; }
   localStorage.setItem('pos_deposito_id', String(depId));
   cookieSet('pos_dep_id', String(depId), 365);
@@ -11522,7 +11878,7 @@ async function eliminarSalon(id){
       headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}
     });
     await mesasCargar();
-    if(mesaSalonSel===id) mesaSalonSel = mesasSalones[0]?.id||null;
+    if(mesaSalonSel===id) mesaSalonSel = (mesasSalones[0] && mesasSalones[0].id)||null;
     toast('✓ Salón eliminado');
     abrirGestionMesas();
   }catch(e){ toast('Error: '+e.message); }
@@ -11749,7 +12105,7 @@ async function renderVentasList(){
     try { items = JSON.parse(v.items||'[]'); } catch(e){}
     const metodo = (v.metodo_pago||'EFECTIVO').toUpperCase();
     const facturada = !!v.tiene_factura;
-    const nroFact = v.factura ? (typeof v.factura==='string' ? JSON.parse(v.factura) : v.factura)?.nro_factura || '' : '';
+    const nroFact = v.factura ? (function(){ var _f = typeof v.factura==='string' ? JSON.parse(v.factura) : v.factura; return (_f && _f.nro_factura) || ''; })() : '';
     const rucFact = v.factura_ruc || '';
     const nombreFact = v.factura_nombre || '';
 
@@ -11845,7 +12201,7 @@ async function anularVenta(id){
   if(!venta) return toast('Venta no encontrada');
 
   const tieneFac = !!venta.tiene_factura;
-  const nroFac   = venta.factura ? (()=>{ try{ return (typeof venta.factura==='string'?JSON.parse(venta.factura):venta.factura)?.nro_factura||''; }catch(e){return '';} })() : '';
+  const nroFac   = venta.factura ? (function(){ try{ var _f=typeof venta.factura==='string'?JSON.parse(venta.factura):venta.factura; return (_f && _f.nro_factura)||''; }catch(e){return '';} })() : '';
   const rucFac   = venta.factura_ruc || '';
 
   // Modal de confirmación con advertencia de factura
@@ -11920,7 +12276,7 @@ async function anularVentaConfirmar(id){
     await renderVentasList();
 
     // 4. Si el turno está visible, refrescarlo también
-    if(document.getElementById('scTurno')?.classList.contains('active')){
+    var _scTurno=document.getElementById('scTurno'); if(_scTurno && _scTurno.classList.contains('active')){
       renderTurno();
     }
   } catch(e){
@@ -12017,7 +12373,7 @@ async function cpConfirmar(id){
     // Intento 1: buscar por dbId
     let idx = turnoData.ventas.findIndex(v => v.dbId === id);
     // Intento 2: buscar por nroTicket
-    if(idx === -1 && venta?.nroTicket != null)
+    if(idx === -1 && venta && venta.nroTicket != null)
       idx = turnoData.ventas.findIndex(v => v.nroTicket === venta.nroTicket);
     // Intento 3: buscar por fecha+total (último recurso)
     if(idx === -1 && venta)
