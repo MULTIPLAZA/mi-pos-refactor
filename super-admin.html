@@ -713,27 +713,125 @@ async function guardarL(){
 
 // ── CLIENTES ─────────────────────────────────────────────
 async function loadCli(){
+  var DEMO_EMAILS=['demo@test.com','pro@test.com','full@test.com','emivitta94@gmail.com'];
+  var esDemoEmail=function(e){ return !e||e.includes('@test.com')||e.includes('demo')||DEMO_EMAILS.includes(e.toLowerCase()); };
+
   try{
-    const a=await sg('activaciones','select=*,licencias(clave,rubro,planes(nombre))&order=fecha_activacion.desc');
-    const m={};
-    a.forEach(x=>{
-      if(!m[x.email])m[x.email]={email:x.email,neg:x.nombre_negocio,plan:x.licencias?.planes?.nombre||'—',rubro:x.licencias?.rubro||'',t:0,ul:null};
-      m[x.email].t++;
-      if(!m[x.email].ul||x.ultima_consulta>m[x.email].ul)m[x.email].ul=x.ultima_consulta;
+    // Traer licencias con datos completos
+    var lics=await sg('licencias','select=*,planes(nombre)&order=created_at.desc');
+    // Traer activaciones para contar terminales
+    var acts=await sg('activaciones','select=email,activa,ultima_consulta,nombre_negocio&order=fecha_activacion.desc');
+    // Traer ventas últimos 30 días para promedio mensual
+    var hace30=new Date(); hace30.setDate(hace30.getDate()-30);
+    var p2=function(n){return String(n).padStart(2,'0');};
+    var hace30str=hace30.getFullYear()+'-'+p2(hace30.getMonth()+1)+'-'+p2(hace30.getDate());
+    var ventas=[];
+    try{ ventas=await sg('pos_ventas','fecha=gte.'+hace30str+'T00:00:00&select=licencia_email,total&limit=5000'); }catch(e){}
+
+    // Agrupar terminales por email
+    var terMap={};
+    acts.forEach(function(a){
+      var em=(a.email||'').toLowerCase();
+      if(!terMap[em]) terMap[em]={total:0,activas:0,ul:null,neg:a.nombre_negocio};
+      terMap[em].total++;
+      if(a.activa) terMap[em].activas++;
+      if(!terMap[em].ul||a.ultima_consulta>terMap[em].ul) terMap[em].ul=a.ultima_consulta;
     });
-    const lista=Object.values(m);
-    document.getElementById('cliList').innerHTML=lista.length?lista.map(c=>`
-      <div class="li">
-        <div class="li-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
-        <div class="li-inf">
-          <div class="li-t">${c.neg||'Sin nombre'}</div>
-          <div class="li-s">${c.email}${c.rubro?' · '+RUBROS[c.rubro]:''}</div>
-        </div>
-        <div class="li-r"><div class="li-v" style="color:var(--green)">${c.t}</div><div class="li-s2">terminales</div></div>
-      </div>`).join('')
-    :'<div class="empty"><div class="empty-i">👥</div><div class="empty-t">Sin clientes</div><div class="empty-s">Aparecen al activar la app POS</div></div>';
+
+    // Agrupar ventas por email
+    var ventasMap={};
+    ventas.forEach(function(v){
+      var em=(v.licencia_email||'').toLowerCase();
+      if(!ventasMap[em]) ventasMap[em]=0;
+      ventasMap[em]+=(v.total||0);
+    });
+
+    // Filtrar solo clientes reales (excluir demo)
+    var reales=lics.filter(function(l){ return !esDemoEmail(l.email_cliente); });
+    var demos=lics.filter(function(l){ return esDemoEmail(l.email_cliente); });
+
+    var hoy=new Date();
+    var cont=document.getElementById('cliList');
+
+    var renderCliente=function(l){
+      var em=(l.email_cliente||'').toLowerCase();
+      var ter=terMap[em]||{total:0,activas:0,ul:null};
+      var ventaMes=ventasMap[em]||0;
+      var vd=l.fecha_vence?new Date(l.fecha_vence):null;
+      var dias=vd?Math.ceil((vd-hoy)/(1000*60*60*24)):null;
+      var pNom=l.planes?.nombre||PLANES[l.plan_id]||'Básico';
+      var pCls=l.plan_id===1?'tag-g':l.plan_id===2?'tag-b':'tag-o';
+
+      // Estado de actividad (última consulta < 48h = activo)
+      var estaActivo=ter.ul&&(hoy-new Date(ter.ul))<48*3600000;
+      var actDot=estaActivo?'background:var(--green)':'background:var(--muted)';
+
+      // Vencimiento
+      var vTag='';
+      if(dias!==null){
+        if(dias<0) vTag='<span class="tag tag-r">VENCIDA</span>';
+        else if(dias<=30) vTag='<span class="tag tag-o">Vence en '+dias+'d</span>';
+        else vTag='<span class="tag tag-g">Vence '+fmt(l.fecha_vence)+'</span>';
+      }
+      if(!l.activa) vTag='<span class="tag tag-r">SUSPENDIDA</span>';
+
+      // Monto licencia y anualidad (estimado 20% del monto original)
+      var montoLic=l.monto||0;
+      var anualidad=montoLic>0?Math.round(montoLic*0.2):0;
+
+      return '<div class="li" style="flex-wrap:wrap;gap:10px;padding:14px 16px;align-items:flex-start;">'+
+        '<div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">'+
+          '<div style="width:10px;height:10px;border-radius:50%;flex-shrink:0;'+actDot+';margin-top:4px;"></div>'+
+          '<div class="li-inf">'+
+            '<div class="li-t" style="font-size:14px;font-weight:700;">'+(l.nombre_cliente||ter.neg||'Sin nombre')+'</div>'+
+            '<div class="li-s">'+(l.email_cliente||'—')+(l.rubro?' · '+( RUBROS[l.rubro]||l.rubro):'')+'</div>'+
+            '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;">'+
+              '<span class="tag '+pCls+'">'+pNom+'</span>'+
+              vTag+
+              (estaActivo?'<span class="tag tag-g">● Activo</span>':'<span class="tag tag-gr">○ Sin actividad reciente</span>')+
+            '</div>'+
+          '</div>'+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%;margin-top:8px;border-top:1px solid var(--border);padding-top:10px;">'+
+          '<div style="text-align:center;"><div style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Terminales</div>'+
+            '<div style="font-size:18px;font-weight:800;color:var(--green);">'+ter.total+'</div>'+
+            '<div style="font-size:10px;color:var(--muted);">'+ter.activas+' activas</div></div>'+
+          '<div style="text-align:center;"><div style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Ventas/mes</div>'+
+            '<div style="font-size:16px;font-weight:800;color:var(--blue);">'+(ventaMes>0?'\u20B2'+gs(ventaMes):'—')+'</div>'+
+            '<div style="font-size:10px;color:var(--muted);">últimos 30d</div></div>'+
+          '<div style="text-align:center;"><div style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Licencia</div>'+
+            '<div style="font-size:16px;font-weight:800;color:var(--text);">'+(montoLic>0?'\u20B2'+gs(montoLic):'—')+'</div>'+
+            '<div style="font-size:10px;color:var(--muted);">'+(TIPOS[l.tipo_pago]||l.tipo_pago||'—')+'</div></div>'+
+          '<div style="text-align:center;"><div style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Soporte anual</div>'+
+            '<div style="font-size:16px;font-weight:800;color:var(--orange);">'+(anualidad>0?'\u20B2'+gs(anualidad):'—')+'</div>'+
+            '<div style="font-size:10px;color:var(--muted);">renovación</div></div>'+
+        '</div>'+
+      '</div>';
+    };
+
+    if(!reales.length && !demos.length){
+      cont.innerHTML='<div class="empty"><div class="empty-i">👥</div><div class="empty-t">Sin clientes</div></div>';
+      return;
+    }
+
+    var html='';
+    if(reales.length){
+      html+='<div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;padding:10px 4px 6px;">Clientes reales ('+reales.length+')</div>';
+      html+=reales.map(renderCliente).join('');
+    }
+    if(demos.length){
+      html+='<div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;padding:14px 4px 6px;">Cuentas demo / prueba ('+demos.length+')</div>';
+      html+=demos.map(function(l){
+        return '<div class="li" style="opacity:0.5;">'+
+          '<div class="li-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></div>'+
+          '<div class="li-inf"><div class="li-t">'+(l.nombre_cliente||'Demo')+'</div><div class="li-s">'+(l.email_cliente||'—')+'</div></div>'+
+          '<span class="tag tag-gr">DEMO</span></div>';
+      }).join('');
+    }
+    cont.innerHTML=html;
+
   }catch(e){
-    document.getElementById('cliList').innerHTML='<div class="loading">'+e.message+'</div>';
+    document.getElementById('cliList').innerHTML='<div class="loading">Error: '+e.message+'</div>';
   }
 }
 
@@ -741,16 +839,27 @@ async function loadCli(){
 let allTer = [];
 
 async function loadTer(){
+  var DEMO_EMAILS=['demo@test.com','pro@test.com','full@test.com','emivitta94@gmail.com'];
+  var esDemoEmail=function(e){ return !e||e.includes('@test.com')||e.includes('demo')||DEMO_EMAILS.includes((e||'').toLowerCase()); };
+
   try{
     allTer = await sg('activaciones','select=*,licencias(clave,nombre_cliente,plan_id,planes(nombre))&order=nombre_negocio.asc');
-    // Poblar filtro por empresa
-    const emails = [...new Set(allTer.map(t=>t.email).filter(Boolean))];
+
+    // Separar reales de demo
+    allTer._reales = allTer.filter(function(t){ return !esDemoEmail(t.email); });
+    allTer._demos  = allTer.filter(function(t){ return esDemoEmail(t.email); });
+
+    // Poblar filtro por empresa (solo reales)
+    const emails = [...new Set(allTer._reales.map(t=>t.email).filter(Boolean))];
     const sel = document.getElementById('terFiltroEmp');
     sel.innerHTML = '<option value="">Todas las empresas</option>' +
-      emails.map(e=>`<option value="${e}">${allTer.find(t=>t.email===e)?.nombre_negocio||e}</option>`).join('');
+      '<option value="__demo__">Solo demo</option>' +
+      emails.map(e=>`<option value="${e}">${allTer._reales.find(t=>t.email===e)?.nombre_negocio||e}</option>`).join('');
     filtrTer();
   }catch(e){
     allTer = DEMO_TER;
+    allTer._reales = allTer;
+    allTer._demos  = [];
     filtrTer();
     toast('Demo terminales: '+e.message, 3000);
   }
@@ -759,9 +868,14 @@ async function loadTer(){
 function filtrTer(){
   const q   = (document.getElementById('terQ')?.value||'').toLowerCase();
   const emp = document.getElementById('terFiltroEmp')?.value||'';
-  let lista = allTer;
-  if(emp)  lista = lista.filter(t=>t.email===emp);
-  if(q)    lista = lista.filter(t=>
+  let lista;
+  if(emp==='__demo__'){
+    lista = allTer._demos||allTer.filter(function(t){ return (t.email||'').includes('@test.com')||(t.email||'').includes('demo'); });
+  } else {
+    lista = allTer._reales||allTer;
+    if(emp) lista = lista.filter(t=>t.email===emp);
+  }
+  if(q) lista = lista.filter(t=>
     (t.nombre_terminal||'').toLowerCase().includes(q)||
     (t.nombre_negocio||'').toLowerCase().includes(q)||
     (t.email||'').toLowerCase().includes(q)||
