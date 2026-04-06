@@ -4381,7 +4381,7 @@ function getCSSTermico(size){
     * { margin:0; padding:0; box-sizing:border-box; }
     html { width:${w}; }
     body {
-      font-family: "Courier New", Courier, monospace;
+      font-family: Arial, "Helvetica Neue", sans-serif;
       font-size: ${fs};
       width: ${pw};
       max-width: ${pw};
@@ -7437,7 +7437,7 @@ function buildCierreTicket(size){
       : '<p style="margin:0;text-align:center;">'+line+'</p>';
   };
 
-  var css = 'body{font-family:"Courier New",Courier,monospace;font-size:'+(size==='80'?'11':'9')+'pt;'
+  var css = 'body{font-family:Arial,"Helvetica Neue",sans-serif;font-size:'+(size==='80'?'11':'9')+'pt;'
     +'width:'+(size==='80'?'80':'58')+'mm;margin:0;padding:2mm 0;background:#fff;color:#000;}'
     +'p{margin:0;padding:0;line-height:1.3;white-space:pre;}';
 
@@ -8848,8 +8848,130 @@ function imprimirTicketConf(htmlContent, tipo){
     return;
   }
 
-  // ── Fallback: PC/USB — abrir diálogo de impresión ─────────────────────────
-  abrirDialogoImpresion(htmlContent, widthPx);
+  // ── PC/USB — generar ESC/POS identico al Bluetooth y descargar .bin ────────
+  imprimirPCUSB(htmlContent, size);
+}
+
+// ── FUNCIÓN: imprimirPCUSB ───────────────────────────────────────────────────
+// Genera bytes ESC/POS identicos al Bluetooth y los envia via canal disponible
+async function imprimirPCUSB(htmlContent, size){
+  var ESC=0x1B, GS=0x1D;
+  var CMD={
+    init:[ESC,0x40], left:[ESC,0x61,0x00], center:[ESC,0x61,0x01],
+    boldOn:[ESC,0x45,0x01], boldOff:[ESC,0x45,0x00],
+    dblWideOn:[ESC,0x21,0x20], dblWideOff:[ESC,0x21,0x00],
+    smallOn:[ESC,0x21,0x01], smallOff:[ESC,0x21,0x00],
+    cut:[GS,0x56,0x41,0x10], feed:[ESC,0x64,0x04],
+  };
+  var cols=size==='58'?32:42;
+
+  function enc(str){
+    var out=[];
+    for(var i=0;i<str.length;i++){
+      var c=str.charCodeAt(i);
+      if(c<128) out.push(c);
+      else if(c===0xC1||c===0xE1) out.push(0xC1);
+      else if(c===0xC9||c===0xE9) out.push(0xC9);
+      else if(c===0xCD||c===0xED) out.push(0xCD);
+      else if(c===0xD3||c===0xF3) out.push(0xD3);
+      else if(c===0xDA||c===0xFA) out.push(0xDA);
+      else if(c===0xD1||c===0xF1) out.push(0xD1);
+      else out.push(0x3F);
+    }
+    return out;
+  }
+  function line(str){ return enc(str).concat([0x0A]); }
+  function sep(){ return line('-'.repeat(cols)); }
+  function rline(l,r){
+    var ls=String(l),rs=String(r);
+    var sp=Math.max(1,cols-ls.length-rs.length);
+    return line(ls+' '.repeat(sp)+rs);
+  }
+
+  var tmp=document.createElement('div');
+  var bm=htmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  tmp.innerHTML=bm?bm[1]:htmlContent;
+
+  var parrafos=Array.from(tmp.querySelectorAll('p'));
+  var bytes=[ESC,0x40,ESC,0x74,0x02];
+
+  parrafos.forEach(function(p){
+    var cls=p.className||'';
+    var text=(p.innerText||p.textContent||'').trim();
+    if(!text&&!cls.includes('hr')) return;
+    if(cls.includes('hr')){ bytes=bytes.concat(sep()); return; }
+
+    var isCenter=cls.includes('c');
+    var isBold=cls.includes('b');
+    var isLarge=cls.includes('l');
+    var isSmall=cls.includes('s')&&!cls.includes('s b')&&!cls.includes('c s');
+
+    if(isCenter) bytes=bytes.concat(CMD.center); else bytes=bytes.concat(CMD.left);
+    if(isLarge)  bytes=bytes.concat(CMD.dblWideOn,CMD.boldOn);
+    else if(isBold) bytes=bytes.concat(CMD.boldOn);
+    if(isSmall) bytes=bytes.concat(CMD.smallOn);
+
+    if(cls.includes('row')){
+      var spans=p.querySelectorAll('span');
+      if(spans.length>=2){
+        var l=(spans[0].innerText||spans[0].textContent||'').trim();
+        var r=(spans[spans.length-1].innerText||spans[spans.length-1].textContent||'').trim();
+        bytes=bytes.concat(CMD.left);
+        if(isBold||isLarge) bytes=bytes.concat(CMD.boldOn);
+        if(isLarge) bytes=bytes.concat(CMD.dblWideOn);
+        bytes=bytes.concat(rline(l,r),CMD.boldOff,CMD.dblWideOff,CMD.smallOff);
+        return;
+      }
+    }
+    if(cls.includes('it-det')||cls.includes('if-det')){
+      var spans=p.querySelectorAll('span');
+      if(spans.length>=2){
+        bytes=bytes.concat(CMD.left,CMD.smallOn);
+        var parts=Array.from(spans).map(function(s){return (s.innerText||s.textContent||'').trim();});
+        if(parts.length===3){ bytes=bytes.concat(rline('  '+parts[0],parts[2])); }
+        else { bytes=bytes.concat(line('  '+parts.join('  '))); }
+        bytes=bytes.concat(CMD.smallOff);
+        return;
+      }
+    }
+    if(cls.includes('it-nom')||cls.includes('if-nom')){
+      bytes=bytes.concat(CMD.left,CMD.boldOn,line(text),CMD.boldOff);
+      return;
+    }
+    bytes=bytes.concat(line(text),CMD.boldOff,CMD.dblWideOff,CMD.smallOff);
+  });
+  bytes=bytes.concat(CMD.feed,CMD.cut);
+
+  // Intentar Web Serial si hay puerto guardado
+  var serialPort=null;
+  try {
+    var ports=await navigator.serial.getPorts();
+    if(ports&&ports.length>0) serialPort=ports[0];
+  } catch(e){}
+
+  if(serialPort){
+    try{
+      if(!serialPort.readable){
+        await serialPort.open({baudRate:9600});
+      }
+      var writer=serialPort.writable.getWriter();
+      await writer.write(new Uint8Array(bytes));
+      writer.releaseLock();
+      toast('\u2713 Impreso por USB');
+      return;
+    }catch(e){ console.warn('Serial fallback:', e.message); }
+  }
+
+  // Descargar .bin para imprimir manualmente con impresora-usb.bat
+  var blob=new Blob([new Uint8Array(bytes)],{type:'application/octet-stream'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url; a.download='ticket.bin';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(url);},5000);
+  toast('\u2193 ticket.bin descargado — ejecut\u00e1 impresora-usb.bat');
 }
 
 // ── HELPER: abrir diálogo de impresión del sistema ──────────────────────────
@@ -8930,7 +9052,7 @@ function abrirDialogoImpresion(htmlContent, widthPx){
   // Intentar imprimir como texto plano primero (mejor para Generic Text Only)
   var css = [
     'html,body{margin:0;padding:0;}',
-    'body{font-family:"Courier New",Courier,monospace;font-size:10pt;',
+    'body{font-family:Arial,"Helvetica Neue",sans-serif;font-size:10pt;',
     'width:'+widthPx+';white-space:pre;word-break:break-all;}',
     '@media print{@page{margin:2mm;size:'+widthPx+' auto;}}'
   ].join('');
