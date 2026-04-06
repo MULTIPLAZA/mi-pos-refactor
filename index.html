@@ -8853,22 +8853,104 @@ function imprimirTicketConf(htmlContent, tipo){
 }
 
 // ── HELPER: abrir diálogo de impresión del sistema ──────────────────────────
+function htmlATextoPlano(htmlContent, cols){
+  // Convierte el HTML del ticket a texto plano para Generic Text Only
+  cols = cols || 32;
+  var tmp = document.createElement('div');
+  var body = htmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  tmp.innerHTML = body ? body[1] : htmlContent;
+
+  var lineas = [];
+  var parrafos = Array.from(tmp.querySelectorAll('p'));
+
+  function pad(l, r){
+    var ls = String(l), rs = String(r);
+    var sp = Math.max(1, cols - ls.length - rs.length);
+    return ls + ' '.repeat(sp) + rs;
+  }
+  function center(t){
+    t = String(t);
+    var sp = Math.max(0, Math.floor((cols - t.length) / 2));
+    return ' '.repeat(sp) + t;
+  }
+  // Reemplazar acentos para compatibilidad Generic Text Only
+  function limpiar(t){
+    return t
+      .replace(/[\u00C1\u00E1]/g,'A').replace(/[\u00C9\u00E9]/g,'E')
+      .replace(/[\u00CD\u00ED]/g,'I').replace(/[\u00D3\u00F3]/g,'O')
+      .replace(/[\u00DA\u00FA]/g,'U').replace(/[\u00D1\u00F1]/g,'N')
+      .replace(/[\u20B2]/g,'Gs').replace(/[^\x00-\x7E]/g,'?');
+  }
+
+  parrafos.forEach(function(p){
+    var cls = p.className || '';
+    var text = limpiar((p.innerText || p.textContent || '').trim());
+    if(!text && !cls.includes('hr')) return;
+
+    if(cls.includes('hr')){
+      lineas.push('-'.repeat(cols));
+      return;
+    }
+
+    // Fila dos columnas
+    if(cls.includes('row')){
+      var spans = p.querySelectorAll('span');
+      if(spans.length >= 2){
+        var l = limpiar((spans[0].innerText || spans[0].textContent || '').trim());
+        var r = limpiar((spans[spans.length-1].innerText || spans[spans.length-1].textContent || '').trim());
+        lineas.push(pad(l, r));
+        return;
+      }
+    }
+    // Items detalle
+    if(cls.includes('it-det') || cls.includes('if-det')){
+      var spans = p.querySelectorAll('span');
+      if(spans.length >= 2){
+        var parts = Array.from(spans).map(function(s){ return limpiar((s.innerText||s.textContent||'').trim()); });
+        if(parts.length === 3){ lineas.push(pad('  '+parts[0], parts[2])); }
+        else { lineas.push('  '+parts.join('  ')); }
+        return;
+      }
+    }
+    // Centrado
+    if(cls.includes('c') && !cls.includes('it-')){
+      lineas.push(center(text));
+      return;
+    }
+    lineas.push(text);
+  });
+
+  return lineas.join('\n') + '\n\n\n\n';
+}
+
 function abrirDialogoImpresion(htmlContent, widthPx){
-  const css = [
-    'body{font-family:"Courier New",monospace;font-size:11px;width:' + widthPx + ';margin:0 auto;padding:8px;}',
-    '@media print{body{padding:0;}@page{margin:0;size:' + widthPx + ' auto;}}'
+  var cols = widthPx === '200px' || widthPx === '58' ? 32 : 42;
+  var texto = htmlATextoPlano(htmlContent, cols);
+
+  // Intentar imprimir como texto plano primero (mejor para Generic Text Only)
+  var css = [
+    'html,body{margin:0;padding:0;}',
+    'body{font-family:"Courier New",Courier,monospace;font-size:10pt;',
+    'width:'+widthPx+';white-space:pre;word-break:break-all;}',
+    '@media print{@page{margin:2mm;size:'+widthPx+' auto;}}'
   ].join('');
-  const fullHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket</title><style>' + css + '</style></head><body>' + htmlContent + '<script>window.onload=function(){window.print();}<\/script></body></html>';
-  const blob = new Blob([fullHtml], {type:'text/html'});
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
+
+  var fullHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
+    '<title>Ticket</title><style>'+css+'</style></head><body>'+
+    texto.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+
+    '<script>window.onload=function(){setTimeout(function(){window.print();window.close();},200);}<\/script>'+
+    '</body></html>';
+
+  var blob = new Blob([fullHtml], {type:'text/html;charset=utf-8'});
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
   a.href = url;
   a.target = '_blank';
   a.rel = 'noopener';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 15000);
 }
 
 // ── FUNCIÓN: imprimirAndroidNativo ───────────────────────────────────────────
