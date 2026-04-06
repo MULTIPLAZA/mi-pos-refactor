@@ -9046,25 +9046,19 @@ function htmlATextoPlano(htmlContent, cols){
 }
 
 function limpiarParaImpresora(html){
-  // Reemplazar caracteres especiales que rompen en impresoras Generic Text Only
   return html
-    .replace(/₲/g, 'Gs')      // ₲ Guarani
-    .replace(/×/g, 'x')       // × multiplicacion
-    .replace(/Ó/g, 'O')       // Ó
-    .replace(/ó/g, 'o')       // ó
-    .replace(/Á/g, 'A')       // Á
-    .replace(/á/g, 'a')       // á
-    .replace(/É/g, 'E')       // É
-    .replace(/é/g, 'e')       // é
-    .replace(/Í/g, 'I')       // Í
-    .replace(/í/g, 'i')       // í
-    .replace(/Ú/g, 'U')       // Ú
-    .replace(/ú/g, 'u')       // ú
-    .replace(/Ñ/g, 'N')       // Ñ
-    .replace(/ñ/g, 'n')       // ñ
-    .replace(/¿/g, '?')       // ¿
-    .replace(/¡/g, '!')       // ¡
-    .replace(/[^ -~]/g, '?'); // cualquier otro no-ASCII
+    .replace(/\u20B2/g, 'Gs')
+    .replace(/\u00D7/g, 'x')
+    .replace(/\u00C1/g, 'A').replace(/\u00E1/g, 'a')
+    .replace(/\u00C9/g, 'E').replace(/\u00E9/g, 'e')
+    .replace(/\u00CD/g, 'I').replace(/\u00ED/g, 'i')
+    .replace(/\u00D3/g, 'O').replace(/\u00F3/g, 'o')
+    .replace(/\u00DA/g, 'U').replace(/\u00FA/g, 'u')
+    .replace(/\u00D1/g, 'N').replace(/\u00F1/g, 'n')
+    .replace(/\u00BF/g, '?').replace(/\u00A1/g, '!')
+    .replace(/[\u0080-\uFFFF]/g, '?');
+}
+
 }
 
 function abrirDialogoImpresion(htmlContent, widthPx){
