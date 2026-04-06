@@ -4617,9 +4617,12 @@ function generarHTMLTicket(data, size){
   if(data.nroOrden) lineas += '<p class="c s">Orden Nro: '+String(data.nroOrden).padStart(4,'0')+'</p>';
   if(configData.pie_recibo) lineas += '<p class="c s">'+configData.pie_recibo+'</p>';
   lineas += '<p class="c s b">*** GRACIAS POR SU PREFERENCIA ***</p>';
-  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
-  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
-  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
   return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
 }
 
@@ -4738,9 +4741,12 @@ function generarHTMLFactura(data, size){
   lineas += '<p class="s">LOS DATOS IMPRESOS REQUIEREN DE CUIDADOS ESPECIALES.</p>';
   if(configData.pie_recibo) lineas += '<p class="c s">'+configData.pie_recibo+'</p>';
   lineas += '<p class="c s b">*** GRACIAS POR SU PREFERENCIA ***</p>';
-  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
-  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
-  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
   return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
 }
 
@@ -4796,7 +4802,7 @@ function generarHTMLComanda(data, size){
   lineas += '<p class="hr"></p>';
 
   // Tipo de pedido — muy visible
-  lineas += '<p class="c" style="font-size:13px;font-weight:900;background:#000;color:#fff;padding:3px 0;margin:2px 0;">'
+  lineas += '<p class="c" style="font-size:13px;font-weight:900;border-top:2px solid #000;border-bottom:2px solid #000;padding:3px 0;margin:2px 0;">'
           + tipoLabel + '</p>';
 
   // Cliente si tiene
@@ -4829,19 +4835,22 @@ function generarHTMLComanda(data, size){
     if(item.obs && !item._esMitad){
       const obsLines = item.obs.split(' · ');
       obsLines.forEach(ob => {
-        lineas += '<p class="s" style="padding-left:16px;font-weight:700;">→ '
+        lineas += '<p class="s" style="padding-left:16px;font-weight:700;">-&gt; '
                 + wrapText(ob, maxNom - 2, '  ') + '</p>';
       });
     } else if(item.obs && item._esMitad === undefined && item.obs){
-      lineas += '<p class="s" style="padding-left:16px;font-weight:700;">→ '
+      lineas += '<p class="s" style="padding-left:16px;font-weight:700;">-&gt; '
               + wrapText(item.obs, maxNom - 2, '  ') + '</p>';
     }
   });
 
   lineas += '<p class="hr"></p>';
-  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
-  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
-  lineas += '<p style="margin:0;line-height:1;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
+  lineas += '<p style="margin:0;line-height:1.8;">&nbsp;</p>';
 
   return '<html><head><style>'+getCSSTermico(size)+'</style></head><body>'+lineas+'</body></html>';
 }
