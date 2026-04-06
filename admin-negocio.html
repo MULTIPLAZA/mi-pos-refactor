@@ -931,14 +931,9 @@ async function _render7Dias(hoy,fmt,p2,textColor,gridColor,fontFam){
   var meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   for(var i=6;i>=0;i--){
     var d=new Date(hoy); d.setDate(hoy.getDate()-i);
-    labels.push(diasSem[d.getDay()]+' '+d.getDate()+'/'+d.getDate()+' '+meses[d.getMonth()]);
+    labels.push(diasSem[d.getDay()]+' '+d.getDate());
     totales.push(0); costos.push(0);
   }
-  // Simplificar labels
-  labels=labels.map(function(l,i){
-    var d=new Date(hoy); d.setDate(hoy.getDate()-(6-i));
-    return diasSem[d.getDay()]+' '+p2(d.getDate())+'/'+meses[d.getMonth()];
-  });
 
   var hace7=new Date(hoy); hace7.setDate(hoy.getDate()-6); hace7.setHours(0,0,0,0);
   var v7=await sg('pos_ventas',
@@ -966,8 +961,8 @@ async function _render7Dias(hoy,fmt,p2,textColor,gridColor,fontFam){
       labels:labels,
       datasets:[
         {label:'Ventas',data:totales,backgroundColor:'rgba(66,165,245,0.85)',borderRadius:4,borderWidth:0},
-        {label:'Costos',data:costos,backgroundColor:'rgba(200,200,200,0.4)',borderRadius:4,borderWidth:0},
-        {label:'Utilidad',data:utilidad,backgroundColor:'rgba(76,175,80,0.7)',borderRadius:4,borderWidth:0}
+        {label:'Costos',data:costos,backgroundColor:'rgba(200,200,200,0.4)',borderRadius:4,borderWidth:0,hidden:true},
+        {label:'Utilidad',data:utilidad,backgroundColor:'rgba(76,175,80,0.7)',borderRadius:4,borderWidth:0,hidden:true}
       ]
     },
     options:{
