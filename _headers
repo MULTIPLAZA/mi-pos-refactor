@@ -1,5 +1,10 @@
 # Cloudflare Pages/Workers — Headers para PWA correcta
 
+# Permitir conexion a servidor local USB (mixed content exception para 127.0.0.1)
+/*
+  Content-Security-Policy: connect-src 'self' https: http://127.0.0.1:9200 http://127.0.0.1:8080
+
+
 # Service Workers — CRÍTICO: deben ser application/javascript
 /sw.js
   Content-Type: application/javascript
