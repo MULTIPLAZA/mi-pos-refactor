@@ -360,8 +360,18 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
         </select>
       </div>
       <div>
-        <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Monto (₲)</label>
+        <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Monto licencia (₲)</label>
         <input id="mMonto" type="number" placeholder="0" min="0"
+          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:11px 14px;outline:none;">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Soporte anual (₲)</label>
+        <input id="mSoporte" type="number" placeholder="0" min="0"
+          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:11px 14px;outline:none;">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Precio x terminal adicional (₲)</label>
+        <input id="mPrecioTer" type="number" placeholder="0" min="0"
           style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:11px 14px;outline:none;">
       </div>
     </div>
@@ -639,6 +649,8 @@ function editL(id){
   document.getElementById('mRubro').value=l.rubro||'';
   document.getElementById('mTipo').value=l.tipo_pago||'anual';
   document.getElementById('mMonto').value=l.monto||'';
+  document.getElementById('mSoporte').value=l.monto_soporte||'';
+  document.getElementById('mPrecioTer').value=l.precio_terminal||'';
   document.getElementById('mVence').value=l.fecha_vence||'';
   document.getElementById('mOv').style.display='flex';
 }
@@ -655,6 +667,8 @@ function renovar(id){
   document.getElementById('mRubro').value=l.rubro||'';
   document.getElementById('mTipo').value=l.tipo_pago||'anual';
   document.getElementById('mMonto').value=l.monto||'';
+  document.getElementById('mSoporte').value=l.monto_soporte||'';
+  document.getElementById('mPrecioTer').value=l.precio_terminal||'';
   // Calcular nueva fecha
   const h=new Date();
   const tp=l.tipo_pago||'anual';
@@ -689,7 +703,9 @@ async function guardarL(){
   if(!vence){toast('Seleccioná la fecha de vencimiento');return;}
 
   const data={clave,plan_id:planId,nombre_cliente:nombre||null,email_cliente:email||null,
-    fecha_vence:vence,notas:notas||null,rubro:rubro||null,tipo_pago:tipo,monto:monto||null};
+    fecha_vence:vence,notas:notas||null,rubro:rubro||null,tipo_pago:tipo,monto:monto||null,
+    monto_soporte:parseInt(document.getElementById('mSoporte').value)||null,
+    precio_terminal:parseInt(document.getElementById('mPrecioTer').value)||null};
 
   try{
     if(editId){
@@ -775,9 +791,10 @@ async function loadCli(){
       }
       if(!l.activa) vTag='<span class="tag tag-r">SUSPENDIDA</span>';
 
-      // Monto licencia y anualidad (estimado 20% del monto original)
       var montoLic=l.monto||0;
-      var anualidad=montoLic>0?Math.round(montoLic*0.2):0;
+      var anualidad=l.monto_soporte||0;
+      var precioTer=l.precio_terminal||0;
+      var totalCobrado=montoLic+(ter.total*precioTer);
 
       return '<div class="li" style="flex-wrap:wrap;gap:10px;padding:14px 16px;align-items:flex-start;">'+
         '<div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">'+
@@ -792,20 +809,25 @@ async function loadCli(){
             '</div>'+
           '</div>'+
         '</div>'+
-        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%;margin-top:8px;border-top:1px solid var(--border);padding-top:10px;">'+
+        '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;width:100%;margin-top:8px;border-top:1px solid var(--border);padding-top:10px;">'+
           '<div style="text-align:center;"><div style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Terminales</div>'+
             '<div style="font-size:18px;font-weight:800;color:var(--green);">'+ter.total+'</div>'+
             '<div style="font-size:10px;color:var(--muted);">'+ter.activas+' activas</div></div>'+
           '<div style="text-align:center;"><div style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Ventas/mes</div>'+
-            '<div style="font-size:16px;font-weight:800;color:var(--blue);">'+(ventaMes>0?'\u20B2'+gs(ventaMes):'—')+'</div>'+
+            '<div style="font-size:16px;font-weight:800;color:var(--blue);">'+(ventaMes>0?gs(ventaMes):'—')+'</div>'+
             '<div style="font-size:10px;color:var(--muted);">últimos 30d</div></div>'+
           '<div style="text-align:center;"><div style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Licencia</div>'+
-            '<div style="font-size:16px;font-weight:800;color:var(--text);">'+(montoLic>0?'\u20B2'+gs(montoLic):'—')+'</div>'+
+            '<div style="font-size:16px;font-weight:800;color:var(--text);">'+(montoLic>0?gs(montoLic):'—')+'</div>'+
             '<div style="font-size:10px;color:var(--muted);">'+(TIPOS[l.tipo_pago]||l.tipo_pago||'—')+'</div></div>'+
           '<div style="text-align:center;"><div style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Soporte anual</div>'+
-            '<div style="font-size:16px;font-weight:800;color:var(--orange);">'+(anualidad>0?'\u20B2'+gs(anualidad):'—')+'</div>'+
+            '<div style="font-size:16px;font-weight:800;color:var(--orange);">'+(anualidad>0?gs(anualidad):'—')+'</div>'+
             '<div style="font-size:10px;color:var(--muted);">renovación</div></div>'+
         '</div>'+
+        // Fila extra si tiene precio por terminal
+        (precioTer>0?'<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--border);margin-top:8px;font-size:12px;">'+
+          '<span style="color:var(--muted);">Terminal adicional: '+gs(precioTer)+' c/u · Total cobrado por terminales: '+gs(ter.total*precioTer)+'</span>'+
+          '<span style="font-weight:800;color:var(--green);">Total: '+gs(totalCobrado)+'</span>'+
+        '</div>':'')+
       '</div>';
     };
 
