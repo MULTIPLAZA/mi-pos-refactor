@@ -233,7 +233,9 @@ tr:last-child td{border-bottom:none;}
       <div class="sb-i" id="sbi-plan-gastos" onclick="goTo(&apos;plan-gastos&apos;)">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>Plan de Gastos</div>
       <div style="font-size:10px;color:#3a3a3a;letter-spacing:1px;text-transform:uppercase;font-weight:700;padding:10px 14px 3px;">Reportes</div>
-      <div class="sb-i" id="sbi-rep-productos" onclick="goTo(&apos;rep-productos&apos;)">
+      <div class="sb-i" id="sbi-ventas" onclick="goTo('ventas')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Historial de Ventas</div>
+      <div class="sb-i" id="sbi-rep-productos" onclick="goTo('rep-productos')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h2v5H7zM11 5h2v8h-2zM15 10h2v3h-2z"/></svg>Ventas por Producto</div>
       <div class="sb-i" id="sbi-rep-compras" onclick="goTo(&apos;rep-compras&apos;)">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>Reporte de Compras</div>
@@ -1087,25 +1089,107 @@ async function _renderHeatmap(hoy,fmt,p2,textColor){
 
 
 
+function renderVentas(){
+  var c=document.getElementById('content');
+  c.innerHTML='<div class="ph"><div><div class="pt">Historial de Ventas</div><div class="ps">Todas las transacciones</div></div><div class="dbar"><button class="dbtn on" onclick="setFV(\'hoy\',this)">Hoy</button><button class="dbtn" onclick="setFV(\'semana\',this)">Semana</button><button class="dbtn" onclick="setFV(\'mes\',this)">Mes</button></div></div>'+
+    '<div class="card" style="margin-bottom:14px;"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:14px;" id="vKpis"></div></div>'+
+    '<div class="card"><div class="card-h"><span class="card-t" id="vCount">—</span><input class="c-srch" placeholder="Buscar..." oninput="filtrV(this.value)"></div>'+
+    '<table><thead><tr><th>Fecha/Hora</th><th>Terminal</th><th>Tipo</th><th>Método</th><th style="text-align:right">Total</th><th></th></tr></thead>'+
+    '<tbody id="vBody"><tr><td colspan="6" class="loading"><span class="sp"></span></td></tr></tbody></table></div>'+
+    '<div id="vDetalle"></div>';
+  loadVData('hoy');
+}
+
+function setFV(f,b){ filtroV=f; document.querySelectorAll('.dbtn').forEach(function(x){x.classList.remove('on');}); if(b)b.classList.add('on'); loadVData(f); }
+
 async function loadVData(f){
-  var fd=getFD(f);
+  var fd=getFD(f||filtroV||'hoy');
   try{
     allVP=await sg('pos_ventas','licencia_email=ilike.'+encodeURIComponent(SE)+'&fecha=gte.'+fd.d+'&fecha=lte.'+fd.h+'&order=fecha.desc&limit=500');
     renderVT(allVP);
-  }catch(e){if(document.getElementById('vBody'))document.getElementById('vBody').innerHTML='<tr><td colspan="5" class="loading">Error</td></tr>';}
+  }catch(e){if(document.getElementById('vBody'))document.getElementById('vBody').innerHTML='<tr><td colspan="6" class="loading">Error cargando</td></tr>';}
 }
 
 function renderVT(v){
   if(!document.getElementById('vCount')) return;
-  document.getElementById('vCount').textContent=v.length+' ventas — '+gs(v.reduce(function(s,x){return s+(x.total||0);},0));
-  var mb=function(m){var u=(m||'').toUpperCase();return u==='EFECTIVO'?'<span class="tag tag-g">EFECTIVO</span>':u==='POS'?'<span class="tag tag-b">POS</span>':'<span class="tag tag-o">TRANSFER.</span>';};
-  document.getElementById('vBody').innerHTML=v.length?v.map(function(x){return '<tr><td>'+fmtDT(x.fecha)+'</td><td>'+(x.terminal||'—')+'</td><td>'+(x.sucursal||'—')+'</td><td>'+mb(x.metodo_pago)+'</td><td style="text-align:right;font-weight:700">'+gs(x.total)+'</td></tr>';}).join(''):'<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Sin ventas</td></tr>';
+  var tot=v.reduce(function(s,x){return s+(x.total||0);},0);
+  var ef=v.filter(function(x){return (x.metodo_pago||'').toUpperCase()==='EFECTIVO';}).reduce(function(s,x){return s+(x.total||0);},0);
+  document.getElementById('vCount').textContent=v.length+' ventas — Total: \u20B2'+gs(tot);
+
+  // KPIs resumen
+  var kEl=document.getElementById('vKpis');
+  if(kEl) kEl.innerHTML=
+    '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Total</div><div style="font-size:22px;font-weight:800;color:var(--green);">\u20B2'+gs(tot)+'</div></div>'+
+    '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Efectivo</div><div style="font-size:22px;font-weight:800;color:var(--green);">\u20B2'+gs(ef)+'</div></div>'+
+    '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">POS / Transfer.</div><div style="font-size:22px;font-weight:800;color:var(--orange);">\u20B2'+gs(tot-ef)+'</div></div>';
+
+  var mb=function(m){var u=(m||'').toUpperCase();return u==='EFECTIVO'?'<span class="tag tag-g">EF</span>':u==='POS'?'<span class="tag tag-b">POS</span>':'<span class="tag tag-o">TR</span>';};
+  var tipoTag=function(x){
+    var tieneF=x.tiene_factura||false;
+    try{ if(x.factura){ var f=typeof x.factura==='string'?JSON.parse(x.factura):x.factura; if(f&&f.nro_factura) tieneF=true; } }catch(e){}
+    return tieneF?'<span class="tag tag-b" style="font-size:10px;">FACTURA</span>':'<span class="tag tag-gr" style="font-size:10px;">TICKET</span>';
+  };
+  document.getElementById('vBody').innerHTML=v.length?v.map(function(x){
+    return '<tr style="cursor:pointer;" onclick="vDetalle(\''+x.id+'\')">'+
+      '<td style="font-size:12px;">'+fmtDT(x.fecha)+'</td>'+
+      '<td>'+(x.terminal||'—')+'</td>'+
+      '<td>'+tipoTag(x)+'</td>'+
+      '<td>'+mb(x.metodo_pago)+'</td>'+
+      '<td style="text-align:right;font-weight:700">\u20B2'+gs(x.total)+'</td>'+
+      '<td style="text-align:center;color:var(--muted);">'+
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>'+
+      '</td></tr>';
+  }).join(''):'<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">Sin ventas en el período</td></tr>';
+}
+
+function vDetalle(id){
+  var venta=allVP.find(function(x){return String(x.id)===String(id);});
+  if(!venta) return;
+  var det=document.getElementById('vDetalle');
+  if(!det) return;
+  // Toggle — si ya está abierto el mismo, cerrar
+  if(det.dataset.open===String(id)){ det.innerHTML=''; det.dataset.open=''; return; }
+  det.dataset.open=String(id);
+
+  var items=[];
+  try{ items=typeof venta.items==='string'?JSON.parse(venta.items):(venta.items||[]); }catch(e){}
+  var factura=null;
+  try{ factura=venta.factura?(typeof venta.factura==='string'?JSON.parse(venta.factura):venta.factura):null; }catch(e){}
+
+  det.innerHTML='<div class="card" style="margin-top:8px;margin-bottom:14px;border:1.5px solid var(--green);"><div class="card-h" style="justify-content:space-between;">'+
+    '<span class="card-t">Detalle — '+fmtDT(venta.fecha)+'</span>'+
+    '<button onclick="document.getElementById(\'vDetalle\').innerHTML=\'\';document.getElementById(\'vDetalle\').dataset.open=\'\'" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">×</button>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;padding:14px;border-bottom:1px solid var(--border);">'+
+    '<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">Terminal</div><div style="font-weight:700;">'+(venta.terminal||'—')+'</div></div>'+
+    '<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">Método</div><div style="font-weight:700;">'+(venta.metodo_pago||'—').toUpperCase()+'</div></div>'+
+    '<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">Total</div><div style="font-weight:800;color:var(--green);">\u20B2'+gs(venta.total)+'</div></div>'+
+    (factura&&factura.nro_factura?'<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">Factura</div><div style="font-weight:700;color:var(--blue);">'+factura.nro_factura+'</div></div>':'')+
+    (factura&&factura.nombre?'<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">Cliente</div><div style="font-weight:700;">'+factura.nombre+'</div></div>':'')+
+    '</div>'+
+    '<table><thead><tr><th>Producto</th><th>Categoría</th><th style="text-align:center">Cant.</th><th style="text-align:right">P.Unit</th><th style="text-align:right">Subtotal</th></tr></thead><tbody>'+
+    (items.filter(function(it){return !it.esDescuento;}).map(function(it){
+      return '<tr><td style="font-weight:600;">'+(it.name||it.nombre||'—')+'</td>'+
+        '<td style="color:var(--muted);">'+(it.cat||it.categoria||'—')+'</td>'+
+        '<td style="text-align:center;">'+(it.qty||1)+'</td>'+
+        '<td style="text-align:right;">\u20B2'+gs(it.price||0)+'</td>'+
+        '<td style="text-align:right;font-weight:700;">\u20B2'+gs((it.price||0)*(it.qty||1))+'</td></tr>';
+    }).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--muted);">Sin detalle</td></tr>')+
+    '</tbody></table></div>';
+
+  // Scroll al detalle
+  setTimeout(function(){ det.scrollIntoView({behavior:'smooth',block:'nearest'}); }, 100);
 }
 
 function filtrV(q){
-  if(!allVP.length) return;
+  if(!allVP||!allVP.length) return;
   var f=q.toLowerCase();
-  renderVT(!q?allVP:allVP.filter(function(v){return (v.terminal||'').toLowerCase().includes(f)||(v.sucursal||'').toLowerCase().includes(f)||(v.metodo_pago||'').toLowerCase().includes(f);}));
+  renderVT(!q?allVP:allVP.filter(function(v){
+    return (v.terminal||'').toLowerCase().includes(f)||
+           (v.metodo_pago||'').toLowerCase().includes(f)||
+           (v.sucursal||'').toLowerCase().includes(f)||
+           gs(v.total).includes(f);
+  }));
 }
 
 // ── TERMINALES ────────────────────────────────────────────
