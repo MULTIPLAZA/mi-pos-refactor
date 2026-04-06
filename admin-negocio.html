@@ -1117,23 +1117,89 @@ async function _renderHeatmap(hoy,fmt,p2,textColor){
 
 function renderVentas(){
   var c=document.getElementById('content');
-  c.innerHTML='<div class="ph"><div><div class="pt">Historial de Ventas</div><div class="ps">Todas las transacciones</div></div><div class="dbar"><button class="dbtn on" onclick="setFV(\'hoy\',this)">Hoy</button><button class="dbtn" onclick="setFV(\'semana\',this)">Semana</button><button class="dbtn" onclick="setFV(\'mes\',this)">Mes</button></div></div>'+
+  var p2=function(n){return String(n).padStart(2,'0');};
+  var hoy=new Date();
+  var fmtDate=function(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());};
+  var hoyStr=fmtDate(hoy);
+  var lunesStr=fmtDate(new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-((hoy.getDay()||7)-1)));
+  var mes1Str=fmtDate(new Date(hoy.getFullYear(),hoy.getMonth(),1));
+
+  c.innerHTML='<div class="ph"><div><div class="pt">Historial de Ventas</div><div class="ps">Todas las transacciones</div></div></div>'+
+    // Filtros rápidos + rango personalizado
+    '<div class="card" style="margin-bottom:14px;padding:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">'+
+      '<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Período rápido</div>'+
+      '<div style="display:flex;gap:6px;">'+
+        '<button class="dbtn on" id="vBtn_hoy" onclick="setFV(\'hoy\',this)">Hoy</button>'+
+        '<button class="dbtn" id="vBtn_semana" onclick="setFV(\'semana\',this)">Semana</button>'+
+        '<button class="dbtn" id="vBtn_mes" onclick="setFV(\'mes\',this)">Mes</button>'+
+      '</div></div>'+
+      '<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Desde</div>'+
+        '<input type="date" id="vFD" class="d-inp" value="'+hoyStr+'"></div>'+
+      '<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Hasta</div>'+
+        '<input type="date" id="vFH" class="d-inp" value="'+hoyStr+'"></div>'+
+      '<button class="btn-sv" onclick="setFV(\'custom\',null)">Buscar</button>'+
+    '</div>'+
     '<div class="card" style="margin-bottom:14px;"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:14px;" id="vKpis"></div></div>'+
     '<div class="card"><div class="card-h"><span class="card-t" id="vCount">—</span><input class="c-srch" placeholder="Buscar..." oninput="filtrV(this.value)"></div>'+
-    '<table><thead><tr><th>Fecha/Hora</th><th>Terminal</th><th>Tipo</th><th>Método</th><th style="text-align:right">Total</th><th></th></tr></thead>'+
-    '<tbody id="vBody"><tr><td colspan="6" class="loading"><span class="sp"></span></td></tr></tbody></table></div>'+
-    '<div id="vDetalle"></div>';
+    '<table><thead><tr><th>Fecha/Hora</th><th>Terminal</th><th>Tipo</th><th>Método</th><th style="text-align:right">Total</th><th style="width:32px;"></th></tr></thead>'+
+    '<tbody id="vBody"><tr><td colspan="6" class="loading"><span class="sp"></span></td></tr></tbody></table></div>';
   loadVData('hoy');
 }
 
-function setFV(f,b){ filtroV=f; document.querySelectorAll('.dbtn').forEach(function(x){x.classList.remove('on');}); if(b)b.classList.add('on'); loadVData(f); }
+function setFV(f,b){
+  filtroV=f;
+  document.querySelectorAll('#vBtn_hoy,#vBtn_semana,#vBtn_mes').forEach(function(x){x.classList.remove('on');});
+  if(b) b.classList.add('on');
+  // Sincronizar inputs de fecha con el botón
+  var p2=function(n){return String(n).padStart(2,'0');};
+  var hoy=new Date();
+  var fmtDate=function(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());};
+  var fd=document.getElementById('vFD'), fh=document.getElementById('vFH');
+  if(f==='hoy'&&fd&&fh){ var s=fmtDate(hoy); fd.value=s; fh.value=s; }
+  if(f==='semana'&&fd&&fh){ var l=new Date(hoy); l.setDate(hoy.getDate()-((hoy.getDay()||7)-1)); fd.value=fmtDate(l); fh.value=fmtDate(hoy); }
+  if(f==='mes'&&fd&&fh){ fd.value=fmtDate(new Date(hoy.getFullYear(),hoy.getMonth(),1)); fh.value=fmtDate(hoy); }
+  loadVData(f);
+}
 
 async function loadVData(f){
-  var fd=getFD(f||filtroV||'hoy');
+  var body=document.getElementById('vBody');
+  if(body) body.innerHTML='<tr><td colspan="6" class="loading"><span class="sp"></span></td></tr>';
+
+  var desde, hasta;
+  if(f==='custom'||f===undefined){
+    // Rango personalizado desde los inputs
+    var fdEl=document.getElementById('vFD'), fhEl=document.getElementById('vFH');
+    desde=(fdEl?fdEl.value:'');
+    hasta=(fhEl?fhEl.value:'');
+    if(!desde||!hasta) return;
+  } else {
+    var fd=getFD(f);
+    desde=fd.d.substring(0,10);
+    hasta=fd.h.substring(0,10);
+  }
+
+  // Ajuste de zona horaria Paraguay (UTC-4): pedir con offset
+  // Para cubrir el día local completo, pedimos desde las 04:00 UTC del día (=00:00 PY)
+  // hasta las 03:59 UTC del día siguiente (=23:59 PY)
+  var desdeTZ=desde+'T04:00:00';
+  var hastaTZ=hasta+'T27:59:59'; // Supabase acepta esto, pero mejor usar día+1
+  // Calcular día siguiente para el hasta
+  var hastaDate=new Date(hasta+'T00:00:00');
+  hastaDate.setDate(hastaDate.getDate()+1);
+  var p2=function(n){return String(n).padStart(2,'0');};
+  var hastaNext=hastaDate.getFullYear()+'-'+p2(hastaDate.getMonth()+1)+'-'+p2(hastaDate.getDate())+'T03:59:59';
+
   try{
-    allVP=await sg('pos_ventas','licencia_email=ilike.'+encodeURIComponent(SE)+'&fecha=gte.'+fd.d+'&fecha=lte.'+fd.h+'&order=fecha.desc&limit=500');
+    allVP=await sg('pos_ventas',
+      'licencia_email=ilike.'+encodeURIComponent(SE)+
+      '&fecha=gte.'+desdeTZ+
+      '&fecha=lte.'+hastaNext+
+      '&order=fecha.desc&limit=500');
     renderVT(allVP);
-  }catch(e){if(document.getElementById('vBody'))document.getElementById('vBody').innerHTML='<tr><td colspan="6" class="loading">Error cargando</td></tr>';}
+  }catch(e){
+    if(document.getElementById('vBody'))
+      document.getElementById('vBody').innerHTML='<tr><td colspan="6" class="loading">Error cargando</td></tr>';
+  }
 }
 
 function renderVT(v){
@@ -1142,7 +1208,6 @@ function renderVT(v){
   var ef=v.filter(function(x){return (x.metodo_pago||'').toUpperCase()==='EFECTIVO';}).reduce(function(s,x){return s+(x.total||0);},0);
   document.getElementById('vCount').textContent=v.length+' ventas — Total: \u20B2'+gs(tot);
 
-  // KPIs resumen
   var kEl=document.getElementById('vKpis');
   if(kEl) kEl.innerHTML=
     '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Total</div><div style="font-size:22px;font-weight:800;color:var(--green);">\u20B2'+gs(tot)+'</div></div>'+
@@ -1152,59 +1217,68 @@ function renderVT(v){
   var mb=function(m){var u=(m||'').toUpperCase();return u==='EFECTIVO'?'<span class="tag tag-g">EF</span>':u==='POS'?'<span class="tag tag-b">POS</span>':'<span class="tag tag-o">TR</span>';};
   var tipoTag=function(x){
     var tieneF=x.tiene_factura||false;
-    try{ if(x.factura){ var f=typeof x.factura==='string'?JSON.parse(x.factura):x.factura; if(f&&f.nro_factura) tieneF=true; } }catch(e){}
+    try{ if(x.factura){ var fac=typeof x.factura==='string'?JSON.parse(x.factura):x.factura; if(fac&&fac.nro_factura) tieneF=true; } }catch(e){}
     return tieneF?'<span class="tag tag-b" style="font-size:10px;">FACTURA</span>':'<span class="tag tag-gr" style="font-size:10px;">TICKET</span>';
   };
+  var detalleHtml=function(x){
+    var items=[];
+    try{ items=typeof x.items==='string'?JSON.parse(x.items):(x.items||[]); }catch(e){}
+    var factura=null;
+    try{ factura=x.factura?(typeof x.factura==='string'?JSON.parse(x.factura):x.factura):null; }catch(e){}
+    return '<tr id="det_'+x.id+'" style="display:none;"><td colspan="6" style="padding:0;background:var(--card2);">'+
+      '<div style="padding:14px;border-top:2px solid var(--green);">'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px;">'+
+      '<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">Terminal</div><div style="font-weight:700;">'+(x.terminal||'—')+'</div></div>'+
+      '<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">Método</div><div style="font-weight:700;">'+(x.metodo_pago||'—').toUpperCase()+'</div></div>'+
+      '<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">Total</div><div style="font-weight:800;color:var(--green);">\u20B2'+gs(x.total)+'</div></div>'+
+      (factura&&factura.nro_factura?'<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">N° Factura</div><div style="font-weight:700;color:var(--blue);">'+factura.nro_factura+'</div></div>':'')+
+      (factura&&factura.nombre?'<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">Cliente</div><div style="font-weight:700;">'+factura.nombre+'</div></div>':'')+
+      '</div>'+
+      '<table style="font-size:12px;"><thead><tr>'+
+        '<th>Producto</th><th>Categoría</th><th style="text-align:center">Cant.</th>'+
+        '<th style="text-align:right">P.Unit</th><th style="text-align:right">Subtotal</th>'+
+      '</tr></thead><tbody>'+
+      (items.filter(function(it){return !it.esDescuento;}).map(function(it){
+        return '<tr><td style="font-weight:600;">'+(it.name||it.nombre||'—')+'</td>'+
+          '<td style="color:var(--muted);">'+(it.cat||it.categoria||'—')+'</td>'+
+          '<td style="text-align:center;">'+(it.qty||1)+'</td>'+
+          '<td style="text-align:right;">\u20B2'+gs(it.price||0)+'</td>'+
+          '<td style="text-align:right;font-weight:700;">\u20B2'+gs((it.price||0)*(it.qty||1))+'</td></tr>';
+      }).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--muted);">Sin detalle</td></tr>')+
+      '</tbody></table></div></td></tr>';
+  };
+
   document.getElementById('vBody').innerHTML=v.length?v.map(function(x){
     return '<tr style="cursor:pointer;" onclick="vDetalle(\''+x.id+'\')">'+
       '<td style="font-size:12px;">'+fmtDT(x.fecha)+'</td>'+
       '<td>'+(x.terminal||'—')+'</td>'+
       '<td>'+tipoTag(x)+'</td>'+
       '<td>'+mb(x.metodo_pago)+'</td>'+
-      '<td style="text-align:right;font-weight:700">\u20B2'+gs(x.total)+'</td>'+
-      '<td style="text-align:center;color:var(--muted);">'+
-        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>'+
-      '</td></tr>';
+      '<td style="text-align:right;font-weight:700;">\u20B2'+gs(x.total)+'</td>'+
+      '<td style="text-align:center;color:var(--muted);"><span id="arr_'+x.id+'">▶</span></td>'+
+      '</tr>'+
+      detalleHtml(x);
   }).join(''):'<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">Sin ventas en el período</td></tr>';
 }
 
 function vDetalle(id){
-  var venta=allVP.find(function(x){return String(x.id)===String(id);});
-  if(!venta) return;
-  var det=document.getElementById('vDetalle');
-  if(!det) return;
-  // Toggle — si ya está abierto el mismo, cerrar
-  if(det.dataset.open===String(id)){ det.innerHTML=''; det.dataset.open=''; return; }
-  det.dataset.open=String(id);
-
-  var items=[];
-  try{ items=typeof venta.items==='string'?JSON.parse(venta.items):(venta.items||[]); }catch(e){}
-  var factura=null;
-  try{ factura=venta.factura?(typeof venta.factura==='string'?JSON.parse(venta.factura):venta.factura):null; }catch(e){}
-
-  det.innerHTML='<div class="card" style="margin-top:8px;margin-bottom:14px;border:1.5px solid var(--green);"><div class="card-h" style="justify-content:space-between;">'+
-    '<span class="card-t">Detalle — '+fmtDT(venta.fecha)+'</span>'+
-    '<button onclick="document.getElementById(\'vDetalle\').innerHTML=\'\';document.getElementById(\'vDetalle\').dataset.open=\'\'" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">×</button>'+
-    '</div>'+
-    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;padding:14px;border-bottom:1px solid var(--border);">'+
-    '<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">Terminal</div><div style="font-weight:700;">'+(venta.terminal||'—')+'</div></div>'+
-    '<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">Método</div><div style="font-weight:700;">'+(venta.metodo_pago||'—').toUpperCase()+'</div></div>'+
-    '<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">Total</div><div style="font-weight:800;color:var(--green);">\u20B2'+gs(venta.total)+'</div></div>'+
-    (factura&&factura.nro_factura?'<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">Factura</div><div style="font-weight:700;color:var(--blue);">'+factura.nro_factura+'</div></div>':'')+
-    (factura&&factura.nombre?'<div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">Cliente</div><div style="font-weight:700;">'+factura.nombre+'</div></div>':'')+
-    '</div>'+
-    '<table><thead><tr><th>Producto</th><th>Categoría</th><th style="text-align:center">Cant.</th><th style="text-align:right">P.Unit</th><th style="text-align:right">Subtotal</th></tr></thead><tbody>'+
-    (items.filter(function(it){return !it.esDescuento;}).map(function(it){
-      return '<tr><td style="font-weight:600;">'+(it.name||it.nombre||'—')+'</td>'+
-        '<td style="color:var(--muted);">'+(it.cat||it.categoria||'—')+'</td>'+
-        '<td style="text-align:center;">'+(it.qty||1)+'</td>'+
-        '<td style="text-align:right;">\u20B2'+gs(it.price||0)+'</td>'+
-        '<td style="text-align:right;font-weight:700;">\u20B2'+gs((it.price||0)*(it.qty||1))+'</td></tr>';
-    }).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--muted);">Sin detalle</td></tr>')+
-    '</tbody></table></div>';
-
-  // Scroll al detalle
-  setTimeout(function(){ det.scrollIntoView({behavior:'smooth',block:'nearest'}); }, 100);
+  var row=document.getElementById('det_'+id);
+  var arr=document.getElementById('arr_'+id);
+  if(!row) return;
+  var visible=row.style.display!=='none';
+  // Cerrar todos
+  allVP.forEach(function(x){
+    var r=document.getElementById('det_'+x.id);
+    var a=document.getElementById('arr_'+x.id);
+    if(r) r.style.display='none';
+    if(a) a.textContent='▶';
+  });
+  // Abrir este si estaba cerrado
+  if(!visible){
+    row.style.display='';
+    if(arr) arr.textContent='▼';
+    setTimeout(function(){ row.scrollIntoView({behavior:'smooth',block:'nearest'}); },100);
+  }
 }
 
 function filtrV(q){
