@@ -8848,8 +8848,8 @@ function imprimirTicketConf(htmlContent, tipo){
     return;
   }
 
-  // ── PC/USB — generar ESC/POS identico al Bluetooth y descargar .bin ────────
-  imprimirPCUSB(htmlContent, size);
+  // ── Fallback: PC/USB — abrir diálogo de impresión ─────────────────────────
+  abrirDialogoImpresion(htmlContent, widthPx);
 }
 
 // ── FUNCIÓN: imprimirPCUSB ───────────────────────────────────────────────────
@@ -9060,36 +9060,51 @@ function limpiarParaImpresora(html){
 }
 
 function abrirDialogoImpresion(htmlContent, widthPx){
-  // Limpiar caracteres especiales del HTML antes de procesar
+  var size = (widthPx === '200px' || widthPx === '58mm' || widthPx === '58') ? '58' : '80';
+  var w = size === '58' ? '58mm' : '80mm';
+
+  // Limpiar caracteres especiales
   var htmlLimpio = limpiarParaImpresora(htmlContent);
 
-  // Usar el HTML del ticket directamente con el CSS correcto
-  // (no texto plano — así conserva el formato visual completo)
-  var size = (widthPx === '200px' || widthPx === '58mm' || widthPx === '58') ? '58' : '80';
-  var css = getCSSTermico(size);
-
-  // Extraer body del HTML
+  // Extraer body del HTML del ticket
   var bodyMatch = htmlLimpio.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
   var body = bodyMatch ? bodyMatch[1] : htmlLimpio;
+
+  // Usar el mismo CSS termico que usa el preview y bluetooth
+  var css = getCSSTermico(size);
 
   var fullHtml = '<!DOCTYPE html><html><head>'+
     '<meta charset="UTF-8">'+
     '<title>Ticket</title>'+
-    '<style>'+css+'</style>'+
+    '<style>'+css+
+    ' body{-webkit-print-color-adjust:exact;}'+
+    ' @media print{html,body{width:'+w+';margin:0;padding:0;}'+
+    ' @page{size:'+w+' auto;margin:0;}}'+
+    '</style>'+
     '</head><body>'+body+
-    '<script>window.onload=function(){setTimeout(function(){window.print();},300);}<\/script>'+
+    '<script>'+
+    'window.onload=function(){'+
+    '  setTimeout(function(){'+
+    '    window.print();'+
+    '  },400);'+
+    '};'+
+    '<\/script>'+
     '</body></html>';
 
+  // Abrir en ventana nueva — Chrome la renderiza correctamente
+  // y el dialogo de impresion muestra el ticket formateado
   var blob = new Blob([fullHtml], {type:'text/html;charset=utf-8'});
   var url  = URL.createObjectURL(blob);
-  var a    = document.createElement('a');
-  a.href = url;
-  a.target = '_blank';
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(function(){ URL.revokeObjectURL(url); }, 15000);
+  var win  = window.open(url, '_blank', 'width=300,height=600');
+  if(!win){
+    // Si popup bloqueado, intentar con link
+    var a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 20000);
 }
 
 // ── FUNCIÓN: imprimirAndroidNativo ───────────────────────────────────────────
