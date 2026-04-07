@@ -5555,6 +5555,10 @@ function supaInsertVenta(data){
   .then(r => {
     if(!r.ok) return r.text().then(t => { throw new Error(t); });
     console.log('[Venta] Guardada en Supabase OK');
+    // Si la venta tenía un pedido satélite vinculado, marcarlo como cobrado
+    if(data._supabasePedidoId){
+      marcarPedidoSateliteCobrado(data._supabasePedidoId);
+    }
     // Descontar stock en background
     stockDescontarVenta(data.items, data.comprobante || ('VENTA-'+Date.now()));
   })
@@ -5565,6 +5569,35 @@ function supaInsertVenta(data){
 }
 
 // ── DESCUENTO DE STOCK POR VENTA ─────────────────────────────────────────
+// ── marcarPedidoSateliteCobrado — actualiza estado en Supabase tras cobrar ───
+// Se llama desde el .then() del INSERT a pos_ventas cuando el pendiente
+// tenía supabasePedidoId. Cambia estado 'abierto' → 'cobrado' en pos_pedidos.
+// También elimina el pendiente local para que desaparezca de la lista y mesas.
+function marcarPedidoSateliteCobrado(pedidoId){
+  if(!pedidoId || USAR_DEMO) return;
+  // PATCH en Supabase
+  fetch(SUPA_URL + '/rest/v1/pos_pedidos?id=eq.' + encodeURIComponent(pedidoId), {
+    method:  'PATCH',
+    headers: {
+      'apikey':        SUPA_ANON,
+      'Authorization': 'Bearer ' + SUPA_ANON,
+      'Content-Type':  'application/json',
+    },
+    body: JSON.stringify({ estado: 'cobrado', updated_at: new Date().toISOString() })
+  })
+  .then(function(r){
+    if(r.ok) console.log('[CajaSync] Pedido satélite marcado cobrado:', pedidoId);
+    else r.text().then(function(t){ console.warn('[CajaSync] Error PATCH pedido:', t); });
+  })
+  .catch(function(e){ console.warn('[CajaSync] Error marcando cobrado:', e.message); });
+
+  // Eliminar de pendientes[] local inmediatamente (no esperar a Supabase)
+  pendientes = pendientes.filter(function(p){ return p.supabasePedidoId !== pedidoId; });
+  guardarPendientesLocal();
+  updBtnGuardar();
+  if(typeof renderMesasScreen === 'function') renderMesasScreen();
+}
+
 async function stockDescontarVenta(items, comprobante){
   const depId    = parseInt(localStorage.getItem('pos_deposito_id'))||null;
   const sucId    = parseInt(localStorage.getItem('pos_sucursal_id'))||null;
@@ -11995,6 +12028,13 @@ async function iniciarApp(){
   // Se ejecuta con delay para que el DOM de la pantalla inicial esté listo.
   // sateliteInicializarUI() es un no-op si MODO_TERMINAL === 'caja'.
   setTimeout(sateliteInicializarUI, 500);
+
+  // ── SYNC PEDIDOS SATÉLITE (solo modo caja) ───────────────────────────────
+  // Primera sync a los 7s (después de que mesasCargar termine y mesasMesas
+  // esté disponible para resolver mesa_id por nombre).
+  // Después cada 30s en background para ver nuevos pedidos de meseros.
+  setTimeout(cajaSyncPedidosSatelite, 7000);
+  setInterval(cajaSyncPedidosSatelite, 30000);
 }
 
 // ── ARRANQUE ──────────────────────────────────────────────
@@ -12137,6 +12177,106 @@ function switchVentasTab(tab){
   renderVentasList();
 }
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+// cajaSyncPedidosSatelite — sincroniza pedidos de satélites a pendientes[] de caja
+//
+// DISEÑO — integración sin tocar el diseño existente:
+//   Inyecta los pos_pedidos de Supabase en pendientes[] con el mismo formato
+//   de los tickets guardados manualmente. Así la caja los ve automáticamente:
+//     - En "Tickets pendientes" (scPendientes / botón GUARDAR) → mismo diseño
+//     - En el panel de mesas → mesa.tile.ocupada (rojo) porque renderMesasScreen
+//       ya busca en pendientes[] por mesa_id. Sin tocar esa lógica.
+//   El único cambio visual: badge "Satélite" en la tarjeta del pendiente.
+//
+// CUÁNDO CORRE:
+//   - Al iniciar la app (setTimeout 7000ms, después de cargar mesas)
+//   - Cada 30 segundos en background (setInterval)
+//   - Al abrir la pantalla de mesas (abrirPantallaMesas la llama)
+//   - Solo en MODO_TERMINAL === 'caja' con internet
+// ══════════════════════════════════════════════════════════════════════════════
+async function cajaSyncPedidosSatelite(){
+  if(MODO_TERMINAL !== 'caja') return;
+  if(!navigator.onLine || USAR_DEMO) return;
+
+  const email    = localStorage.getItem(SK.email);
+  const sucursal = localStorage.getItem('pos_sucursal') || 'Principal';
+  if(!email) return;
+
+  try{
+    const res = await fetch(
+      SUPA_URL + '/rest/v1/pos_pedidos'
+        + '?licencia_email=eq.' + encodeURIComponent(email)
+        + '&sucursal=eq.'       + encodeURIComponent(sucursal)
+        + '&estado=in.(abierto,en_cobro)'
+        + '&order=created_at.asc'
+        + '&select=id,numero_orden,mesa,tipo_pedido,estado,items,total,terminal_origen,created_at',
+      { headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON, 'Accept': 'application/json' } }
+    );
+    if(!res.ok){ console.warn('[CajaSync] Error HTTP:', res.status); return; }
+
+    const rows = await res.json();
+    if(!Array.isArray(rows)) return;
+
+    // Conservar tickets locales (de esta caja), reemplazar los de satélite
+    const locales = pendientes.filter(function(p){ return !p.esSatelite; });
+    var antes = pendientes.length;
+
+    var satelites = rows.map(function(p){
+      var items = [];
+      try { items = typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || []); } catch(e){}
+
+      // Resolver mesa_id local por nombre
+      var mesaId = null;
+      if(p.mesa && typeof mesasMesas !== 'undefined'){
+        var ml = mesasMesas.find(function(m){ return m.nombre === p.mesa; });
+        if(ml) mesaId = ml.id;
+      }
+
+      var total = p.total || items.reduce(function(s,i){ return s+(i.price||i.precio||0)*(i.qty||1); }, 0);
+
+      return {
+        nro:              p.numero_orden || p.id,
+        supabasePedidoId: p.id,
+        obs:              p.mesa || (p.tipo_pedido === 'delivery' ? 'Delivery' : 'Para llevar'),
+        cart: items.map(function(i){
+          return {
+            lineId:  i.id || Math.random(),
+            id:      i.id  || null,
+            name:    i.name  || i.nombre || '',
+            price:   i.price || i.precio || 0,
+            qty:     i.qty   || 1,
+            cat:     i.cat   || '',
+            obs:     i.obs   || '',
+            costo:   i.costo || 0,
+            color:   i.color || '#888',
+            enviado: true,
+          };
+        }),
+        total:          total,
+        fecha:          p.created_at,
+        mesa_id:        mesaId,
+        tipoPedido:     p.tipo_pedido || 'local',
+        esSatelite:     true,
+        terminalOrigen: p.terminal_origen || '',
+        estadoSupabase: p.estado,
+        esPresupuesto:  false,
+      };
+    });
+
+    pendientes = locales.concat(satelites);
+    guardarPendientesLocal();
+    updBtnGuardar();
+
+    if(satelites.length > 0 && typeof renderMesasScreen === 'function') renderMesasScreen();
+
+    var diff = pendientes.length - antes;
+    if(diff > 0 && typeof toast === 'function')
+      toast(diff + ' pedido' + (diff > 1 ? 's' : '') + ' nuevo' + (diff > 1 ? 's' : '') + ' de mesa');
+
+    console.log('[CajaSync] Satelite pendientes:', satelites.length, '| Total:', pendientes.length);
+  } catch(e){ console.warn('[CajaSync] Error:', e.message); }
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // MODO SATÉLITE — Funciones de inicialización y configuración
@@ -12475,6 +12615,9 @@ async function mesasCargar(){
 
 // ── Abrir pantalla mesas ──────────────────────────────
 async function abrirPantallaMesas(){
+  // Sync de pedidos satélite antes de mostrar las mesas
+  // para que las mesas ocupadas (rojo) reflejen el estado real de Supabase
+  cajaSyncPedidosSatelite().catch(function(){});
   await mesasCargar();
   if(mesasSalones.length === 0){
     const ok = confirm('No hay salones configurados. ¿Deseas crear uno ahora?');

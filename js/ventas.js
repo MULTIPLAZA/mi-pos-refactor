@@ -252,22 +252,47 @@ function renderPendientes() {
     </div>`;
     return;
   }
-  list.innerHTML = pendientes.map((t, i) => `
-    <div class="pend-item" style="display:flex;align-items:center;gap:0;">
-      <div style="flex:1;display:flex;align-items:center;gap:10px;padding:14px 0 14px 14px;cursor:pointer;" onclick="cargarTicket(${i})">
-        <div class="pend-item-num">#${String(t.nro).padStart(4, '0')}</div>
-        <div class="pend-item-info">
-          <div class="pend-item-title">Ticket #${String(t.nro).padStart(4, '0')}${t.esPresupuesto ? ' 📋' : ''}</div>
-          <div class="pend-item-obs">${t.obs || 'Sin observación'} · ${t.cart.reduce((s, i) => s + i.qty, 0)} art.</div>
-        </div>
-        <div class="pend-item-total">${gs(t.total)}</div>
-      </div>
-      <button onclick="event.stopPropagation();imprimirTicketPendiente(${i})" title="Imprimir"
-        style="background:none;border:none;cursor:pointer;color:var(--muted);padding:14px 12px;display:flex;align-items:center;flex-shrink:0;border-left:1px solid var(--border);">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      </button>
-    </div>`
-  ).join('');
+  list.innerHTML = pendientes.map((t, i) => {
+    // Pedido de terminal satélite — va directo a cobrar, no se edita
+    var esSat = !!t.esSatelite;
+    // Badge visual: satélite o presupuesto
+    var badge = '';
+    if (esSat) {
+      badge = ' <span style="font-size:10px;font-weight:800;background:rgba(83,74,183,.15);' +
+              'color:#a78bfa;border:1px solid rgba(83,74,183,.3);padding:1px 6px;' +
+              'border-radius:4px;letter-spacing:.5px;vertical-align:middle;">SATELITE</span>';
+      if (t.tipoPedido === 'delivery') {
+        badge = ' <span style="font-size:10px;font-weight:800;background:rgba(255,152,0,.15);' +
+                'color:#ff9800;border:1px solid rgba(255,152,0,.3);padding:1px 6px;' +
+                'border-radius:4px;letter-spacing:.5px;vertical-align:middle;">DELIVERY</span>';
+      }
+    } else if (t.esPresupuesto) {
+      badge = ' <span style="font-size:10px;">📋</span>';
+    }
+    // Acción al tocar: satélite → cobrar directo | local → cargar al carrito
+    var onclickAccion = esSat
+      ? 'cajaAbrirPedidoSatelite(' + i + ')'
+      : 'cargarTicket(' + i + ')';
+    // Info secundaria
+    var artCount = (t.cart || []).reduce(function(s, it) { return s + it.qty; }, 0);
+    var infoObs  = (t.obs || 'Sin observación') + ' · ' + artCount + ' art.';
+    if (esSat && t.terminalOrigen) infoObs += ' · ' + t.terminalOrigen;
+    return '<div class="pend-item" style="display:flex;align-items:center;gap:0;' +
+           (esSat ? 'border-left:3px solid #534AB7;' : '') + '">' +
+      '<div style="flex:1;display:flex;align-items:center;gap:10px;padding:14px 0 14px 14px;cursor:pointer;" onclick="' + onclickAccion + '">' +
+        '<div class="pend-item-num">#' + String(t.nro).padStart(4, '0') + '</div>' +
+        '<div class="pend-item-info">' +
+          '<div class="pend-item-title">Ticket #' + String(t.nro).padStart(4, '0') + badge + '</div>' +
+          '<div class="pend-item-obs">' + infoObs + '</div>' +
+        '</div>' +
+        '<div class="pend-item-total">' + gs(t.total) + '</div>' +
+      '</div>' +
+      '<button onclick="event.stopPropagation();imprimirTicketPendiente(' + i + ')" title="Imprimir"' +
+        ' style="background:none;border:none;cursor:pointer;color:var(--muted);padding:14px 12px;display:flex;align-items:center;flex-shrink:0;border-left:1px solid var(--border);">' +
+        '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>' +
+      '</button>' +
+    '</div>';
+  }).join('');
 }
 
 function cargarTicket(i) {
@@ -299,6 +324,51 @@ function cargarTicket(i) {
   updBtnGuardar();
   goTo('scSale');
   toast('Ticket #' + String(t.nro).padStart(4, '0') + ' cargado');
+}
+
+// ── cajaAbrirPedidoSatelite — abre pedido satélite directo al cobro ──────────
+// Los pedidos de satélite no se "editan" — el cajero los cobra tal cual.
+// Carga el carrito del pedido y va directo a la pantalla de cobro.
+// El pedido queda en pendientes[] hasta que se confirme el cobro en pos_ventas.
+function cajaAbrirPedidoSatelite(i) {
+  var t = pendientes[i];
+  if (!t || !t.esSatelite) { if (typeof cargarTicket !== 'undefined') cargarTicket(i); return; }
+
+  // Si hay carrito activo, preguntar antes de pisar
+  var totalActual = typeof calcTotal === 'function' ? calcTotal() : 0;
+  if (totalActual > 0) {
+    if (!confirm('Hay un ticket en curso. ¿Descartar y abrir el pedido de ' + (t.obs || 'mesero') + '?')) return;
+  }
+
+  // Cargar el carrito del pedido satélite
+  cart = JSON.parse(JSON.stringify(t.cart || []));
+  currentTicketNro = t.nro;
+
+  // Setear tipo de pedido y mesa si corresponde
+  if (typeof setTipoPedido === 'function') {
+    setTipoPedido(t.tipoPedido || 'local');
+  }
+  if (t.mesa_id && typeof mesasMesas !== 'undefined') {
+    var mesa = mesasMesas.find(function(m) { return m.id === t.mesa_id; });
+    if (mesa) {
+      mesaActual = mesa;
+      if (typeof updMesaBtn === 'function') updMesaBtn();
+    }
+  }
+
+  if (typeof updUI === 'function') updUI();
+  if (typeof updBtnGuardar === 'function') updBtnGuardar();
+
+  // Ir directo al cobro — el cajero no edita el pedido del mesero
+  if (typeof goCobrar === 'function') {
+    goTo('scSale');
+    setTimeout(function() { goCobrar(); }, 100);
+  } else {
+    goTo('scCobrar');
+  }
+
+  if (typeof toast === 'function')
+    toast('Pedido de ' + (t.terminalOrigen || 'mesero') + ' — ' + (t.obs || '') + ' listo para cobrar');
 }
 
 function nuevaVenta() {

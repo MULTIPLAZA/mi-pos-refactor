@@ -819,9 +819,15 @@ function confirmarPago() {
   // Limpiar divPagos para que no contamine la próxima venta normal
   if(typeof divPagos !== 'undefined') divPagos.length = 0;
 
+  // Capturar supabasePedidoId ANTES de limpiar pendientes
+  // para poder marcar el pedido satélite como cobrado en Supabase
+  var _supabasePedidoId = null;
   if (currentTicketNro !== null) {
     const idx = pendientes.findIndex(p => p.nro === currentTicketNro);
-    if (idx >= 0) pendientes.splice(idx, 1);
+    if (idx >= 0) {
+      _supabasePedidoId = pendientes[idx].supabasePedidoId || null;
+      pendientes.splice(idx, 1);
+    }
     currentTicketNro = null;
   }
   try { localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); } catch (e) {}
@@ -843,14 +849,15 @@ function confirmarPago() {
 
   // ── Registrar y mostrar recibo ─────────────────────────────
   registrarVentaEnTurno({
-    items:       itemsVenta,
-    total:       totalVenta,
-    metodo:      metodoPago,
-    comprobante: comprobante === '—' ? '' : comprobante,
-    factura:     facturaData,
-    fecha:       new Date(),
+    items:          itemsVenta,
+    total:          totalVenta,
+    metodo:         metodoPago,
+    comprobante:    comprobante === '—' ? '' : comprobante,
+    factura:        facturaData,
+    fecha:          new Date(),
     nroTicket,
-    divPagos:    divPagosCopia,
+    divPagos:       divPagosCopia,
+    _supabasePedidoId, // UUID del pedido satélite (null si fue venta directa)
   });
 
   mesaLimpiarAlPagar();
