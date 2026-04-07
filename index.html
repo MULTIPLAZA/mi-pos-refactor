@@ -2996,6 +2996,8 @@
     </div>
     <div class="drawer-separator"></div>
 
+    <div class="drawer-separator"></div>
+
     <div class="drawer-item" onclick="drawerGo('backoffice')">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="18" y1="20" x2="18" y2="10"/>
@@ -4145,6 +4147,197 @@ function toggleSearch(){
 
 
 // CONFIRM PAYMENT
+// ══════════════════════════════════════════════════════════════════════════════
+// goCobrar — punto de entrada unificado para el botón COBRAR / ENVIAR PEDIDO
+//
+// MODO CAJA:     Navega a la pantalla #scCobrar (comportamiento original).
+//                Valida que el carrito no esté vacío antes de navegar.
+//
+// MODO SATÉLITE: Llama a sateliteEnviarPedido() que:
+//                  1. Inserta en pos_pedidos (Supabase) → caja lo ve en tiempo real
+//                  2. Imprime comanda en cocina (reutiliza imprimirComandaPreCobro)
+//                  3. Guarda backup local en pendientes[] para modo offline
+//                  4. Limpia carrito y vuelve al panel de mesas
+//
+// Los 3 botones COBRAR del HTML (móvil, tablet, detalle) llaman a esta función.
+// ══════════════════════════════════════════════════════════════════════════════
+function goCobrar(){
+  if(MODO_TERMINAL === 'satelite'){
+    // Modo satélite: no cobrar, enviar pedido a cocina y a caja
+    sateliteEnviarPedido();
+  } else {
+    // Modo caja: comportamiento original — ir a pantalla de cobro
+    if(calcTotal() === 0){ toast('El ticket está vacío'); return; }
+    goTo('scCobrar');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// sateliteEnviarPedido — lógica completa del envío de pedido desde satélite
+//
+// FLUJO:
+//   1. Valida carrito no vacío
+//   2. Arma el objeto pedido con: items, mesa, tipo, terminal, total
+//   3. POST a /rest/v1/pos_pedidos en Supabase (con fallback offline)
+//   4. Llama a imprimirComandaPreCobro() → imprime en comandera de cocina
+//      y marca los ítems como enviado:true (comportamiento ya existente)
+//   5. Guarda copia local en pendientes[] con flag esSatelite:true
+//   6. Muestra toast con resultado (con conexión / sin conexión)
+//   7. Limpia carrito, mesa, tipoPedido → listo para próximo pedido
+//   8. Vuelve al panel de mesas (si hay salones) o al POS
+//
+// TABLA SUPABASE REQUERIDA:
+//   Ver SQL en: /docs/satelite_setup.sql
+//   CREATE TABLE pos_pedidos (id uuid, licencia_email, terminal_origen,
+//     numero_orden, mesa, tipo_pedido, estado, items jsonb, total, mesero_id,
+//     created_at, updated_at)
+//
+// REGLA DE PROPIEDAD DEL PEDIDO:
+//   mesero_id = nombre del terminal que creó el pedido.
+//   Los pedidos adicionales a la misma mesa crean un nuevo registro
+//   en pos_pedidos con tipo_pedido='adicional', NO editan el original.
+//   Esto garantiza que cocina siempre recibe una comanda nueva y clara.
+// ══════════════════════════════════════════════════════════════════════════════
+async function sateliteEnviarPedido(){
+  // ── Validación básica ────────────────────────────────────────────────────
+  if(!cart || cart.length === 0){
+    toast('Agregá productos primero');
+    return;
+  }
+
+  const email    = localStorage.getItem('lic_email');
+  const terminal = localStorage.getItem('pos_terminal') || 'Satélite';
+  const licId    = parseInt(localStorage.getItem('ali')) || null;
+  const tipo     = tipoPedido || 'llevar'; // 'local' | 'delivery' | 'llevar'
+  const mesaNombre = mesaActual ? mesaActual.nombre : null;
+
+  // Número de orden visible (ej: Orden #0012 en la comanda)
+  // Usamos ticketCounter que ya existe y se autoincrementa
+  const nroOrden = ticketCounter;
+
+  // ── Detectar si es pedido ADICIONAL a una mesa ya ocupada ───────────────
+  // Si la mesa ya tiene un pendiente local, marcarlo como adicional
+  const esAdicional = mesaActual
+    ? pendientes.some(p => p.mesa_id === mesaActual.id && !p.esSateliteCobrado)
+    : false;
+  const tipoFinal = esAdicional ? 'adicional' : tipo;
+
+  // ── Armar payload para Supabase ──────────────────────────────────────────
+  const itemsParaSupabase = cart.map(function(i){
+    return {
+      id:    i.id    || null,
+      name:  i.name  || '',
+      qty:   i.qty   || 1,
+      price: i.price || 0,
+      cat:   i.cat   || '',
+      obs:   i.obs   || '',
+      costo: i.costo || 0,
+    };
+  });
+
+  const pedidoData = {
+    licencia_email:  email,
+    licencia_id:     licId,
+    terminal_origen: terminal,          // identifica qué tablet/celular creó el pedido
+    numero_orden:    nroOrden,          // número correlativo visible
+    mesa:            mesaNombre,        // null si es delivery o para llevar
+    tipo_pedido:     tipoFinal,         // 'local' | 'delivery' | 'llevar' | 'adicional'
+    estado:          'abierto',         // la caja lo cambia a 'en_cobro' → 'cobrado'
+    items:           JSON.stringify(itemsParaSupabase),
+    total:           calcTotal(),
+    mesero_id:       terminal,          // para la regla: solo el dueño puede editar
+    created_at:      new Date().toISOString(),
+    updated_at:      new Date().toISOString(),
+  };
+
+  // ── Intentar sincronizar con Supabase ────────────────────────────────────
+  let supaOk = false;
+  if(navigator.onLine && email && !USAR_DEMO){
+    try{
+      const res = await fetch(SUPA_URL + '/rest/v1/pos_pedidos', {
+        method:  'POST',
+        headers: {
+          'apikey':        SUPA_ANON,
+          'Authorization': 'Bearer ' + SUPA_ANON,
+          'Content-Type':  'application/json',
+          'Prefer':        'return=minimal',
+        },
+        body: JSON.stringify(pedidoData),
+      });
+      supaOk = res.ok;
+      if(!res.ok){
+        const errText = await res.text();
+        console.warn('[Satélite] Error al enviar pedido a Supabase:', res.status, errText);
+        // Si la tabla no existe aún, no bloquear al mesero — solo advertir
+        if(res.status === 404 || res.status === 400){
+          console.warn('[Satélite] Tabla pos_pedidos no encontrada. Ejecutar SQL de setup.');
+        }
+      } else {
+        console.log('[Satélite] Pedido #' + nroOrden + ' sincronizado con Supabase OK');
+      }
+    } catch(e){
+      // Sin internet — modo offline, el pedido queda solo en localStorage
+      console.warn('[Satélite] Sin conexión al enviar pedido:', e.message);
+    }
+  }
+
+  // ── Imprimir comanda en cocina ───────────────────────────────────────────
+  // Reutiliza imprimirComandaPreCobro() que ya existe:
+  //   - Filtra items con enviado:false
+  //   - Imprime con el formato de comanda existente (número de orden, mesa, tipo)
+  //   - Marca los items como enviado:true en memoria
+  // Si es pedido adicional, el encabezado de la comanda ya incluye el tipo
+  // ('adicional') que la función de impresión tomará de tipoPedido si lo pasamos
+  imprimirComandaPreCobro();
+
+  // ── Guardar backup local en pendientes[] ─────────────────────────────────
+  // Permite que el satélite funcione sin internet y que el panel de mesas
+  // muestre la mesa como "ocupada" aunque Supabase no respondió.
+  const nro = ticketCounter++;
+  localStorage.setItem('pos_ticket_counter', ticketCounter);
+
+  pendientes.push({
+    nro:              nro,
+    obs:              mesaNombre || (tipo === 'delivery' ? 'Delivery' : 'Para llevar'),
+    cart:             JSON.parse(JSON.stringify(cart)),
+    total:            calcTotal(),
+    fecha:            new Date().toISOString(),
+    mesa_id:          mesaActual ? mesaActual.id : null,
+    esSatelite:       true,              // flag: distingue de tickets de caja
+    esSateliteCobrado:false,             // la caja lo marcará como cobrado
+    supaSync:         supaOk,            // true si se sinronizó con Supabase
+    esPresupuesto:    false,
+  });
+  guardarPendientesLocal();
+
+  // ── Feedback al mesero ───────────────────────────────────────────────────
+  const mesaMsg  = mesaNombre
+    ? (esAdicional ? 'Adicional Mesa ' + mesaNombre : 'Mesa ' + mesaNombre)
+    : (tipo === 'delivery' ? 'Delivery' : 'Para llevar');
+  const syncMsg  = supaOk
+    ? ' — caja notificada'
+    : ' — sin conexión, guardado local';
+  toast('Pedido #' + String(nro).padStart(4, '0') + ' enviado · ' + mesaMsg + syncMsg);
+
+  // ── Limpiar estado para próximo pedido ───────────────────────────────────
+  cart             = [];
+  currentTicketNro = null;
+  mesaActual       = null;
+  tipoPedido       = 'llevar';
+  setTipoPedido('llevar');
+  updMesaBtn();
+  updUI();
+  updBtnGuardar();
+  updTabTicketHeader();
+
+  // Volver al panel de mesas (si hay salones configurados) o al POS principal
+  if(mesasSalones && mesasSalones.length > 0){
+    abrirPantallaMesas();
+  } else {
+    goTo('scSale');
+  }
+}
+
 function goDetalle(){
   if(calcTotal() === 0){ toast('El ticket está vacío'); return; }
   renderDetalle();
@@ -6197,6 +6390,7 @@ function closeDrawer(){
   document.getElementById('drawer').classList.remove('open');
   document.getElementById('drawerOverlay').classList.remove('open');
 }
+
 function drawerGo(section){
   document.querySelectorAll('.drawer-item').forEach(el => el.classList.remove('active'));
   if(event && event.currentTarget) event.currentTarget.classList.add('active');
@@ -11008,6 +11202,33 @@ const BTPrinter = {
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
 const APP_VERSION = 'v1.8.3 (2026-03-31)';
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MODO TERMINAL — 'caja' (default) o 'satelite'
+//
+// DESCRIPCIÓN:
+//   Controla qué puede hacer este dispositivo dentro del sistema POS.
+//
+//   'caja'     → Terminal principal. Puede abrir/cerrar turno, cobrar y facturar.
+//                Comportamiento original sin cambios.
+//
+//   'satelite' → Terminal de mesero/delivery. Puede tomar pedidos, asignar mesas,
+//                imprimir comandas en cocina, pero NO puede cobrar ni facturar.
+//                El botón COBRAR se convierte en ENVIAR PEDIDO.
+//                Los pedidos se sincronizan a Supabase (tabla pos_pedidos) para
+//                que la caja central los vea en tiempo real.
+//
+// CÓMO CONFIGURAR:
+//   Desde admin-negocio.html → Configuración → Modo Terminal
+//   O directamente: localStorage.setItem('pos_modo_terminal', 'satelite')
+//
+// IMPACTO EN UI:
+//   - Botón COBRAR → ENVIAR PEDIDO (color púrpura #534AB7)
+//   - Pantalla #scCobrar → inaccesible
+//   - Turno/Cierre → ocultos en drawer
+//   - Todo lo demás (catálogo, mesas, delivery, carrito) → sin cambios
+// ══════════════════════════════════════════════════════════════════════════════
+let MODO_TERMINAL = localStorage.getItem('pos_modo_terminal') || 'caja';
 const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
 
 async function supaRPC(fn, params){
@@ -11147,6 +11368,10 @@ function licGuardar(data){
   localStorage.setItem(SK.vence,data.vence);
   localStorage.setItem(SK.fallos,'0');
   localStorage.setItem(SK.nextCheck,String(Date.now()+24*60*60*1000));
+  // Guardar email en cookie como backup para auto-recuperación offline.
+  // Si se borra el localStorage, licInit puede leer el email desde aquí
+  // y usarlo como fallback mientras no haya internet.
+  cookieSet('pos_email_bk', data.email, 730); // 2 años
 }
 
 function licSetNegocio(nombre){
@@ -11214,35 +11439,195 @@ function licMostrarBloqueo(motivo){
   document.getElementById('scBloqueado').style.display='flex';
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// licInit — punto de entrada de la verificación de licencia al arrancar.
+//
+// FLUJO MEJORADO — auto-recuperación sin re-registro:
+//
+//   CASO 1 — Normal (localStorage intacto):
+//     lic_activated presente → arrancar directo, verificar en background.
+//
+//   CASO 2 — Caché borrada / app reinstalada (localStorage perdido):
+//     lic_activated ausente, PERO el device_id puede sobrevivir en:
+//       a) Cookie (dura 1 año, sobrevive borrar caché en Android/Chrome)
+//       b) IndexedDB (sobrevive borrar caché si no se borró storage completo)
+//     Si hay device_id → consultar activaciones en Supabase.
+//     Si Supabase confirma que ese device está activo → restaurar todo
+//     automáticamente SIN pedirle nada al usuario.
+//     Si no hay device_id O Supabase dice que no está → pedir registro.
+//
+//   CASO 3 — Sin internet:
+//     Usar lo que haya en localStorage/cookies sin verificar.
+//     Si no hay nada en ninguna capa → mostrar pantalla de activación.
+//
+// PRINCIPIO:
+//   Una vez que un dispositivo fue registrado, NUNCA debe pedir registro
+//   de nuevo salvo que el proveedor (super-admin) lo deshabilite
+//   seteando activaciones.activa = false.
+// ══════════════════════════════════════════════════════════════════════════════
 async function licInit(){
-  if(!licIsActivated()){
-    document.getElementById('scActivacion').style.display='flex';
-    return false;
+
+  // ── CASO 1: localStorage intacto — flujo normal ──────────────────────────
+  if(licIsActivated()){
+    const neg = localStorage.getItem(SK.negocio);
+    if(neg && typeof configData !== 'undefined') configData.negocio = neg;
+
+    if(navigator.onLine){
+      // Verificar en background sin bloquear el arranque
+      licVerificarAhora().catch(e => console.warn('[Licencia] Verificación background:', e.message));
+      // Recuperar config de terminal si se perdió (sin re-registro)
+      if(!localStorage.getItem('pos_terminal') || !localStorage.getItem('pos_sucursal')){
+        try{
+          await licGetDeviceIdAsync();
+          const cfg = await recuperarConfigTerminalSupabase();
+          if(cfg){
+            aplicarConfigTerminal(cfg);
+            console.log('[licInit] Terminal recuperada:', cfg.terminal, '/', cfg.sucursal);
+          }
+        }catch(e){ console.warn('[licInit] No se pudo recuperar config:', e.message); }
+      }
+    } else {
+      licCheckPeriodico().catch(()=>{});
+    }
+    return true;
   }
-  const neg=localStorage.getItem(SK.negocio);
-  if(neg&&typeof configData!=='undefined') configData.negocio=neg;
+
+  // ── CASO 2: localStorage perdido — intentar auto-recuperar ───────────────
+  // El device_id puede sobrevivir en cookie o IndexedDB aunque se borre
+  // el localStorage. Si lo encontramos, consultamos Supabase.
+  console.log('[licInit] localStorage sin activación — buscando device_id en otras capas...');
+
+  // Mostrar pantalla de carga mientras intentamos recuperar
+  licMostrarRecuperando();
+
+  let recuperado = false;
 
   if(navigator.onLine){
-    // Con internet: verificar licencia en background, sin bloquear el arranque
-    // Si falla por red, licVerificarAhora ya tolera el error
-    licVerificarAhora().catch(e => console.warn('[Licencia] Verificación background:', e.message));
-    // Recuperar config de terminal si hace falta
-    if(!localStorage.getItem('pos_terminal') || !localStorage.getItem('pos_sucursal')){
-      try{
-        await licGetDeviceIdAsync();
-        const cfg = await recuperarConfigTerminalSupabase();
-        if(cfg){
-          aplicarConfigTerminal(cfg);
-          console.log('[licInit] Terminal recuperada:', cfg.terminal, '/', cfg.sucursal);
+    try{
+      // Intentar recuperar el device_id desde cookie o IndexedDB
+      const deviceId = await licGetDeviceIdAsync();
+      console.log('[licInit] device_id encontrado:', deviceId ? deviceId.substring(0,12)+'...' : 'ninguno');
+
+      if(deviceId){
+        // Consultar activaciones por device_id directamente
+        const res = await fetch(
+          SUPA_URL + '/rest/v1/activaciones'
+            + '?device_id=eq.' + encodeURIComponent(deviceId)
+            + '&activa=eq.true'
+            + '&select=email,nombre_negocio,nombre_terminal,sucursal,licencia_id,modo'
+            + '&limit=1',
+          { headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON, 'Accept': 'application/json' } }
+        );
+
+        if(res.ok){
+          const rows = await res.json();
+          const activ = Array.isArray(rows) && rows[0] ? rows[0] : null;
+
+          if(activ && activ.email){
+            console.log('[licInit] ✓ Dispositivo reconocido en Supabase — restaurando sesión...');
+            console.log('[licInit]   Email:', activ.email, '| Terminal:', activ.nombre_terminal, '| Modo:', activ.modo);
+
+            // Restaurar datos de licencia en localStorage
+            // El token lo regeneramos desde Supabase o usamos un placeholder seguro
+            const tokenData = await supaRPC('verificar_licencia', {
+              p_device_id: deviceId,
+              p_email:     activ.email,
+            });
+
+            if(tokenData && tokenData.activa){
+              // Restaurar todas las claves SK
+              localStorage.setItem(SK.activated, '1');
+              localStorage.setItem(SK.email,     activ.email);
+              localStorage.setItem(SK.token,     tokenData.token || 'restored_' + deviceId.slice(0,8));
+              localStorage.setItem(SK.plan,      tokenData.plan  || 'Basico');
+              localStorage.setItem(SK.vence,     tokenData.vence || '');
+              localStorage.setItem(SK.fallos,    '0');
+              localStorage.setItem(SK.nextCheck, String(Date.now() + 24*60*60*1000));
+
+              // Restaurar datos del negocio
+              if(activ.nombre_negocio){
+                localStorage.setItem(SK.negocio, activ.nombre_negocio);
+                if(typeof configData !== 'undefined') configData.negocio = activ.nombre_negocio;
+              }
+
+              // Restaurar datos de terminal
+              if(activ.nombre_terminal) localStorage.setItem('pos_terminal', activ.nombre_terminal);
+              if(activ.sucursal)        localStorage.setItem('pos_sucursal', activ.sucursal);
+              if(activ.licencia_id)     { localStorage.setItem('ali', String(activ.licencia_id)); cookieSet('ali', String(activ.licencia_id), 365); }
+              if(activ.modo)            localStorage.setItem('pos_modo_terminal', activ.modo);
+
+              // Intentar recuperar config completa (deposito_id, sucursal_id, etc.)
+              try{
+                const cfg = await recuperarConfigTerminalSupabase();
+                if(cfg) aplicarConfigTerminal(cfg);
+              }catch(e){}
+
+              recuperado = true;
+              console.log('[licInit] ✓ Sesión restaurada automáticamente — sin re-registro');
+            } else {
+              console.warn('[licInit] Supabase dice que la licencia no está activa para este device');
+            }
+          } else {
+            console.warn('[licInit] device_id no encontrado en activaciones o inactivo');
+          }
         }
-      }catch(e){ console.warn('[licInit] No se pudo recuperar config:', e.message); }
+      }
+    } catch(e){
+      console.warn('[licInit] Error al intentar auto-recuperar:', e.message);
+      // No bloquear: si falla la red, caer al caso 3 (sin internet)
     }
   } else {
-    // Sin internet: verificar solo si el timer expiró (tolerancia offline)
-    // No bloquear el arranque bajo ningún concepto
-    licCheckPeriodico().catch(()=>{});
+    // ── CASO 3: Sin internet y sin localStorage ─────────────────────────────
+    // Intentar usar lo que quede en cookie/sessionStorage como fallback mínimo
+    const emailCookie = cookieGet('pos_email_bk'); // guardado al activar
+    if(emailCookie){
+      console.warn('[licInit] Sin internet — usando email desde cookie como fallback offline');
+      localStorage.setItem(SK.email, emailCookie);
+      // NO marcamos como activated — al conectarse verificará correctamente
+    }
   }
-  return true;
+
+  // Ocultar pantalla de recuperación
+  licOcultarRecuperando();
+
+  if(recuperado){
+    // Restauración exitosa — arrancar normalmente
+    return true;
+  }
+
+  // No se pudo recuperar — mostrar pantalla de activación
+  console.log('[licInit] No se pudo recuperar sesión — mostrando pantalla de activación');
+  document.getElementById('scActivacion').style.display = 'flex';
+  return false;
+}
+
+// ── Pantalla de "Recuperando sesión..." (mientras se consulta Supabase) ──────
+// Evita que el usuario vea brevemente la pantalla de activación antes
+// de que la auto-recuperación termine.
+function licMostrarRecuperando(){
+  // Reutilizar scBloqueado con mensaje diferente, o crear overlay simple
+  const overlay = document.getElementById('licRecuperandoOverlay');
+  if(overlay){ overlay.style.display = 'flex'; return; }
+  // Crear el overlay si no existe
+  const div = document.createElement('div');
+  div.id = 'licRecuperandoOverlay';
+  div.style.cssText = [
+    'position:fixed', 'inset:0', 'z-index:10000', 'background:#1a1a1a',
+    'display:flex', 'flex-direction:column', 'align-items:center',
+    'justify-content:center', 'gap:16px',
+  ].join(';');
+  div.innerHTML = [
+    '<div style="width:48px;height:48px;border-radius:50%;border:3px solid #2a2a2a;',
+    'border-top-color:#4caf50;animation:lic-spin .8s linear infinite;"></div>',
+    '<p style="color:#666;font-size:14px;font-family:Barlow,sans-serif;">',
+    'Verificando dispositivo...</p>',
+  ].join('');
+  document.body.appendChild(div);
+}
+
+function licOcultarRecuperando(){
+  const overlay = document.getElementById('licRecuperandoOverlay');
+  if(overlay) overlay.style.display = 'none';
 }
 
 async function doActivar(){
@@ -11414,6 +11799,14 @@ async function iniciarApp(){
   const _vCfg = document.getElementById('configVersion');
   if(_vCfg) _vCfg.textContent = APP_VERSION + ' · by Nodo Informática';
   // ─────────────────────────────────────────────────────────
+  // ── PASO 0: Leer modo de terminal desde activaciones ─────
+  // DEBE ejecutarse primero: determina si este dispositivo es
+  // 'caja' o 'satelite'. El modo lo configura el proveedor
+  // (Emvitta) desde el super-admin. El usuario/negocio NO puede
+  // cambiarlo. Si no hay internet, usa el último valor guardado.
+  await leerModoDesdeActivaciones();
+
+  // ─────────────────────────────────────────────────────────
   // ── PASO 1: Config local (sin red) ───────────────────────
   // Restaurar desde localStorage o cookies (cookies sobreviven al borrar caché)
   const terminal = localStorage.getItem('pos_terminal') || cookieGet('pos_terminal');
@@ -11522,7 +11915,28 @@ async function iniciarApp(){
       toast('Sesión restaurada — '+turnoData.ventas.length+' venta'+(turnoData.ventas.length!==1?'s':''));
     }
   } else {
-    goTo('scClosed');
+    // Sin turno activo — comportamiento diferente según el modo:
+    if(MODO_TERMINAL === 'satelite'){
+      // MODO SATÉLITE: el mesero NO abre turno, simplemente espera que la caja lo haga.
+      // En lugar de mostrar la pantalla confusa de "Turno cerrado / Abrir turno",
+      // ir directo al POS y cargar productos. El mesero puede tomar pedidos
+      // siempre que haya internet y la caja haya abierto turno en Supabase.
+      // La validación de turno activo ocurre en sateliteEnviarPedido().
+      if(mesasSalones && mesasSalones.length > 0){
+        // Si hay mesas configuradas, ir al panel de mesas directamente
+        await mesasCargar();
+        goTo('scMesas');
+        renderMesasScreen();
+      } else {
+        goTo('scSale');
+        renderCatPills();
+        filterP();
+      }
+      toast('Terminal satélite lista');
+    } else {
+      // MODO CAJA: comportamiento original — mostrar pantalla de turno cerrado
+      goTo('scClosed');
+    }
   }
 
   // ── PASO 4: Refrescar productos/categorías ───────────────
@@ -11576,6 +11990,11 @@ async function iniciarApp(){
   setTimeout(mesasCargar, 6000); // Cargar mesas en background
   setTimeout(updSyncBadge, 1500); // Actualizar badge de sync al iniciar
   setTimeout(cargarModificadores, 4000); // Cargar modificadores en background
+
+  // ── MODO SATÉLITE: adaptar UI si corresponde ─────────────────────────────
+  // Se ejecuta con delay para que el DOM de la pantalla inicial esté listo.
+  // sateliteInicializarUI() es un no-op si MODO_TERMINAL === 'caja'.
+  setTimeout(sateliteInicializarUI, 500);
 }
 
 // ── ARRANQUE ──────────────────────────────────────────────
@@ -11718,6 +12137,292 @@ function switchVentasTab(tab){
   renderVentasList();
 }
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MODO SATÉLITE — Funciones de inicialización y configuración
+// ══════════════════════════════════════════════════════════════════════════════
+
+// sateliteInicializarUI — adapta la interfaz gráfica al modo satélite.
+//
+// CAMBIOS EN UI:
+//   1. Botones COBRAR → texto "ENVIAR PEDIDO" + color púrpura (#534AB7)
+//      Afecta: btn-cobrar (móvil), tab-btn-cobrar (tablet), det-cobrar-btn (detalle)
+//   2. Badge "SATÉLITE" en el header del POS (identificación visual)
+//   3. Ocultar ítems de turno en el drawer (abrir/cerrar turno no aplica)
+//
+// SIN CAMBIOS:
+//   - Catálogo de productos, búsqueda, categorías
+//   - Carrito, cantidades, observaciones, descuentos
+//   - Panel de mesas (onMesaTap, guardarConMesa — todo igual)
+//   - Tipos de pedido: Local/Llevar/Delivery
+//   - Impresión de comanda (imprimirComandaPreCobro)
+//   - Pantalla de detalle del ticket
+//
+// Se llama desde iniciarApp() con setTimeout(sateliteInicializarUI, 500)
+// para asegurar que el DOM esté completamente renderizado.
+// ══════════════════════════════════════════════════════════════════════════════
+// leerModoDesdeActivaciones — LEE el modo ('caja'|'satelite') y la sucursal
+// directamente desde la tabla activaciones en Supabase.
+//
+// DISEÑO INTENCIONAL:
+//   El modo NO lo elige el usuario ni el negocio. Lo configura el proveedor
+//   (Emvitta) desde el super-admin antes o después de la instalación.
+//   Esta función es la ÚNICA fuente de verdad para MODO_TERMINAL.
+//
+// CUÁNDO SE LLAMA:
+//   - Al arrancar la app (iniciarApp, paso 1)
+//   - Cada vez que se verifica la licencia (background, cada 24hs)
+//
+// MULTI-SUCURSAL:
+//   activaciones.sucursal ya existe y contiene el nombre de la sucursal
+//   ('Principal', 'Asunción', 'San Lorenzo', etc.).
+//   El satélite filtra pos_pedidos por licencia_email + sucursal,
+//   así solo ve pedidos de SU sucursal. La caja de sucursal A
+//   nunca ve los pedidos de la sucursal B.
+//
+// FALLBACK OFFLINE:
+//   Si no hay internet, usa el valor guardado en localStorage.
+//   Si nunca se conectó y no hay valor, asume 'caja' (más seguro).
+// ══════════════════════════════════════════════════════════════════════════════
+async function leerModoDesdeActivaciones(){
+  // Sin internet: usar el último valor conocido (guardado al conectarse)
+  if(!navigator.onLine || USAR_DEMO){
+    const modoGuardado = localStorage.getItem('pos_modo_terminal') || 'caja';
+    MODO_TERMINAL = modoGuardado;
+    console.log('[Modo] Offline — usando modo guardado:', MODO_TERMINAL);
+    return MODO_TERMINAL;
+  }
+
+  const deviceId = licGetDeviceId();
+  const email    = localStorage.getItem(SK.email);
+  if(!deviceId || !email){
+    console.warn('[Modo] Sin device_id o email — asumiendo modo caja');
+    MODO_TERMINAL = 'caja';
+    return MODO_TERMINAL;
+  }
+
+  try{
+    // Consultar activaciones por device_id (identificador único del dispositivo)
+    // Traer: modo, sucursal, nombre_terminal, licencia_id
+    const res = await fetch(
+      SUPA_URL + '/rest/v1/activaciones'
+        + '?device_id=eq.' + encodeURIComponent(deviceId)
+        + '&email=eq.'     + encodeURIComponent(email)
+        + '&activa=eq.true'
+        + '&select=modo,sucursal,nombre_terminal,licencia_id'
+        + '&limit=1',
+      { headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON, 'Accept': 'application/json' } }
+    );
+
+    if(!res.ok){
+      console.warn('[Modo] Error HTTP al leer activaciones:', res.status);
+      MODO_TERMINAL = localStorage.getItem('pos_modo_terminal') || 'caja';
+      return MODO_TERMINAL;
+    }
+
+    const rows = await res.json();
+    const activ = Array.isArray(rows) && rows[0] ? rows[0] : null;
+
+    if(!activ){
+      console.warn('[Modo] Terminal no encontrada en activaciones — asumiendo modo caja');
+      MODO_TERMINAL = localStorage.getItem('pos_modo_terminal') || 'caja';
+      return MODO_TERMINAL;
+    }
+
+    // Aplicar modo leído desde Supabase (la fuente de verdad)
+    const modoServidor = activ.modo || 'caja';
+    MODO_TERMINAL = modoServidor;
+
+    // Persistir en localStorage para uso offline futuro
+    localStorage.setItem('pos_modo_terminal', modoServidor);
+
+    // Actualizar sucursal si viene en activaciones (consistencia)
+    if(activ.sucursal && !localStorage.getItem('pos_sucursal')){
+      localStorage.setItem('pos_sucursal', activ.sucursal);
+      if(typeof configData !== 'undefined') configData.sucursal = activ.sucursal;
+    }
+
+    // Guardar licencia_id si no estaba (útil para pos_pedidos)
+    if(activ.licencia_id && !localStorage.getItem('ali')){
+      localStorage.setItem('ali', String(activ.licencia_id));
+      cookieSet('ali', String(activ.licencia_id), 365);
+    }
+
+    console.log('[Modo] Terminal:', activ.nombre_terminal,
+                '| Sucursal:', activ.sucursal,
+                '| Modo:', modoServidor.toUpperCase(),
+                '| Licencia ID:', activ.licencia_id);
+
+    return MODO_TERMINAL;
+
+  } catch(e){
+    // Error de red: no bloquear, usar valor local
+    console.warn('[Modo] Error leyendo activaciones:', e.message, '— usando modo guardado');
+    MODO_TERMINAL = localStorage.getItem('pos_modo_terminal') || 'caja';
+    return MODO_TERMINAL;
+  }
+}
+
+function sateliteInicializarUI(){
+  if(MODO_TERMINAL !== 'satelite') return; // no-op en modo caja
+
+  console.log('[Satélite] Inicializando UI modo satélite...');
+
+  // ── 1. Botón COBRAR móvil (scSale, action-bar) ───────────────────────────
+  const btnCobrarMob = document.querySelector('#scSale .btn-cobrar');
+  if(btnCobrarMob){
+    const spanTexto = btnCobrarMob.querySelector('span:first-child');
+    if(spanTexto) spanTexto.textContent = 'ENVIAR PEDIDO';
+    btnCobrarMob.style.background = '#534AB7'; // púrpura = identifica modo satélite
+    btnCobrarMob.style.fontSize   = '13px';    // ajuste para que entre el texto largo
+  }
+
+  // ── 2. Botón COBRAR tablet (panel derecho) ───────────────────────────────
+  const btnCobrarTab = document.querySelector('.tab-btn-cobrar');
+  if(btnCobrarTab){
+    const spanTab = btnCobrarTab.querySelector('span:first-child');
+    if(spanTab) spanTab.textContent = 'ENVIAR';
+    btnCobrarTab.style.background = '#534AB7';
+  }
+
+  // ── 3. Botón COBRAR en pantalla detalle (scDetalle) ─────────────────────
+  // Hay dos botones det-cobrar-btn: el de imprimir y el de cobrar
+  // Solo cambiar el que llama a goCobrar()
+  const btnsDet = document.querySelectorAll('.det-cobrar-btn');
+  btnsDet.forEach(function(btn){
+    if(btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf('goCobrar') >= 0){
+      btn.textContent = 'ENVIAR PEDIDO';
+      btn.style.background = '#534AB7';
+      btn.style.color = '#fff';
+    }
+  });
+
+  // ── 4. Badge "SATÉLITE" en el header del POS ────────────────────────────
+  // Permite identificar visualmente que este dispositivo es un satélite
+  if(!document.getElementById('sateliteBadge')){
+    const header = document.querySelector('#scSale .htitle');
+    if(header){
+      const badge = document.createElement('span');
+      badge.id = 'sateliteBadge';
+      badge.textContent = 'SATÉLITE';
+      badge.style.cssText = [
+        'font-size:9px',
+        'font-weight:800',
+        'background:#534AB7',
+        'color:#fff',
+        'padding:2px 6px',
+        'border-radius:4px',
+        'letter-spacing:.5px',
+        'margin-left:4px',
+        'vertical-align:middle',
+        'font-family:Barlow,sans-serif',
+      ].join(';');
+      header.appendChild(badge);
+    }
+  }
+
+  // ── 5. Ocultar turno en el drawer ────────────────────────────────────────
+  // Los meseros no abren/cierran turno — eso es exclusivo de la caja
+  // Buscar por el texto del ítem en el drawer
+  const drawerItems = document.querySelectorAll('.drawer-item');
+  drawerItems.forEach(function(item){
+    const txt = item.textContent || '';
+    // Ocultar ítems de turno/caja (ajustar strings según el HTML del drawer)
+    if(txt.indexOf('Turno') >= 0 || txt.indexOf('Caja') >= 0 || txt.indexOf('Cierre') >= 0){
+      item.style.display = 'none';
+    }
+  });
+
+  console.log('[Satélite] UI adaptada: COBRAR → ENVIAR PEDIDO, badge visible, turno oculto');
+}
+
+// sateliteConfigurarModo — cambia el modo del terminal y recarga la UI.
+//
+// USO DESDE ADMIN:
+//   sateliteConfigurarModo('satelite')  → activa modo satélite
+//   sateliteConfigurarModo('caja')      → activa modo caja (default)
+//
+// Persiste en localStorage Y en Supabase (tabla activaciones, campo modo).
+// Requiere recarga de la app para aplicar completamente.
+//
+// Se llama desde admin-negocio.html en la sección de configuración de terminal.
+async function sateliteConfigurarModo(modo){
+  if(modo !== 'caja' && modo !== 'satelite'){
+    console.warn('[Satélite] Modo inválido:', modo);
+    return;
+  }
+
+  // Guardar localmente
+  localStorage.setItem('pos_modo_terminal', modo);
+  MODO_TERMINAL = modo;
+
+  // Intentar persistir en Supabase (campo modo en tabla activaciones)
+  const email    = localStorage.getItem('lic_email');
+  const terminal = localStorage.getItem('pos_terminal');
+  if(email && terminal && navigator.onLine && !USAR_DEMO){
+    try{
+      await fetch(
+        SUPA_URL + '/rest/v1/activaciones'
+          + '?email=eq.' + encodeURIComponent(email)
+          + '&nombre_terminal=eq.' + encodeURIComponent(terminal),
+        {
+          method:  'PATCH',
+          headers: {
+            'apikey':        SUPA_ANON,
+            'Authorization': 'Bearer ' + SUPA_ANON,
+            'Content-Type':  'application/json',
+          },
+          body: JSON.stringify({ modo }),
+        }
+      );
+      console.log('[Satélite] Modo ' + modo + ' guardado en Supabase para terminal:', terminal);
+    } catch(e){
+      console.warn('[Satélite] No se pudo guardar modo en Supabase:', e.message);
+    }
+  }
+
+  toast('Modo ' + (modo === 'satelite' ? 'SATÉLITE' : 'CAJA') + ' configurado — reiniciá la app para aplicar');
+}
+
+// sateliteVerificarCajaActiva — verifica si hay un turno abierto en Supabase.
+//
+// MODO SATÉLITE ARRANQUE:
+//   Al iniciar, el satélite verifica si la caja abrió turno.
+//   Si no hay turno: muestra aviso "Esperando que el cajero abra el turno"
+//   Si hay turno: permite tomar pedidos normalmente.
+//
+// Retorna: true si hay caja activa, false si no.
+async function sateliteVerificarCajaActiva(){
+  if(MODO_TERMINAL !== 'satelite') return true; // en modo caja siempre ok
+  if(!navigator.onLine || USAR_DEMO) return true; // offline: asumir que hay caja
+
+  const email    = localStorage.getItem('lic_email');
+  const terminal = localStorage.getItem('pos_terminal');
+  if(!email) return false;
+
+  try{
+    // Buscar turno abierto para esta licencia (cualquier terminal)
+    const res = await fetch(
+      SUPA_URL + '/rest/v1/pos_turno'
+        + '?licencia_email=eq.' + encodeURIComponent(email)
+        + '&estado=eq.abierto'
+        + '&limit=1'
+        + '&select=id,terminal,fecha_apertura',
+      { headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON, 'Accept': 'application/json' } }
+    );
+    const rows = await res.json();
+    const hayTurno = Array.isArray(rows) && rows.length > 0;
+    if(hayTurno){
+      console.log('[Satélite] Caja activa detectada — turno de terminal:', rows[0].terminal);
+    } else {
+      console.warn('[Satélite] Sin caja activa — el cajero debe abrir turno primero');
+    }
+    return hayTurno;
+  } catch(e){
+    console.warn('[Satélite] Error verificando caja:', e.message);
+    return true; // ante la duda, permitir operar
+  }
+}
 
 // ════════════════════════════════════════════════════════
 // SISTEMA DE MESAS
