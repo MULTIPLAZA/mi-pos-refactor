@@ -8719,11 +8719,80 @@ function loadCfgMitad(){
   selCfgMitad(val);
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// cerrarSesion — cierre de sesión real con limpieza de estado
+//
+// QUÉ BORRA:
+//   - Credenciales de sesión (lic_activated, lic_token, lic_plan, lic_vence, etc.)
+//   - Turno activo (pos_turno_activo) — la caja empieza limpia
+//   - Tickets pendientes (pos_pendientes) — sin cola anterior
+//   - Contador de tickets (pos_ticket_counter) — vuelve a 1
+//   - Modo terminal (pos_modo_terminal) — se re-lee desde Supabase al volver
+//
+// QUÉ CONSERVA:
+//   - device_id (lic_device_id + cookie) — para auto-recuperar sin re-registro
+//   - Configuración de terminal (pos_terminal, pos_sucursal, pos_deposito)
+//   - Config de impresoras (btps_mac, etc.)
+//   - Cookie pos_email_bk — fallback offline
+//
+// Al volver a abrir la app, licInit() consulta Supabase con el device_id,
+// recupera la sesión automáticamente y lee el modo (caja/satélite) fresco.
+// ══════════════════════════════════════════════════════════════════════════════
 function cerrarSesion(){
-  if(confirm('¿Confirmar cierre de sesión?')){
-    toast('Sesión cerrada');
-    goTo('scClosed');
+  var msg = '¿Cerrar sesión?\n\n' +
+    'La terminal se reconectará automáticamente la próxima vez que abras la app.\n' +
+    'El modo (Caja/Satélite) se actualizará desde el servidor.';
+
+  if(!confirm(msg)) return;
+
+  // ── Limpiar credenciales de sesión ───────────────────────────────────────
+  // Las SK keys son las de autenticación — sin ellas licInit() va a Supabase
+  Object.values(SK).forEach(function(k){
+    // Conservar solo device_id — es el identificador del dispositivo físico
+    if(k !== SK.deviceId) localStorage.removeItem(k);
+  });
+
+  // ── Limpiar estado operativo ──────────────────────────────────────────────
+  localStorage.removeItem('pos_turno_activo');   // turno activo
+  localStorage.removeItem('pos_pendientes');     // tickets pendientes
+  localStorage.removeItem('pos_ticket_counter'); // contador de tickets
+  localStorage.removeItem('pos_modo_terminal');  // modo — se re-lee desde Supabase
+
+  // ── Limpiar cookies de sesión (NO device_id ni email_bk) ─────────────────
+  // pos_email_bk y pos_device_id se conservan para auto-recuperación offline
+  cookieSet('ali', '', -1);         // licencia_id — se recupera al reconectar
+
+  // ── Limpiar IndexedDB — turno y ventas en memoria ─────────────────────────
+  if(db){
+    try{
+      db.turno.clear();
+      console.log('[Sesion] IndexedDB turno limpiado');
+    } catch(e){ console.warn('[Sesion] Error limpiando IndexedDB:', e.message); }
   }
+
+  // ── Reset de variables en memoria ─────────────────────────────────────────
+  // Sin esto, la sesión anterior quedaría en RAM aunque el localStorage esté limpio
+  if(typeof pendientes !== 'undefined') pendientes = [];
+  if(typeof cart !== 'undefined') cart = [];
+  if(typeof currentTicketNro !== 'undefined') currentTicketNro = null;
+  if(typeof turnoData !== 'undefined'){
+    turnoData.fechaApertura   = null;
+    turnoData.efectivoInicial = 0;
+    turnoData.ventas          = [];
+    turnoData.egresos         = [];
+    turnoData.ingresos        = [];
+    turnoData.supaId          = null;
+    turnoData.dbId            = null;
+  }
+  if(typeof mesaActual !== 'undefined') mesaActual = null;
+  if(typeof MODO_TERMINAL !== 'undefined') MODO_TERMINAL = 'caja';
+
+  toast('Sesión cerrada — reconectando...');
+
+  // ── Recargar la app para aplicar limpieza completa ───────────────────────
+  // location.reload() es la forma más limpia — cualquier estado residual
+  // en memoria desaparece y licInit() corre desde cero con el device_id
+  setTimeout(function(){ location.reload(); }, 800);
 }
 
 function selPrinterSize(tipo, size){
