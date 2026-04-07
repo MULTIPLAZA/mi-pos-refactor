@@ -24,7 +24,7 @@
   --blue:#42a5f5;--b2:rgba(66,165,245,.15);
   --border:#222;--muted:#666;
 }
-body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:100vh;}
+body{font-family:Barlow,sans-serif;background:var(--bg);color:#fff;min-height:100vh;}
 
 /* ═══ LOGIN ═══ */
 #loginWrap{
@@ -42,10 +42,10 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
 .fi{margin-bottom:13px;}
 .fi label{font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;}
 .fi input{width:100%;background:#1e1e1e;border:1.5px solid #2a2a2a;border-radius:8px;
-  color:#fff;font-family:'Barlow',sans-serif;font-size:15px;padding:11px 14px;outline:none;transition:border-color .2s;}
+  color:#fff;font-family:Barlow,sans-serif;font-size:15px;padding:11px 14px;outline:none;transition:border-color .2s;}
 .fi input:focus{border-color:var(--green);}
 .btn-p{width:100%;background:var(--green);border:none;border-radius:8px;color:#fff;
-  font-family:'Barlow',sans-serif;font-size:14px;font-weight:800;letter-spacing:.8px;
+  font-family:Barlow,sans-serif;font-size:14px;font-weight:800;letter-spacing:.8px;
   text-transform:uppercase;padding:13px;cursor:pointer;margin-top:4px;}
 .l-err{color:var(--red);font-size:12px;text-align:center;margin-top:8px;display:none;}
 
@@ -140,7 +140,7 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
 .sbar{display:flex;align-items:center;gap:10px;background:var(--card);
   border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:14px;}
 .sbar input{flex:1;background:transparent;border:none;color:#fff;
-  font-family:'Barlow',sans-serif;font-size:14px;outline:none;}
+  font-family:Barlow,sans-serif;font-size:14px;outline:none;}
 .sbar input::placeholder{color:#444;}
 
 /* ═══ LICENSE CARDS ═══ */
@@ -161,7 +161,7 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
 .tag-r{background:var(--r2);color:var(--red);}
 .tag-gr{background:#1e1e1e;color:var(--muted);}
 .lacts{display:flex;border-top:1px solid var(--border);}
-.la{flex:1;padding:11px 6px;background:none;border:none;font-family:'Barlow',sans-serif;
+.la{flex:1;padding:11px 6px;background:none;border:none;font-family:Barlow,sans-serif;
   font-size:12px;font-weight:700;cursor:pointer;letter-spacing:.3px;text-transform:uppercase;
   display:flex;align-items:center;justify-content:center;gap:5px;transition:background .15s;}
 .la:not(:last-child){border-right:1px solid var(--border);}
@@ -204,7 +204,7 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
 @keyframes sp{to{transform:rotate(360deg);}}
 .loading{text-align:center;padding:32px;color:var(--muted);font-size:14px;}
 .btn-nueva{background:var(--green);border:none;border-radius:8px;color:#fff;
-  font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;
+  font-family:Barlow,sans-serif;font-size:13px;font-weight:800;
   padding:10px 16px;cursor:pointer;letter-spacing:.3px;}
 .btn-nueva:active{background:#43a047;}
 .lcount{font-size:13px;color:var(--muted);margin-top:2px;}
@@ -311,10 +311,10 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
       <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Clave de licencia</label>
       <div style="display:flex;gap:8px;">
         <input id="mClave" type="text" placeholder="PRO-2026-XXXX"
-          style="flex:1;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;padding:11px 14px;outline:none;text-transform:uppercase;"
+          style="flex:1;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:Barlow,sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;padding:11px 14px;outline:none;text-transform:uppercase;"
           oninput="this.value=this.value.toUpperCase()">
         <button onclick="genClave()"
-          style="background:var(--green);border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:12px;font-weight:800;padding:0 14px;cursor:pointer;white-space:nowrap;">
+          style="background:var(--green);border:none;border-radius:8px;color:#fff;font-family:Barlow,sans-serif;font-size:12px;font-weight:800;padding:0 14px;cursor:pointer;white-space:nowrap;">
           🎲 GENERAR
         </button>
       </div>
@@ -324,7 +324,7 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
       <div>
         <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Plan</label>
         <select id="mPlan" onchange="genClave()"
-          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:11px 14px;outline:none;">
+          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:Barlow,sans-serif;font-size:14px;padding:11px 14px;outline:none;">
           <option value="1">Básico — 1 disp.</option>
           <option value="2" selected>Pro — 3 disp.</option>
           <option value="3">Completo</option>
@@ -333,7 +333,7 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
       <div>
         <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Tipo de pago</label>
         <select id="mTipo"
-          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:11px 14px;outline:none;">
+          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:Barlow,sans-serif;font-size:14px;padding:11px 14px;outline:none;">
           <option value="anual">🔁 Anual</option>
           <option value="mensual">📅 Mensual</option>
           <option value="unico">💰 Pago único</option>
@@ -346,7 +346,7 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
       <div>
         <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Rubro</label>
         <select id="mRubro"
-          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:13px;padding:11px 14px;outline:none;">
+          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:Barlow,sans-serif;font-size:13px;padding:11px 14px;outline:none;">
           <option value="">General</option>
           <option value="gastronomia">Gastronomía</option>
           <option value="kiosco">Kiosco/Almacén</option>
@@ -362,52 +362,52 @@ body{font-family:'Barlow',sans-serif;background:var(--bg);color:#fff;min-height:
       <div>
         <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Monto licencia (₲)</label>
         <input id="mMonto" type="number" placeholder="0" min="0"
-          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:11px 14px;outline:none;">
+          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:Barlow,sans-serif;font-size:14px;padding:11px 14px;outline:none;">
       </div>
       <div>
         <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Soporte anual (₲)</label>
         <input id="mSoporte" type="number" placeholder="0" min="0"
-          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:11px 14px;outline:none;">
+          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:Barlow,sans-serif;font-size:14px;padding:11px 14px;outline:none;">
       </div>
       <div>
         <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Precio x terminal adicional (₲)</label>
         <input id="mPrecioTer" type="number" placeholder="0" min="0"
-          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:11px 14px;outline:none;">
+          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:Barlow,sans-serif;font-size:14px;padding:11px 14px;outline:none;">
       </div>
     </div>
 
     <div style="margin-bottom:13px;">
       <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Nombre del cliente</label>
       <input id="mNombre" type="text" placeholder="Ej: Pizzería Express"
-        style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:11px 14px;outline:none;">
+        style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:Barlow,sans-serif;font-size:14px;padding:11px 14px;outline:none;">
     </div>
 
     <div style="margin-bottom:13px;">
       <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Email del cliente</label>
       <input id="mEmail" type="email" placeholder="cliente@email.com"
-        style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:11px 14px;outline:none;">
+        style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:Barlow,sans-serif;font-size:14px;padding:11px 14px;outline:none;">
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
       <div>
         <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Vencimiento</label>
         <input id="mVence" type="date"
-          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:11px 14px;outline:none;">
+          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:Barlow,sans-serif;font-size:14px;padding:11px 14px;outline:none;">
       </div>
       <div>
         <label style="font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Notas</label>
         <input id="mNotas" type="text" placeholder="Opcional"
-          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:14px;padding:11px 14px;outline:none;">
+          style="width:100%;background:#111;border:1.5px solid #2a2a2a;border-radius:8px;color:#fff;font-family:Barlow,sans-serif;font-size:14px;padding:11px 14px;outline:none;">
       </div>
     </div>
 
     <div style="display:flex;gap:10px;">
       <button onclick="closeM()"
-        style="flex:1;background:#2a2a2a;border:none;border-radius:8px;color:#aaa;font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;padding:14px;cursor:pointer;">
+        style="flex:1;background:#2a2a2a;border:none;border-radius:8px;color:#aaa;font-family:Barlow,sans-serif;font-size:13px;font-weight:700;padding:14px;cursor:pointer;">
         CANCELAR
       </button>
       <button onclick="guardarL()"
-        style="flex:2;background:var(--green);border:none;border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:13px;font-weight:800;padding:14px;cursor:pointer;letter-spacing:.5px;">
+        style="flex:2;background:var(--green);border:none;border-radius:8px;color:#fff;font-family:Barlow,sans-serif;font-size:13px;font-weight:800;padding:14px;cursor:pointer;letter-spacing:.5px;">
         GUARDAR LICENCIA
       </button>
     </div>
@@ -867,6 +867,21 @@ async function loadTer(){
   try{
     allTer = await sg('activaciones','select=*,licencias(clave,nombre_cliente,plan_id,planes(nombre))&order=nombre_negocio.asc');
 
+    // Cargar turnos abiertos y timbrados configurados para enriquecer cada terminal
+    // pos_turno: para saber si la caja tiene turno abierto
+    // pos_config: para saber si tiene timbrado SET configurado (clave='timbrado_nro')
+    try {
+      const [turnos, configs] = await Promise.all([
+        sg('pos_turno', 'select=terminal,licencia_email,estado&estado=eq.abierto'),
+        sg('pos_config', 'select=licencia_email,clave,valor&clave=eq.timbrado_nro'),
+      ]);
+      allTer._turnos  = Array.isArray(turnos)  ? turnos  : [];
+      allTer._configs = Array.isArray(configs) ? configs : [];
+    } catch(e) {
+      allTer._turnos  = [];
+      allTer._configs = [];
+    }
+
     // Separar reales de demo
     allTer._reales = allTer.filter(function(t){ return !esDemoEmail(t.email); });
     allTer._demos  = allTer.filter(function(t){ return esDemoEmail(t.email); });
@@ -906,6 +921,142 @@ function filtrTer(){
   renderTer(lista);
 }
 
+// ── buildTerCard — tarjeta de terminal para el panel de terminales ───────────
+// Usa concatenación pura (sin template literals anidados) para compatibilidad.
+// Muestra: nombre, modo CAJA/SATÉLITE, alertas de config, selector de modo.
+function buildTerCard(t, g, hoy) {
+  var ul    = t.ultima_consulta ? new Date(t.ultima_consulta) : null;
+  var on    = ul && (hoy - ul) < 25 * 3600000;
+  var act   = !!t.activa;
+  var modo  = t.modo || 'caja';
+  var esUlt = g.items.indexOf(t) === g.items.length - 1;
+  var nom   = t.nombre_terminal || 'Terminal';
+  var nomSafe = nom.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+  // ── Verificaciones de estado ─────────────────────────────────────────────
+  var turnos  = allTer._turnos  || [];
+  var configs = allTer._configs || [];
+
+  var turnoAbierto = turnos.some(function(tr) {
+    return tr.licencia_email === t.email && tr.estado === 'abierto';
+  });
+  var tieneTimbrado = configs.some(function(cfg) {
+    return cfg.licencia_email === t.email &&
+           cfg.clave === 'timbrado_nro' &&
+           cfg.valor && cfg.valor !== 'null' && cfg.valor !== '';
+  });
+
+  // ── Partes del HTML ──────────────────────────────────────────────────────
+  var parts = [];
+
+  // Contenedor principal
+  parts.push('<div style="background:var(--card);border:1px solid var(--border);');
+  parts.push('border-top:1px solid #1a1a1a;padding:12px 14px;');
+  if (esUlt) parts.push('border-radius:0 0 10px 10px;');
+  parts.push('">');
+  parts.push('<div style="display:flex;align-items:flex-start;gap:10px;">');
+
+  // Dot online/offline
+  parts.push('<div style="width:8px;height:8px;border-radius:50%;');
+  parts.push('background:' + (on ? 'var(--green)' : '#333') + ';');
+  parts.push('flex-shrink:0;margin-top:5px;"></div>');
+
+  // Columna info
+  parts.push('<div style="flex:1;min-width:0;">');
+
+  // Nombre + badge modo
+  parts.push('<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:3px;">');
+  parts.push('<span style="font-size:13px;font-weight:700;">' + nom + '</span>');
+  if (modo === 'satelite') {
+    parts.push('<span style="font-size:10px;font-weight:800;');
+    parts.push('background:rgba(83,74,183,0.15);border:1px solid rgba(83,74,183,0.4);');
+    parts.push('color:#a78bfa;padding:2px 8px;border-radius:4px;letter-spacing:.5px;">');
+    parts.push('SATELITE</span>');
+  } else {
+    parts.push('<span style="font-size:10px;font-weight:800;');
+    parts.push('background:var(--g2);border:1px solid rgba(76,175,80,0.4);');
+    parts.push('color:var(--green);padding:2px 8px;border-radius:4px;letter-spacing:.5px;">');
+    parts.push('CAJA</span>');
+  }
+  parts.push('</div>');
+
+  // Sucursal y última conexión
+  parts.push('<div style="font-size:11px;color:var(--muted);">');
+  parts.push((t.sucursal || '—') + ' &middot; ' + (on ? 'Online' : 'Ultima: ' + fmt(t.ultima_consulta)));
+  parts.push('</div>');
+
+  // Device ID
+  parts.push('<div style="font-size:10px;color:#3a3a3a;margin-top:2px;font-family:monospace;">');
+  parts.push((t.device_id || '').substring(0, 24) + '...');
+  parts.push('</div>');
+
+  // Alertas — solo para caja activa
+  if (modo === 'caja' && act) {
+    if (!turnoAbierto) {
+      parts.push('<div style="display:flex;align-items:center;gap:5px;font-size:11px;');
+      parts.push('color:var(--orange);margin-top:4px;">');
+      parts.push('<span>&#9888;</span><span>Sin turno abierto</span></div>');
+    }
+    if (!tieneTimbrado) {
+      parts.push('<div style="display:flex;align-items:center;gap:5px;font-size:11px;');
+      parts.push('color:var(--orange);margin-top:2px;">');
+      parts.push('<span>&#9888;</span><span>Sin timbrado SET configurado</span></div>');
+    }
+  }
+
+  parts.push('</div>'); // /columna info
+
+  // Columna acciones (derecha)
+  parts.push('<div style="display:flex;flex-direction:column;gap:6px;');
+  parts.push('flex-shrink:0;align-items:flex-end;">');
+
+  // Selector CAJA / SATÉLITE (solo si activa)
+  if (act) {
+    parts.push('<div style="display:flex;border:1px solid #2a2a2a;border-radius:6px;overflow:hidden;">');
+
+    // Botón CAJA
+    var cajaBg  = modo === 'caja'     ? 'var(--green)' : '#1e1e1e';
+    var cajaCol = modo === 'caja'     ? '#000'         : '#555';
+    parts.push('<button');
+    parts.push(' onclick="cambiarModoTer(' + t.id + ',\'caja\',\'' + nomSafe + '\',\'' + modo + '\')"');
+    parts.push(' style="padding:5px 10px;font-size:10px;font-weight:800;border:none;cursor:pointer;');
+    parts.push('letter-spacing:.5px;background:' + cajaBg + ';color:' + cajaCol + ';">');
+    parts.push('CAJA</button>');
+
+    // Botón SATÉLITE
+    var satBg   = modo === 'satelite' ? '#534AB7'       : '#1e1e1e';
+    var satCol  = modo === 'satelite' ? '#fff'           : '#555';
+    parts.push('<button');
+    parts.push(' onclick="cambiarModoTer(' + t.id + ',\'satelite\',\'' + nomSafe + '\',\'' + modo + '\')"');
+    parts.push(' style="padding:5px 10px;font-size:10px;font-weight:800;border:none;cursor:pointer;');
+    parts.push('border-left:1px solid #2a2a2a;letter-spacing:.5px;');
+    parts.push('background:' + satBg + ';color:' + satCol + ';">');
+    parts.push('SATELITE</button>');
+
+    parts.push('</div>'); // /selector
+  }
+
+  // Botones habilitar / eliminar
+  parts.push('<div style="display:flex;gap:5px;">');
+  if (!act) {
+    parts.push('<button onclick="habilitarTer(' + t.id + ')"');
+    parts.push(' style="background:var(--g2);border:1px solid var(--green);border-radius:6px;');
+    parts.push('color:var(--green);font-size:11px;font-weight:800;padding:5px 10px;cursor:pointer;">');
+    parts.push('HABILITAR</button>');
+  }
+  parts.push('<button onclick="eliminarTer(' + t.id + ',\'' + nomSafe + '\',' + act + ')"');
+  parts.push(' style="background:var(--r2);border:1px solid var(--red);border-radius:6px;');
+  parts.push('color:var(--red);font-size:11px;font-weight:800;padding:5px 10px;cursor:pointer;">');
+  parts.push('ELIMINAR</button>');
+  parts.push('</div>'); // /botones
+
+  parts.push('</div>'); // /columna acciones
+  parts.push('</div>'); // /flex row
+  parts.push('</div>'); // /contenedor tarjeta
+
+  return parts.join('');
+}
+
 function renderTer(lista){
   document.getElementById('terCount').textContent = lista.length+' terminales';
   const hoy = new Date();
@@ -938,36 +1089,65 @@ function renderTer(lista){
         <span class="tag tag-g" style="flex-shrink:0;">${g.items.filter(t=>t.activa).length} activas</span>
       </div>
       <!-- Terminales de esta empresa -->
-      ${g.items.map(t=>{
-        const ul  = t.ultima_consulta?new Date(t.ultima_consulta):null;
-        const on  = ul&&(hoy-ul)<25*3600000;
-        const act = !!t.activa;
-        return`<div style="background:var(--card);border:1px solid var(--border);border-top:1px solid #1a1a1a;padding:12px 14px;display:flex;align-items:center;gap:10px;${g.items.indexOf(t)===g.items.length-1?'border-radius:0 0 10px 10px;':''}">
-          <div style="width:8px;height:8px;border-radius:50%;background:${on?'var(--green)':'#333'};flex-shrink:0;"></div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:700;">${t.nombre_terminal||'Terminal'}</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:1px;">
-              ${t.sucursal||'—'} · ${on?'Online':'Última: '+fmt(t.ultima_consulta)}
-            </div>
-            <div style="font-size:10px;color:#3a3a3a;margin-top:2px;font-family:monospace;">${(t.device_id||'').substring(0,24)}...</div>
-          </div>
-          <div style="display:flex;gap:6px;flex-shrink:0;">
-            ${!act
-              ?`<button onclick="habilitarTer(${t.id})"
-                  style="background:var(--g2);border:1px solid var(--green);border-radius:6px;color:var(--green);font-family:'Barlow',sans-serif;font-size:11px;font-weight:800;padding:6px 10px;cursor:pointer;white-space:nowrap;">
-                  HABILITAR
-                </button>`
-              :''
-            }
-            <button onclick="eliminarTer(${t.id},'${(t.nombre_terminal||'Terminal').replace(/'/g,"\'")}',${act})"
-              style="background:var(--r2);border:1px solid var(--red);border-radius:6px;color:var(--red);font-family:'Barlow',sans-serif;font-size:11px;font-weight:800;padding:6px 10px;cursor:pointer;">
-              ELIMINAR
-            </button>
-          </div>
-        </div>`;
-      }).join('')}
+      ${g.items.map(function(t){ return buildTerCard(t, g, hoy); }).join('')}
     </div>
   `).join('');
+}
+
+// ── cambiarModoTer — cambia el modo de una terminal (caja ↔ satélite) ──────
+// Solo el proveedor puede hacer esto desde este panel.
+// La terminal aplica el cambio la próxima vez que arranca o verifica licencia.
+// Si se cambia a CAJA y no tiene turno o timbrado, se muestra advertencia.
+async function cambiarModoTer(id, nuevoModo, nombreTerminal, modoActual){
+  // No hacer nada si ya tiene ese modo
+  if(nuevoModo === modoActual){
+    toast('La terminal ya está en modo ' + nuevoModo.toUpperCase());
+    return;
+  }
+
+  const label = nuevoModo === 'satelite' ? 'SATÉLITE (mesero)' : 'CAJA (cajero)';
+
+  // Si se pasa a CAJA, verificar turno y timbrado para advertir
+  if(nuevoModo === 'caja'){
+    const ter = allTer.find(function(t){ return t.id === id; });
+    if(ter){
+      const turnoAbierto = (allTer._turnos || []).some(function(tr){
+        return tr.licencia_email === ter.email && tr.estado === 'abierto';
+      });
+      const tieneTimbrado = (allTer._configs || []).some(function(cfg){
+        return cfg.licencia_email === ter.email &&
+               cfg.clave === 'timbrado_nro' &&
+               cfg.valor && cfg.valor !== 'null' && cfg.valor !== '';
+      });
+
+      let advertencias = [];
+      if(!turnoAbierto)   advertencias.push('⚠ No tiene un turno abierto');
+      if(!tieneTimbrado)  advertencias.push('⚠ No tiene timbrado SET configurado');
+
+      if(advertencias.length > 0){
+        var msg = 'Confirmar cambio a CAJA para "' + nombreTerminal + '"?' +
+          '\n\n' + advertencias.join('\n') + '\n\n' +
+          'La terminal podra operar igual, pero estas configuraciones ' +
+          'deben completarse en el panel del negocio para cobrar y facturar correctamente.';
+        if(!confirm(msg)) return;
+      } else {
+        if(!confirm('Cambiar "' + nombreTerminal + '" a modo CAJA?')) return;
+      }
+    }
+  } else {
+    // Cambio a satélite — confirmación simple
+    if(!confirm('Cambiar "' + nombreTerminal + '" a modo SATELITE?' +
+      '\n\nEl boton COBRAR pasara a ser ENVIAR PEDIDO.' +
+      '\nNo podra cobrar ni cerrar turno desde esta terminal.')) return;
+  }
+
+  try{
+    await spatch('activaciones', id, { modo: nuevoModo });
+    toast('✓ "' + nombreTerminal + '" → ' + label + ' (aplica al próximo arranque)');
+    await loadTer();
+  } catch(e){
+    toast('Error al cambiar modo: ' + e.message);
+  }
 }
 
 async function habilitarTer(id){
