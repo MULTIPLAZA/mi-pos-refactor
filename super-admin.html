@@ -865,7 +865,7 @@ async function loadTer(){
   var esDemoEmail=function(e){ return !e||e.includes('@test.com')||e.includes('demo')||DEMO_EMAILS.includes((e||'').toLowerCase()); };
 
   try{
-    allTer = await sg('activaciones','select=*,licencias(clave,nombre_cliente,plan_id,planes(nombre))&order=nombre_negocio.asc');
+    allTer = await sg('activaciones','select=*,licencias(clave,nombre_cliente,plan_id,planes(nombre))&deleted_at=is.null&order=nombre_negocio.asc');
 
     // Cargar turnos abiertos y timbrados configurados para enriquecer cada terminal
     // pos_turno: para saber si la caja tiene turno abierto
@@ -895,10 +895,12 @@ async function loadTer(){
     filtrTer();
   }catch(e){
     allTer = DEMO_TER;
-    allTer._reales = allTer;
-    allTer._demos  = [];
+    allTer._reales  = allTer;
+    allTer._demos   = [];
+    allTer._turnos  = []; // sin turnos en demo
+    allTer._configs = []; // sin timbrado en demo — así se ven las alertas
     filtrTer();
-    toast('Demo terminales: '+e.message, 3000);
+    toast('Modo demo: '+e.message, 3000);
   }
 }
 
@@ -1142,9 +1144,18 @@ async function cambiarModoTer(id, nuevoModo, nombreTerminal, modoActual){
   }
 
   try{
-    await spatch('activaciones', id, { modo: nuevoModo });
-    toast('✓ "' + nombreTerminal + '" → ' + label + ' (aplica al próximo arranque)');
-    await loadTer();
+    // En modo demo, DEMO_TER es un array local — actualizar directamente
+    var isDemoMode = (allTer === DEMO_TER || (allTer._demos && !allTer._reales.length));
+    var terLocal = DEMO_TER.find(function(t){ return t.id === id; });
+    if(terLocal){
+      terLocal.modo = nuevoModo;
+    }
+    if(!isDemoMode){
+      // Solo hacer PATCH a Supabase si no estamos en modo demo
+      await spatch('activaciones', id, { modo: nuevoModo });
+    }
+    toast('✓ "' + nombreTerminal + '" → ' + label + (isDemoMode ? ' (demo — no persiste en BD)' : ' (aplica al próximo arranque)'));
+    filtrTer(); // re-renderizar sin recargar de Supabase
   } catch(e){
     toast('Error al cambiar modo: ' + e.message);
   }
@@ -1159,22 +1170,47 @@ async function habilitarTer(id){
 }
 
 async function eliminarTer(id, nombre, activa){
-  // Mostrar opciones: desactivar (soft) o eliminar definitivo
-  const opc = activa
-    ? confirm('¿Qué querés hacer con "'+nombre+'"?\n\n✓ Aceptar = DESACTIVAR (el historial se conserva, el dispositivo pierde acceso)\n✗ Cancelar = No hacer nada')
-    : confirm('¿Desactivar "'+nombre+'"? Sus datos históricos se conservan.');
-  if(!opc) return;
-  try{
-    // Soft delete: marcar como inactiva, NO eliminar
-    const r = await fetch(SURL+'/rest/v1/activaciones?id=eq.'+id,{
-      method:'PATCH',
-      headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'application/json'},
-      body: JSON.stringify({ activa: false, deleted_at: new Date().toISOString() })
-    });
-    if(!r.ok) throw new Error(await r.text());
-    toast('✓ Terminal desactivada — historial conservado');
-    await loadTer();
-  }catch(e){ toast('Error: '+e.message); }
+  // Paso 1: confirmar que quiere hacer algo con esta terminal
+  var accion = prompt(
+    'Terminal: "' + nombre + '"\n\n' +
+    'Escribí la acción:\n' +
+    '  1 = DESACTIVAR (pierde acceso, historial conservado, puede reactivarse)\n' +
+    '  2 = ELIMINAR DEFINITIVO (desaparece del panel, historial en pos_ventas conservado)\n\n' +
+    'Cancelar = No hacer nada'
+  );
+  if(!accion) return;
+  accion = accion.trim();
+
+  if(accion === '1'){
+    // Soft delete — sigue en BD pero con deleted_at seteado y activa:false
+    if(!confirm('¿Desactivar "' + nombre + '"? El dispositivo pierde acceso. Se puede reactivar luego.')) return;
+    try{
+      const r = await fetch(SURL+'/rest/v1/activaciones?id=eq.'+id,{
+        method:'PATCH',
+        headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'application/json'},
+        body: JSON.stringify({ activa: false, deleted_at: new Date().toISOString() })
+      });
+      if(!r.ok) throw new Error(await r.text());
+      toast('✓ Terminal desactivada — desaparece del panel, historial conservado');
+      await loadTer();
+    }catch(e){ toast('Error: '+e.message); }
+
+  } else if(accion === '2'){
+    // Hard delete — elimina la activación definitivamente
+    if(!confirm('⚠️ ELIMINAR DEFINITIVAMENTE "' + nombre + '"?\n\nLas ventas históricas se conservan en pos_ventas.\nEsta acción NO se puede deshacer.')) return;
+    try{
+      const r = await fetch(SURL+'/rest/v1/activaciones?id=eq.'+id,{
+        method:'DELETE',
+        headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'application/json'}
+      });
+      if(!r.ok) throw new Error(await r.text());
+      toast('✓ Terminal eliminada definitivamente');
+      await loadTer();
+    }catch(e){ toast('Error: '+e.message); }
+
+  } else {
+    toast('Acción no reconocida — escribí 1 o 2');
+  }
 }
 
 async function eliminarTerDefinitivo(id, nombre){
@@ -1191,9 +1227,30 @@ async function eliminarTerDefinitivo(id, nombre){
 }
 
 const DEMO_TER = [
-  {id:1,email:'emivitta94@gmail.com',nombre_negocio:'Pizza Demo',nombre_terminal:'Caja Local',sucursal:'Casa Central',activa:true,ultima_consulta:new Date().toISOString(),device_id:'dev_abc123xyz',licencias:{planes:{nombre:'Básico'}}},
-  {id:2,email:'emivitta94@gmail.com',nombre_negocio:'Pizza Demo',nombre_terminal:'Delivery',sucursal:'Casa Central',activa:true,ultima_consulta:new Date(Date.now()-3600000).toISOString(),device_id:'dev_def456uvw',licencias:{planes:{nombre:'Básico'}}},
-  {id:3,email:'pro@test.com',nombre_negocio:'Burguer Pro',nombre_terminal:'Caja 1',sucursal:'Sucursal Norte',activa:false,ultima_consulta:new Date(Date.now()-86400000*3).toISOString(),device_id:'dev_ghi789rst',licencias:{planes:{nombre:'Pro'}}},
+  {
+    id:1, email:'emivitta94@gmail.com', nombre_negocio:'Pizza Demo',
+    nombre_terminal:'Caja Local', sucursal:'Casa Central',
+    activa:true, modo:'caja',
+    ultima_consulta:new Date().toISOString(),
+    device_id:'dev_abc123xyz', deleted_at:null,
+    licencias:{planes:{nombre:'Basico'}}
+  },
+  {
+    id:2, email:'emivitta94@gmail.com', nombre_negocio:'Pizza Demo',
+    nombre_terminal:'Tablet Mesero 1', sucursal:'Casa Central',
+    activa:true, modo:'satelite',
+    ultima_consulta:new Date(Date.now()-3600000).toISOString(),
+    device_id:'dev_def456uvw', deleted_at:null,
+    licencias:{planes:{nombre:'Basico'}}
+  },
+  {
+    id:3, email:'pro@test.com', nombre_negocio:'Burguer Pro',
+    nombre_terminal:'Caja 1', sucursal:'Sucursal Norte',
+    activa:false, modo:'caja',
+    ultima_consulta:new Date(Date.now()-86400000*3).toISOString(),
+    device_id:'dev_ghi789rst', deleted_at:null,
+    licencias:{planes:{nombre:'Pro'}}
+  },
 ];
 
 // ── REPORTES ─────────────────────────────────────────────
