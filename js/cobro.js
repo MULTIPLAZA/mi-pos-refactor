@@ -36,10 +36,12 @@
 // ── IR A COBRAR ─────────────────────────────────────────────
 
 /**
- * Abre la pantalla de cobro con los datos del ticket actual.
- * Resetea el método de pago a Efectivo y limpia el display.
+ * Setup visual de la pantalla de cobro — actualiza ctotal, métodos, etc.
+ * Llamada desde goCobrar() en index.html cuando MODO_TERMINAL === 'caja'.
+ * NO hacer goTo() aquí — lo hace goCobrar() después de llamar esta función.
+ * Nombre interno: _goCobrarSetup para evitar colisión con index.html.
  */
-function goCobrar() {
+function _goCobrarSetup() {
   const t = calcTotal();
   if (!t) { toast('Agregá productos primero'); return; }
 
@@ -62,7 +64,7 @@ function goCobrar() {
   document.getElementById('compSec').classList.remove('open');
   document.getElementById('npLbl').textContent = 'Efectivo recibido';
 
-  goTo('scCobrar');
+  // goTo('scCobrar') lo hace goCobrar() en index.html — no duplicar navegación
   // Mostrar/ocultar botón comanda según config
   if(typeof updBtnComandaCobro === 'function') updBtnComandaCobro();
 }
@@ -757,7 +759,7 @@ function setRucStatus(msg, type) {
  *   5. Registra la venta en el turno activo
  *   6. Genera el recibo y navega a scRecibo
  */
-function confirmarPago() {
+async function confirmarPago() {
   // ── Capturar datos ANTES de limpiar ───────────────────────
   const totalVenta        = calcTotal();
   const itemsVenta        = JSON.parse(JSON.stringify(cart));
@@ -854,7 +856,7 @@ function confirmarPago() {
     metodo:         metodoPago,
     comprobante:    comprobante === '—' ? '' : comprobante,
     factura:        facturaData,
-    fecha:          new Date(),
+    fecha:          _fechaVenta, // hora del servidor
     nroTicket,
     divPagos:       divPagosCopia,
     _supabasePedidoId, // UUID del pedido satélite (null si fue venta directa)
@@ -862,6 +864,12 @@ function confirmarPago() {
 
   mesaLimpiarAlPagar();
   resetFactura();
+
+  // Hora del servidor para la venta — evita problemas de reloj del dispositivo
+  // Si no hay internet, obtenerFechaServidor() retorna new Date() como fallback
+  const _fechaVenta = (typeof obtenerFechaServidor === 'function')
+    ? await obtenerFechaServidor()
+    : new Date();
 
   generarRecibo({
     items:       itemsVenta,
@@ -876,7 +884,7 @@ function confirmarPago() {
     nroOrden:    nroTicket,
     tipoPedido:  tipoPedido || 'llevar',
     mesa:        mesaActual ? mesaActual.nombre : null,
-    fecha:       new Date(),
+    fecha:       _fechaVenta, // hora del servidor
     factura:     facturaData,
     divPagos:    divPagosCopia,
   });

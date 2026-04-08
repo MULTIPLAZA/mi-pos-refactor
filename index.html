@@ -3960,7 +3960,7 @@ async function doOpenShift(){
     if(!ok) return; // licMostrarBloqueo ya fue llamado
   }
 
-  turnoData.fechaApertura  = new Date();
+  turnoData.fechaApertura  = await obtenerFechaServidor(); // hora del servidor, no del dispositivo
   turnoData.efectivoInicial = v;
   turnoData.ventas          = [];
   turnoData.egresos         = [];
@@ -3977,6 +3977,76 @@ async function doOpenShift(){
   // Persistir en localStorage DESPUÉS de tener el dbId
   turnoGuardar();
   goTo('scSale'); renderCatPills(); filterP(); toast('Turno abierto ✓');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// obtenerFechaServidor — retorna la hora del servidor Supabase (PostgreSQL).
+//
+// POR QUÉ:
+//   new Date() usa el reloj del dispositivo. En Android, si el usuario tiene
+//   la fecha/hora manual o el zona horaria mal configurada, los timestamps
+//   de ventas y turnos quedan incorrectos.
+//   Supabase/PostgreSQL tiene el reloj del servidor (UTC) siempre correcto.
+//
+// USO:
+//   const ahora = await obtenerFechaServidor();
+//   // ahora es un Date() con la hora real del servidor
+//
+// FALLBACK:
+//   Si no hay internet o Supabase falla, retorna new Date() del dispositivo.
+//   La app nunca se bloquea por esto.
+//
+// CACHE:
+//   Guarda el offset entre servidor y dispositivo en memoria (_serverOffset).
+//   Las llamadas subsiguientes usan el offset sin consultar Supabase de nuevo.
+//   El offset se recalcula cada vez que hay internet disponible.
+// ══════════════════════════════════════════════════════════════════════════════
+var _serverOffset = 0; // diferencia en ms entre servidor y dispositivo
+var _serverOffsetOk = false; // si el offset fue calculado exitosamente
+
+async function obtenerFechaServidor(){
+  // Intentar calcular el offset si no lo tenemos aún
+  if(!_serverOffsetOk && navigator.onLine && !USAR_DEMO){
+    try{
+      const t0 = Date.now();
+      // Consulta mínima a Supabase — solo para obtener la hora del servidor
+      // Usamos /rest/v1/ con una tabla que siempre existe y traemos 0 rows
+      const res = await fetch(
+        SUPA_URL + '/rest/v1/pos_config?limit=0&select=id',
+        {
+          headers:{
+            'apikey':        SUPA_ANON,
+            'Authorization': 'Bearer ' + SUPA_ANON,
+            'Accept':        'application/json',
+          }
+        }
+      );
+      const t1 = Date.now();
+      // El header Date de la respuesta HTTP es la hora del servidor
+      const serverDateStr = res.headers.get('date');
+      if(serverDateStr){
+        const serverMs = new Date(serverDateStr).getTime();
+        // Compensar la latencia de red (mitad del round-trip)
+        const latencia = Math.round((t1 - t0) / 2);
+        _serverOffset = (serverMs + latencia) - t1;
+        _serverOffsetOk = true;
+        console.log('[FechaServidor] Offset calculado:',
+          (_serverOffset >= 0 ? '+' : '') + _serverOffset + 'ms respecto al dispositivo',
+          '| Latencia:', latencia + 'ms'
+        );
+      }
+    } catch(e){
+      console.warn('[FechaServidor] No se pudo calcular offset:', e.message);
+    }
+  }
+  // Retornar fecha ajustada con el offset
+  return new Date(Date.now() + _serverOffset);
+}
+
+// Sincronizar el offset al arrancar (background, sin bloquear)
+function sincronizarFechaServidor(){
+  _serverOffsetOk = false; // forzar recálculo
+  obtenerFechaServidor().catch(function(){});
 }
 
 function supaInsertTurno(estado, efectivoInicial){
@@ -4161,13 +4231,25 @@ function toggleSearch(){
 //
 // Los 3 botones COBRAR del HTML (móvil, tablet, detalle) llaman a esta función.
 // ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// goCobrar — punto de entrada unificado del botón COBRAR / ENVIAR PEDIDO
+//
+// MODO CAJA:
+//   Llama a _goCobrarSetup() (definida en cobro.js) que actualiza el total
+//   en pantalla (ctotal), resetea método de pago, etc. Luego navega a scCobrar.
+//   IMPORTANTE: _goCobrarSetup() debe ejecutarse ANTES de goTo('scCobrar')
+//   para que el DOM de scCobrar tenga el total correcto al mostrarse.
+//
+// MODO SATÉLITE:
+//   Llama a sateliteEnviarPedido() — inserta en pos_pedidos, imprime comanda.
+// ══════════════════════════════════════════════════════════════════════════════
 function goCobrar(){
   if(MODO_TERMINAL === 'satelite'){
-    // Modo satélite: no cobrar, enviar pedido a cocina y a caja
     sateliteEnviarPedido();
   } else {
-    // Modo caja: comportamiento original — ir a pantalla de cobro
     if(calcTotal() === 0){ toast('El ticket está vacío'); return; }
+    // _goCobrarSetup() actualiza ctotal y los controles antes de navegar
+    if(typeof _goCobrarSetup === 'function') _goCobrarSetup();
     goTo('scCobrar');
   }
 }
@@ -7819,7 +7901,7 @@ async function confirmarCierre(){
         },
         body: JSON.stringify({
           estado:        'cerrado',
-          fecha_cierre:  new Date().toISOString(),
+          fecha_cierre:  (await obtenerFechaServidor()).toISOString(), // hora del servidor
           total_contado: totalContado,
           diferencia:    diferencia,
         }),
@@ -11945,7 +12027,6 @@ async function iniciarApp(){
   // Primero intentar desde localStorage (más rápido)
   let turnoOk = false;
   try {
-    const _raw = localStorage.getItem('pos_turno_activo');
     turnoOk = turnoRestaurar();
     // Si se restauró pero dbId es null, recuperarlo desde IndexedDB
     if(turnoOk && !turnoData.dbId && db){
@@ -11957,6 +12038,32 @@ async function iniciarApp(){
           console.log('[Turno] dbId recuperado desde IndexedDB:', t.id);
         }
       } catch(e){ console.warn('[Turno] Error recuperando dbId:', e.message); }
+    }
+    // ── Verificar con Supabase que el turno restaurado sigue abierto ─────────
+    // Bug conocido: si la app se cierra DESPUÉS de confirmarCierre() pero ANTES
+    // de que location.reload() procese la limpieza del localStorage, el turno
+    // cerrado puede quedar en caché. Esta verificación lo detecta y lo limpia.
+    if(turnoOk && navigator.onLine && !USAR_DEMO){
+      const supaIdCheck = turnoData.supaId || turnoData.dbId;
+      if(supaIdCheck){
+        try{
+          const chk = await fetch(
+            SUPA_URL+'/rest/v1/pos_turno?id=eq.'+supaIdCheck+'&select=id,estado&limit=1',
+            { headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'} }
+          );
+          if(chk.ok){
+            const rows = await chk.json();
+            const row  = rows && rows[0];
+            if(row && row.estado !== 'abierto'){
+              // El turno ya fue cerrado en Supabase — limpiar localStorage
+              console.warn('[Turno] Turno en localStorage ya está '+row.estado+' en Supabase — limpiando caché');
+              turnoBorrar();
+              turnoData = { fechaApertura:null, efectivoInicial:0, ventas:[], egresos:[], ingresos:[] };
+              turnoOk = false;
+            }
+          }
+        } catch(e){ console.warn('[Turno] Error verificando estado en Supabase:', e.message); }
+      }
     }
   } catch(e){ console.warn('[App] Turno:', e.message); }
 
@@ -12086,6 +12193,7 @@ async function iniciarApp(){
     }, 4000);
   }
 
+  setTimeout(sincronizarFechaServidor, 1000);  // sincronizar reloj con servidor al arrancar
   setTimeout(sincronizarConfigNegocio, 3000);
   setTimeout(syncConSupabase, 5000);
   setTimeout(syncVentasPendientes, 8000);
