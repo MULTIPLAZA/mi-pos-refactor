@@ -10215,24 +10215,7 @@ async function supaLoadCategorias(){
   }
 }
 
-async function supaGet(tabla, qs){
-  const url = SUPA_URL+'/rest/v1/'+tabla+(qs?'?'+qs:'');
-  const res = await fetch(url, {
-    method: 'GET',
-    headers:{
-      'apikey':          SUPA_ANON,
-      'Authorization':   'Bearer '+SUPA_ANON,
-      'Content-Type':    'application/json',
-      'Accept':          'application/json',
-    }
-  });
-  if(!res.ok){
-    const txt = await res.text();
-    throw new Error('HTTP '+res.status+': '+txt);
-  }
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
-}
+// supaGet viene de js/config.js
 
 async function supaUpsertProducto(prod){
   if(USAR_DEMO) return;
@@ -11416,24 +11399,7 @@ const APP_VERSION = 'v1.9.0 (2026-04-08)';
 let MODO_TERMINAL = localStorage.getItem('pos_modo_terminal') || 'caja';
 // SUPA_ANON ahora en js/config.js
 
-async function supaRPC(fn, params){
-  const url = SUPA_URL + '/rest/v1/rpc/' + fn;
-  console.log('[RPC] Llamando:', fn, params);
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'apikey':        SUPA_ANON,
-      'Authorization': 'Bearer ' + SUPA_ANON,
-      'Accept':        'application/json',
-    },
-    body: JSON.stringify(params)
-  });
-  const text = await res.text();
-  console.log('[RPC] Respuesta', fn, ':', res.status, text.substring(0,200));
-  if(!res.ok) throw new Error('RPC '+fn+' HTTP '+res.status+': '+text);
-  try { return JSON.parse(text); } catch(e){ return text; }
-}
+// supaRPC viene de js/config.js
 
 const SK = {
   token:'lic_token', email:'lic_email', negocio:'lic_negocio',

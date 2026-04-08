@@ -427,61 +427,10 @@ function toast(m,dur){
 }
 
 // ── SUPABASE ──────────────────────────────────────────────
-async function sg(t,q){
-  var url = SUPA_URL+'/rest/v1/'+t+(q?'?'+q:'');
-  var r = await fetch(url,{
-    headers:{
-      'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-      'Content-Type':'application/json','Accept':'application/json'
-    }
-  });
-  if(!r.ok){
-    var txt = await r.text().catch(function(){return '';});
-    throw new Error('HTTP '+r.status+' en '+t+': '+txt.substring(0,150));
-  }
-  var d = await r.json();
-  return Array.isArray(d) ? d : [];
-}
-
-async function srpc(fn,p){
-  var r = await fetch(SUPA_URL+'/rest/v1/rpc/'+fn,{
-    method:'POST',
-    headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json'},
-    body:JSON.stringify(p)
-  });
-  if(!r.ok) throw new Error(await r.text());
-  return await r.json();
-}
-
-async function supaPost(tabla,data,conflictCol){
-  var url = conflictCol ? SUPA_URL+'/rest/v1/'+tabla+'?on_conflict='+conflictCol : SUPA_URL+'/rest/v1/'+tabla;
-  var r = await fetch(url,{
-    method:'POST',
-    headers:{
-      'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-      'Content-Type':'application/json',
-      'Prefer': conflictCol ? 'resolution=merge-duplicates,return=representation' : 'return=representation'
-    },
-    body:JSON.stringify(data)
-  });
-  var txt = await r.text();
-  if(!r.ok) throw new Error('HTTP '+r.status+': '+txt.substring(0,200));
-  try{ return JSON.parse(txt); }catch(e){ return []; }
-}
-
-async function supaPatch(tabla,filtro,data){
-  var r = await fetch(SUPA_URL+'/rest/v1/'+tabla+'?'+filtro,{
-    method:'PATCH',
-    headers:{
-      'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-      'Content-Type':'application/json','Prefer':'return=representation'
-    },
-    body:JSON.stringify(data)
-  });
-  var txt = await r.text();
-  if(!r.ok) throw new Error('HTTP '+r.status+': '+txt.substring(0,200));
-  try{ return JSON.parse(txt); }catch(e){ return []; }
-}
+// supaGet, supaPost, supaPatch, supaDelete, supaRPC vienen de js/config.js
+// Aliases para compatibilidad con código existente en este archivo:
+var sg   = supaGet;
+var srpc = supaRPC;
 
 // ── DATE HELPERS ──────────────────────────────────────────
 function getFD(f){
