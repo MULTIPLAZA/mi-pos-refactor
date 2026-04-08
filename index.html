@@ -11385,7 +11385,7 @@ const BTPrinter = {
 
 
 const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const APP_VERSION = 'v1.8.3 (2026-03-31)';
+const APP_VERSION = 'v1.9.0 (2026-04-08)';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // MODO TERMINAL — 'caja' (default) o 'satelite'
@@ -12559,8 +12559,10 @@ async function leerModoDesdeActivaciones(){
       if(typeof configData !== 'undefined') configData.sucursal = activ.sucursal;
     }
 
-    // Guardar licencia_id si no estaba (útil para pos_pedidos)
-    if(activ.licencia_id && !localStorage.getItem('ali')){
+    // SIEMPRE actualizar ali desde activaciones — fuente de verdad.
+    // Si había un ali de una sesión anterior con otro email (ej: demo@test.com),
+    // esto lo corrige automáticamente con el valor correcto de esta licencia.
+    if(activ.licencia_id){
       localStorage.setItem('ali', String(activ.licencia_id));
       cookieSet('ali', String(activ.licencia_id), 365);
     }
