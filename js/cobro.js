@@ -760,6 +760,13 @@ function setRucStatus(msg, type) {
  *   6. Genera el recibo y navega a scRecibo
  */
 async function confirmarPago() {
+  // ── Obtener fecha del servidor PRIMERO (antes de cualquier await posterior) ──
+  // IMPORTANTE: debe ser lo primero en la función para que esté disponible
+  // en registrarVentaEnTurno y generarRecibo más abajo.
+  const _fechaVenta = (typeof obtenerFechaServidor === 'function')
+    ? await obtenerFechaServidor()
+    : new Date();
+
   // ── Capturar datos ANTES de limpiar ───────────────────────
   const totalVenta        = calcTotal();
   const itemsVenta        = JSON.parse(JSON.stringify(cart));
@@ -864,12 +871,6 @@ async function confirmarPago() {
 
   mesaLimpiarAlPagar();
   resetFactura();
-
-  // Hora del servidor para la venta — evita problemas de reloj del dispositivo
-  // Si no hay internet, obtenerFechaServidor() retorna new Date() como fallback
-  const _fechaVenta = (typeof obtenerFechaServidor === 'function')
-    ? await obtenerFechaServidor()
-    : new Date();
 
   generarRecibo({
     items:       itemsVenta,
