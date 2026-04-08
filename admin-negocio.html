@@ -3291,17 +3291,12 @@ async function movGuardar(){
           costo_unitario:it.costo||0
         });
         // Upsert stock (fire and forget)
-        fetch(SUPA_URL+'/rest/v1/stock?on_conflict=deposito_id,producto_id',{
-          method:'POST',
-          headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-            'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-          body:JSON.stringify({
+        supaPost('stock',{
             deposito_id:depId, sucursal_id:sucId, licencia_id:licId,
             producto_id:it.prodId, nombre_producto:it.nombre,
             cantidad:desp, costo_unitario:it.costo||0,
             updated_at:now
-          })
-        }).catch(function(e){console.warn('[Stock upsert]',e.message);});
+        },'deposito_id,producto_id',true).catch(function(e){console.warn('[Stock upsert]',e.message);});
       }
 
       // Insertar items en bloque
@@ -3322,12 +3317,8 @@ async function movGuardar(){
       if(tipo==='compra'){
         _mov.items.forEach(function(it){
           if(it.costo>0){
-            fetch(SUPA_URL+'/rest/v1/pos_productos?id=eq.'+it.prodId,{
-              method:'PATCH',
-              headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-                'Content-Type':'application/json','Prefer':'return=minimal'},
-              body:JSON.stringify({costo:it.costo,updated_at:now})
-            }).catch(function(e){console.warn('[Costo update]',e.message);});
+            supaPatch('pos_productos','id=eq.'+it.prodId,{costo:it.costo,updated_at:now},true)
+              .catch(function(e){console.warn('[Costo update]',e.message);});
           }
         });
       }
@@ -3632,17 +3623,12 @@ async function movEjecutarAnulacion(compId){
       var it=items[k];
       var antes2=stockMap[it.producto_id]||0;
       var cantInv2=-(it.cantidad||0);
-      fetch(SUPA_URL+'/rest/v1/stock?on_conflict=deposito_id,producto_id',{
-        method:'POST',
-        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-          'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-        body:JSON.stringify({
+      supaPost('stock',{
           deposito_id:orig.deposito_id, sucursal_id:orig.sucursal_id,
           licencia_id:licId, producto_id:it.producto_id,
           nombre_producto:it.nombre_producto,
           cantidad:antes2+cantInv2, updated_at:now
-        })
-      }).catch(function(e){console.warn('[Stock anul]',e.message);});
+      },'deposito_id,producto_id',true).catch(function(e){console.warn('[Stock anul]',e.message);});
     }
 
     // Marcar comprobante original como anulado
@@ -4216,17 +4202,12 @@ async function cntConfirmar(){
       // Actualizar stock en tabla stock
       for(var k=0;k<conAjuste.length;k++){
         var it=conAjuste[k];
-        fetch(SUPA_URL+'/rest/v1/stock?on_conflict=deposito_id,producto_id',{
-          method:'POST',
-          headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-            'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-          body:JSON.stringify({
+        supaPost('stock',{
             deposito_id:ct.deposito_id, sucursal_id:dep.sucursal_id||null,
             licencia_id:licId, producto_id:it.producto_id,
             nombre_producto:it.nombre_producto,
             cantidad:it.stock_fisico, updated_at:now
-          })
-        }).catch(function(e){ console.warn('[Conteo] stock upsert:',e.message); });
+        },'deposito_id,producto_id',true).catch(function(e){ console.warn('[Conteo] stock upsert:',e.message); });
 
         // Marcar ítem como ajustado
         await supaPatch('stock_conteo_items','id=eq.'+it.id,{ajustado:true});
@@ -5062,13 +5043,9 @@ async function planEliminarCat(id){
   try{
     // Eliminar conceptos primero
     if(cons.length){
-      await fetch(SUPA_URL+'/rest/v1/gasto_conceptos?categoria_id=eq.'+id,{
-        method:'DELETE',headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Prefer':'return=minimal'}
-      });
+      await supaDelete('gasto_conceptos','categoria_id=eq.'+id);
     }
-    await fetch(SUPA_URL+'/rest/v1/gasto_categorias?id=eq.'+id,{
-      method:'DELETE',headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Prefer':'return=minimal'}
-    });
+    await supaDelete('gasto_categorias','id=eq.'+id);
     toast('Categoría eliminada');
     await planCargar();
     renderPlanGastos();
@@ -5078,9 +5055,7 @@ async function planEliminarCat(id){
 async function planEliminarCon(id){
   if(!confirm('¿Eliminar este concepto?')) return;
   try{
-    await fetch(SUPA_URL+'/rest/v1/gasto_conceptos?id=eq.'+id,{
-      method:'DELETE',headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Prefer':'return=minimal'}
-    });
+    await supaDelete('gasto_conceptos','id=eq.'+id);
     toast('Concepto eliminado');
     await planCargar();
     renderPlanGastos();
@@ -5277,11 +5252,7 @@ async function gastosBuscar(){
 async function gastoEliminar(id){
   if(!confirm('¿Eliminar este gasto?')) return;
   try{
-    var r=await fetch(SUPA_URL+'/rest/v1/gastos?id=eq.'+id,{
-      method:'DELETE',
-      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Prefer':'return=minimal'}
-    });
-    if(!r.ok) throw new Error(await r.text());
+    await supaDelete('gastos','id=eq.'+id);
     toast('Gasto eliminado');
     await gastosBuscar();
   }catch(e){ toast('Error: '+e.message); }
@@ -5934,12 +5905,9 @@ async function ivaCerrar(id){
 
 async function testConexion(){
   try {
-    var r1=await fetch(SUPA_URL+'/rest/v1/licencias?limit=1',{headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}});
-    console.log('[Supabase] Conectividad OK:', r1.status);
-    var r2=await fetch(SUPA_URL+'/rest/v1/timbrados?limit=1',{headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}});
-    console.log('[Supabase] timbrados:', r2.status);
-    var r3=await fetch(SUPA_URL+'/rest/v1/timbrado_terminales?limit=1',{headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}});
-    console.log('[Supabase] timbrado_terminales:', r3.status);
+    await sg('licencias','limit=1'); console.log('[Supabase] Conectividad OK');
+    await sg('timbrados','limit=1'); console.log('[Supabase] timbrados OK');
+    await sg('timbrado_terminales','limit=1'); console.log('[Supabase] timbrado_terminales OK');
   }catch(e){console.error('[Supabase] Error:', e.message);}
 }
 

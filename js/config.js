@@ -30,31 +30,33 @@ async function supaGet(tabla, query) {
   return Array.isArray(d) ? d : [];
 }
 
-// POST: supaPost('pos_ventas', {datos}, 'on_conflict_col')
-async function supaPost(tabla, data, conflictCol) {
+// POST: supaPost('pos_ventas', {datos}, 'on_conflict_col', true) — 4to param = minimal (sin retorno)
+async function supaPost(tabla, data, conflictCol, minimal) {
   var url = conflictCol
     ? SUPA_URL + '/rest/v1/' + tabla + '?on_conflict=' + conflictCol
     : SUPA_URL + '/rest/v1/' + tabla;
+  var prefer = conflictCol
+    ? 'resolution=merge-duplicates,return=' + (minimal ? 'minimal' : 'representation')
+    : 'return=' + (minimal ? 'minimal' : 'representation');
   var r = await fetch(url, {
     method: 'POST',
-    headers: supaHeaders({
-      'Content-Type': 'application/json',
-      'Prefer': conflictCol ? 'resolution=merge-duplicates,return=representation' : 'return=representation'
-    }),
+    headers: supaHeaders({ 'Content-Type': 'application/json', 'Prefer': prefer }),
     body: JSON.stringify(data)
   });
+  if (minimal) { if (!r.ok) throw new Error('HTTP ' + r.status); return; }
   var txt = await r.text();
   if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + txt.substring(0, 200));
   try { return JSON.parse(txt); } catch(e) { return []; }
 }
 
-// PATCH: supaPatch('pos_productos', 'id=eq.123', {nombre:'nuevo'})
-async function supaPatch(tabla, filtro, data) {
+// PATCH: supaPatch('pos_productos', 'id=eq.123', {nombre:'nuevo'}, true) — 4to param = minimal
+async function supaPatch(tabla, filtro, data, minimal) {
   var r = await fetch(SUPA_URL + '/rest/v1/' + tabla + '?' + filtro, {
     method: 'PATCH',
-    headers: supaHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
+    headers: supaHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=' + (minimal ? 'minimal' : 'representation') }),
     body: JSON.stringify(data)
   });
+  if (minimal) { if (!r.ok) throw new Error('HTTP ' + r.status); return; }
   var txt = await r.text();
   if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + txt.substring(0, 200));
   try { return JSON.parse(txt); } catch(e) { return []; }
