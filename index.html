@@ -3632,11 +3632,9 @@ async function sincronizarConfigNegocio(){
   const email = localStorage.getItem('lic_email');
   if(!email || USAR_DEMO) return;
   try {
-    const rows = await fetch(
-      SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+
-      '&clave=in.(negocio_config,timbrados_config,timbrados_mapa)',
-      { headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'} }
-    ).then(r=>r.ok?r.json():[]);
+    const rows = await supaGet('pos_config',
+      'licencia_email=eq.'+encodeURIComponent(email)+
+      '&clave=in.(negocio_config,timbrados_config,timbrados_mapa)');
 
     rows.forEach(row => {
       try {
@@ -4014,13 +4012,7 @@ async function obtenerFechaServidor(){
       // Usamos /rest/v1/ con una tabla que siempre existe y traemos 0 rows
       const res = await fetch(
         SUPA_URL + '/rest/v1/pos_config?limit=0&select=id',
-        {
-          headers:{
-            'apikey':        SUPA_ANON,
-            'Authorization': 'Bearer ' + SUPA_ANON,
-            'Accept':        'application/json',
-          }
-        }
+        { headers: supaHeaders({ 'Accept': 'application/json' }) }
       );
       const t1 = Date.now();
       // El header Date de la respuesta HTTP es la hora del servidor
@@ -4060,11 +4052,7 @@ function supaInsertTurno(estado, efectivoInicial){
     terminal:         localStorage.getItem('pos_terminal') || 'Terminal 1',
     licencia_email:   email,
   };
-  fetch(SUPA_URL+'/rest/v1/pos_turno',{
-    method:'POST',
-    headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=representation'},
-    body: JSON.stringify(data)
-  }).then(r=>r.json()).then(rows=>{
+  supaPost('pos_turno', data).then(rows=>{
     if(rows&&rows[0]) turnoData.supaId = rows[0].id;
     console.log('[Turno] Guardado en Supabase id:', rows&&rows[0]&&rows[0].id);
   }).catch(e=>console.warn('[Turno] Error Supabase:', e.message));
@@ -4339,12 +4327,7 @@ async function sateliteEnviarPedido(){
     try{
       const res = await fetch(SUPA_URL + '/rest/v1/pos_pedidos', {
         method:  'POST',
-        headers: {
-          'apikey':        SUPA_ANON,
-          'Authorization': 'Bearer ' + SUPA_ANON,
-          'Content-Type':  'application/json',
-          'Prefer':        'return=minimal',
-        },
+        headers: supaHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
         body: JSON.stringify(pedidoData),
       });
       supaOk = res.ok;
@@ -5518,11 +5501,7 @@ async function avanzarNroFactura(timbrado){
   if(cached){ cached.nro_actual=(cached.nro_actual||1)+1; localStorage.setItem('pos_timbrado_activo',JSON.stringify(cached)); }
   // Avisar a Supabase sin bloquear
   if(email && !USAR_DEMO){
-    fetch(SUPA_URL+'/rest/v1/rpc/avanzar_correlativo',{
-      method:'POST',
-      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json'},
-      body: JSON.stringify({ p_email:email, p_terminal:terminal })
-    }).then(r=>r.json()).then(d=>{
+    supaRPC('avanzar_correlativo', { p_email:email, p_terminal:terminal }).then(d=>{
       if(d&&d.ok) console.log('[Correlativo] +1 en Supabase → nro_actual:',d.nro_actual);
     }).catch(e=>console.warn('[Correlativo]',e.message));
   }
@@ -5625,18 +5604,7 @@ function supaInsertVenta(data){
     return;
   }
 
-  fetch(SUPA_URL+'/rest/v1/pos_ventas', {
-    method:  'POST',
-    headers: {
-      'apikey':          SUPA_ANON,
-      'Authorization':   'Bearer '+SUPA_ANON,
-      'Content-Type':    'application/json',
-      'Prefer':          'return=minimal',
-    },
-    body: JSON.stringify(venta)
-  })
-  .then(r => {
-    if(!r.ok) return r.text().then(t => { throw new Error(t); });
+  supaPost('pos_ventas', venta, null, true).then(() => {
     console.log('[Venta] Guardada en Supabase OK');
     // Si la venta tenía un pedido satélite vinculado, marcarlo como cobrado
     if(data._supabasePedidoId){
@@ -5659,18 +5627,10 @@ function supaInsertVenta(data){
 function marcarPedidoSateliteCobrado(pedidoId){
   if(!pedidoId || USAR_DEMO) return;
   // PATCH en Supabase
-  fetch(SUPA_URL + '/rest/v1/pos_pedidos?id=eq.' + encodeURIComponent(pedidoId), {
-    method:  'PATCH',
-    headers: {
-      'apikey':        SUPA_ANON,
-      'Authorization': 'Bearer ' + SUPA_ANON,
-      'Content-Type':  'application/json',
-    },
-    body: JSON.stringify({ estado: 'cobrado', updated_at: new Date().toISOString() })
-  })
-  .then(function(r){
-    if(r.ok) console.log('[CajaSync] Pedido satélite marcado cobrado:', pedidoId);
-    else r.text().then(function(t){ console.warn('[CajaSync] Error PATCH pedido:', t); });
+  supaPatch('pos_pedidos', 'id=eq.' + encodeURIComponent(pedidoId),
+    { estado: 'cobrado', updated_at: new Date().toISOString() }, true)
+  .then(function(){
+    console.log('[CajaSync] Pedido satélite marcado cobrado:', pedidoId);
   })
   .catch(function(e){ console.warn('[CajaSync] Error marcando cobrado:', e.message); });
 
@@ -5703,19 +5663,13 @@ async function stockDescontarVenta(items, comprobante){
 
     // Leer stock actual
     const prodIds = itemsInv.map(function(i){ return i.id; }).join(',');
-    const stockR = await fetch(
-      SUPA_URL+'/rest/v1/stock?deposito_id=eq.'+depId+'&producto_id=in.('+prodIds+')&select=producto_id,cantidad',
-      { headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'} }
-    );
-    const stockData = await stockR.json();
+    const stockData = await supaGet('stock',
+      'deposito_id=eq.'+depId+'&producto_id=in.('+prodIds+')&select=producto_id,cantidad');
     const stockMap = {};
     (stockData||[]).forEach(function(s){ stockMap[s.producto_id] = parseFloat(s.cantidad)||0; });
 
     // Crear comprobante de venta
-    const compR = await fetch(SUPA_URL+'/rest/v1/stock_comprobantes', {
-      method: 'POST',
-      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=representation'},
-      body: JSON.stringify({
+    const compData = await supaPost('stock_comprobantes', {
         licencia_id: licId,
         deposito_id: depId,
         sucursal_id: sucId,
@@ -5725,9 +5679,7 @@ async function stockDescontarVenta(items, comprobante){
         terminal: localStorage.getItem('pos_terminal')||'Terminal',
         usuario: email,
         fecha: new Date().toISOString()
-      })
-    });
-    const compData = await compR.json();
+      });
     const compId = Array.isArray(compData) ? compData[0].id : compData.id;
 
     // Items del comprobante + upsert stock
@@ -5746,21 +5698,14 @@ async function stockDescontarVenta(items, comprobante){
       };
     });
 
-    await fetch(SUPA_URL+'/rest/v1/stock_comprobante_items', {
-      method: 'POST',
-      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body: JSON.stringify(compItems)
-    });
+    await supaPost('stock_comprobante_items', compItems, null, true);
 
     // Upsert stock (actualizar cantidades)
     for(const it of itemsInv){
       const qty   = parseFloat(it.qty)||1;
       const antes = stockMap[it.id]||0;
       const desp  = antes - qty;
-      fetch(SUPA_URL+'/rest/v1/stock?on_conflict=deposito_id,producto_id', {
-        method: 'POST',
-        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-        body: JSON.stringify({
+      supaPost('stock', {
           deposito_id: depId,
           sucursal_id: sucId,
           licencia_id: licId,
@@ -5768,8 +5713,8 @@ async function stockDescontarVenta(items, comprobante){
           nombre_producto: it.name||it.nombre||'',
           cantidad: desp,
           updated_at: new Date().toISOString()
-        })
-      }).catch(function(e){ console.warn('[Stock] upsert error:', e.message); });
+        }, 'deposito_id,producto_id', true)
+      .catch(function(e){ console.warn('[Stock] upsert error:', e.message); });
     }
     console.log('[Stock] Descontado — '+itemsInv.length+' productos | depósito:', depId);
   }catch(e){
@@ -5793,17 +5738,8 @@ async function syncVentasPendientes(){
       try {
         const datos = JSON.parse(item.datos);
         datos.licencia_email = email;
-        const res = await fetch(SUPA_URL+'/rest/v1/pos_ventas', {
-          method:  'POST',
-          headers: {
-            'apikey':        SUPA_ANON,
-            'Authorization': 'Bearer '+SUPA_ANON,
-            'Content-Type':  'application/json',
-            'Prefer':        'return=minimal',
-          },
-          body: JSON.stringify(datos)
-        });
-        if(res.ok) await db.sync_queue.update(item.id, { sincronizado: 1 });
+        await supaPost('pos_ventas', datos, null, true);
+        await db.sync_queue.update(item.id, { sincronizado: 1 });
       } catch(e){ break; } // sin internet, parar
     }
   } catch(e){ console.warn('[Sync ventas]', e.message); }
@@ -6691,19 +6627,12 @@ function guardarDescuentosConfig(){
   // Guardar en Supabase pos_config
   const email = localStorage.getItem('lic_email');
   if(!email || USAR_DEMO) return;
-  fetch(SUPA_URL+'/rest/v1/pos_config?on_conflict=licencia_email,clave',{
-    method:'POST',
-    headers:{
-      'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-      'Content-Type':'application/json',
-      'Prefer':'resolution=merge-duplicates'
-    },
-    body: JSON.stringify({
+  supaPost('pos_config', {
       licencia_email: email,
       clave: 'descuentos_config',
       valor: JSON.stringify(DESCUENTOS)
-    })
-  }).catch(e=>console.warn('[Desc] No se pudo guardar en Supabase:', e.message));
+    }, 'licencia_email,clave')
+  .catch(e=>console.warn('[Desc] No se pudo guardar en Supabase:', e.message));
 }
 
 async function cargarDescuentosConfig(){
@@ -6711,13 +6640,10 @@ async function cargarDescuentosConfig(){
   try {
     const email = localStorage.getItem('lic_email');
     if(email && !USAR_DEMO){
-      const r = await fetch(
-        SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)+
-        '&clave=eq.descuentos_config&select=valor',
-        {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}}
-      );
-      if(r.ok){
-        const data = await r.json();
+      const data = await supaGet('pos_config',
+        'licencia_email=eq.'+encodeURIComponent(email)+
+        '&clave=eq.descuentos_config&select=valor');
+      {
         if(data && data[0] && data[0].valor){
           const parsed = JSON.parse(data[0].valor);
           if(Array.isArray(parsed) && parsed.length){
@@ -7209,16 +7135,10 @@ async function reactivarArticulo(prodIdx){
   const email = localStorage.getItem('lic_email');
   if(email && !USAR_DEMO){
     try {
-      const r = await fetch(
-        SUPA_URL+'/rest/v1/pos_productos?id=eq.'+p.id+'&licencia_email=eq.'+encodeURIComponent(email),
-        { method:'PATCH',
-          headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-            'Content-Type':'application/json','Prefer':'return=minimal'},
-          body: JSON.stringify({activo:true})
-        }
-      );
-      if(r.ok) console.log('[Producto] Reactivado OK:', p.name);
-      else { const t=await r.text(); console.warn('[Producto] Error reactivar:',t); }
+      await supaPatch('pos_productos',
+        'id=eq.'+p.id+'&licencia_email=eq.'+encodeURIComponent(email),
+        {activo:true}, true);
+      console.log('[Producto] Reactivado OK:', p.name);
     } catch(e){ console.warn('[Producto] Sin conexión:', e.message); }
   }
 
@@ -7401,21 +7321,10 @@ async function eliminarArticulo(){
   const email = localStorage.getItem('lic_email');
   if(email && !USAR_DEMO){
     try {
-      const r = await fetch(
-        SUPA_URL+'/rest/v1/pos_productos?id=eq.'+prod.id+'&licencia_email=eq.'+encodeURIComponent(email),
-        { method:'PATCH',
-          headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,
-            'Content-Type':'application/json','Prefer':'return=minimal'},
-          body: JSON.stringify({activo:false})
-        }
-      );
-      if(r.ok){
-        console.log('[Producto] Desactivado OK:', prod.name);
-      } else {
-        const t = await r.text();
-        console.warn('[Producto] Error desactivar:', t);
-        toast('⚠️ Error al guardar en servidor — intenta de nuevo');
-      }
+      await supaPatch('pos_productos',
+        'id=eq.'+prod.id+'&licencia_email=eq.'+encodeURIComponent(email),
+        {activo:false}, true);
+      console.log('[Producto] Desactivado OK:', prod.name);
     } catch(e){ console.warn('[Producto] Sin conexión:', e.message); }
   }
 
@@ -7892,21 +7801,12 @@ async function confirmarCierre(){
   const supaId = turnoSupaIdCierre || turnoDbIdCierre;
   if(navigator.onLine && supaId){
     try {
-      await fetch(SUPA_URL+'/rest/v1/pos_turno?id=eq.'+supaId, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SUPA_ANON,
-          'Authorization': 'Bearer '+SUPA_ANON,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal',
-        },
-        body: JSON.stringify({
+      await supaPatch('pos_turno', 'id=eq.'+supaId, {
           estado:        'cerrado',
           fecha_cierre:  (await obtenerFechaServidor()).toISOString(), // hora del servidor
           total_contado: totalContado,
           diferencia:    diferencia,
-        }),
-      });
+        }, true);
       console.log('[Cierre] Turno cerrado en Supabase OK');
     } catch(e){ console.warn('[Cierre] Error Supabase:', e.message); }
   }
@@ -10244,17 +10144,7 @@ async function supaUpsertProducto(prod){
     };
     // Limpiar undefined para no enviar campos no deseados
     if(row.imagen === undefined) delete row.imagen;
-    const res = await fetch(SUPA_URL+'/rest/v1/pos_productos', {
-      method:  'POST',
-      headers: {
-        'apikey':        SUPA_ANON,
-        'Authorization': 'Bearer '+SUPA_ANON,
-        'Content-Type':  'application/json',
-        'Prefer':        'resolution=merge-duplicates',
-      },
-      body: JSON.stringify(row)
-    });
-    if(!res.ok) throw new Error(await res.text());
+    await supaPost('pos_productos', row, 'id', true);
     console.log('[Supabase] Producto guardado:', prod.name);
   } catch(e){ console.warn('[Supabase] Error guardando producto:', e.message); }
 }
@@ -10264,24 +10154,10 @@ async function supaDeleteProducto(id){
   const email = localStorage.getItem(SK.email);
   if(!email) return;
   try {
-    const r = await fetch(
-      SUPA_URL+'/rest/v1/pos_productos?id=eq.'+id+
-      '&licencia_email=eq.'+encodeURIComponent(email), {
-      method:  'PATCH',
-      headers: {
-        'apikey':        SUPA_ANON,
-        'Authorization': 'Bearer '+SUPA_ANON,
-        'Content-Type':  'application/json',
-        'Prefer':        'return=minimal'
-      },
-      body: JSON.stringify({ activo: false })
-    });
-    if(!r.ok){
-      const t = await r.text();
-      console.warn('[Supabase] Error desactivando producto:', t);
-    } else {
-      console.log('[Supabase] Producto desactivado ID:', id);
-    }
+    await supaPatch('pos_productos',
+      'id=eq.'+id+'&licencia_email=eq.'+encodeURIComponent(email),
+      { activo: false }, true);
+    console.log('[Supabase] Producto desactivado ID:', id);
   } catch(e){ console.warn('[Supabase] Error:', e.message); }
 }
 
@@ -10297,17 +10173,7 @@ async function supaUpsertCategoria(cat){
       licencia_email: email,
       updated_at:     new Date().toISOString(),
     };
-    const res = await fetch(SUPA_URL+'/rest/v1/pos_categorias', {
-      method:  'POST',
-      headers: {
-        'apikey':        SUPA_ANON,
-        'Authorization': 'Bearer '+SUPA_ANON,
-        'Content-Type':  'application/json',
-        'Prefer':        'resolution=merge-duplicates',
-      },
-      body: JSON.stringify(row)
-    });
-    if(!res.ok) throw new Error(await res.text());
+    await supaPost('pos_categorias', row, 'id', true);
     console.log('[Supabase] Categoría guardada:', cat.nombre);
   } catch(e){ console.warn('[Supabase] Error guardando categoría:', e.message); }
 }
@@ -10704,12 +10570,7 @@ async function supaFetch(method, tabla, body, params, prefer){
   }
   const opts = {
     method,
-    headers: {
-      'Content-Type':  'application/json',
-      'apikey':        SUPA_ANON,
-      'Authorization': 'Bearer ' + SUPA_ANON,
-      'Prefer':        prefer || 'return=minimal',
-    },
+    headers: supaHeaders({ 'Content-Type': 'application/json', 'Prefer': prefer || 'return=minimal' }),
   };
   if(body) opts.body = JSON.stringify(body);
   const res = await fetch(url, opts);
@@ -11661,17 +11522,13 @@ async function licInit(){
 
       if(deviceId){
         // Consultar activaciones por device_id directamente
-        const res = await fetch(
-          SUPA_URL + '/rest/v1/activaciones'
-            + '?device_id=eq.' + encodeURIComponent(deviceId)
+        const rows = await supaGet('activaciones',
+            'device_id=eq.' + encodeURIComponent(deviceId)
             + '&activa=eq.true'
             + '&select=email,nombre_negocio,nombre_terminal,sucursal,licencia_id,modo'
-            + '&limit=1',
-          { headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON, 'Accept': 'application/json' } }
-        );
+            + '&limit=1');
 
-        if(res.ok){
-          const rows = await res.json();
+        {
           const activ = Array.isArray(rows) && rows[0] ? rows[0] : null;
 
           if(activ && activ.email){
@@ -12014,12 +11871,9 @@ async function iniciarApp(){
       const supaIdCheck = turnoData.supaId || turnoData.dbId;
       if(supaIdCheck){
         try{
-          const chk = await fetch(
-            SUPA_URL+'/rest/v1/pos_turno?id=eq.'+supaIdCheck+'&select=id,estado&limit=1',
-            { headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'} }
-          );
-          if(chk.ok){
-            const rows = await chk.json();
+          const rows = await supaGet('pos_turno',
+            'id=eq.'+supaIdCheck+'&select=id,estado&limit=1');
+          {
             const row  = rows && rows[0];
             if(row && row.estado !== 'abierto'){
               // El turno ya fue cerrado en Supabase — limpiar localStorage
@@ -12046,15 +11900,8 @@ async function iniciarApp(){
           + '&terminal=eq.' + encodeURIComponent(terminal)
           + '&order=fecha_apertura.desc&limit=1'
           + '&select=id,terminal,fecha_apertura,efectivo_inicial';
-        const r = await fetch(SUPA_URL+'/rest/v1/pos_turno?'+query, {
-          headers:{
-            'apikey':        SUPA_ANON,
-            'Authorization': 'Bearer '+SUPA_ANON,
-            'Accept':        'application/json'
-          }
-        });
-        if(r.ok){
-          const rows = await r.json();
+        const rows = await supaGet('pos_turno', query);
+        {
                   const t = rows && rows[0];
           if(t){
                       // Reconstruir turnoData desde Supabase
@@ -12135,22 +11982,19 @@ async function iniciarApp(){
         const email  = localStorage.getItem(SK.email);
         const sucNom = localStorage.getItem('pos_sucursal');
         if(!email || !sucNom) return;
-        const lr = await fetch(SUPA_URL+'/rest/v1/licencias?email_cliente=ilike.'+encodeURIComponent(email)+'&activa=eq.true&select=id&limit=1',
-          {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
-        const ld = await lr.json();
+        const ld = await supaGet('licencias',
+          'email_cliente=ilike.'+encodeURIComponent(email)+'&activa=eq.true&select=id&limit=1');
         if(!ld||!ld[0]) return;
         const licId = ld[0].id;
         localStorage.setItem('ali', String(licId));
         cookieSet('ali', String(licId), 365);
-        const sr = await fetch(SUPA_URL+'/rest/v1/sucursales?licencia_id=eq.'+licId+'&nombre=ilike.'+encodeURIComponent(sucNom)+'&select=id&limit=1',
-          {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
-        const sd = await sr.json();
+        const sd = await supaGet('sucursales',
+          'licencia_id=eq.'+licId+'&nombre=ilike.'+encodeURIComponent(sucNom)+'&select=id&limit=1');
         if(!sd||!sd[0]) return;
         localStorage.setItem('pos_sucursal_id', String(sd[0].id));
         cookieSet('pos_suc_id', String(sd[0].id), 365);
-        const dr = await fetch(SUPA_URL+'/rest/v1/depositos?licencia_id=eq.'+licId+'&sucursal_id=eq.'+sd[0].id+'&activo=eq.true&select=id&order=id.asc&limit=1',
-          {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
-        const dd = await dr.json();
+        const dd = await supaGet('depositos',
+          'licencia_id=eq.'+licId+'&sucursal_id=eq.'+sd[0].id+'&activo=eq.true&select=id&order=id.asc&limit=1');
         if(!dd||!dd[0]) return;
         localStorage.setItem('pos_deposito_id', String(dd[0].id));
         cookieSet('pos_dep_id', String(dd[0].id), 365);
@@ -12185,10 +12029,7 @@ async function iniciarApp(){
 async function guardarConfigTerminalSupabase(cfg){
   const deviceId = await licGetDeviceIdAsync(); // siempre usar el ID de ESTE dispositivo
   try{
-    await fetch(SUPA_URL+'/rest/v1/pos_config',{
-      method:'POST',
-      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-      body:JSON.stringify({
+    await supaPost('pos_config', {
         clave: 'terminal_config_'+deviceId,
         valor: JSON.stringify({
           negocio:     cfg.negocio,
@@ -12201,8 +12042,7 @@ async function guardarConfigTerminalSupabase(cfg){
           savedAt:     new Date().toISOString()
         }),
         licencia_email: email
-      })
-    });
+      }, 'licencia_email,clave', true);
     console.log('[Terminal] Config guardada — device:', deviceId.slice(0,12));
   }catch(e){console.warn('[Terminal] Error guardando:', e.message);}
 }
@@ -12216,12 +12056,9 @@ async function recuperarConfigTerminalSupabase(){
   try{
     // Intento 1: buscar por device_id específico
     if(deviceId){
-      const r = await fetch(
-        SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)
-        +'&clave=eq.terminal_config_'+encodeURIComponent(deviceId)+'&select=valor',
-        {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}}
-      );
-      const data = await r.json();
+      const data = await supaGet('pos_config',
+        'licencia_email=eq.'+encodeURIComponent(email)
+        +'&clave=eq.terminal_config_'+encodeURIComponent(deviceId)+'&select=valor');
       if(data && data[0]){
         const cfg = JSON.parse(data[0].valor);
         if(!cfg.deviceId || cfg.deviceId === deviceId){
@@ -12233,12 +12070,9 @@ async function recuperarConfigTerminalSupabase(){
 
     // Intento 2 (fallback): buscar cualquier config de este email
     // Útil cuando se borró caché y se perdió el device_id
-    const r2 = await fetch(
-      SUPA_URL+'/rest/v1/pos_config?licencia_email=eq.'+encodeURIComponent(email)
-      +'&clave=like.terminal_config_*&select=valor,clave&order=id.desc&limit=1',
-      {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}}
-    );
-    const data2 = await r2.json();
+    const data2 = await supaGet('pos_config',
+      'licencia_email=eq.'+encodeURIComponent(email)
+      +'&clave=like.terminal_config_*&select=valor,clave&order=id.desc&limit=1');
     if(data2 && data2[0]){
       const cfg = JSON.parse(data2[0].valor);
       // Si tiene config válida, restaurar y guardar el device_id que estaba en esa config
@@ -12348,18 +12182,12 @@ async function cajaSyncPedidosSatelite(){
   if(!email) return;
 
   try{
-    const res = await fetch(
-      SUPA_URL + '/rest/v1/pos_pedidos'
-        + '?licencia_email=eq.' + encodeURIComponent(email)
+    const rows = await supaGet('pos_pedidos',
+        'licencia_email=eq.' + encodeURIComponent(email)
         + '&sucursal=eq.'       + encodeURIComponent(sucursal)
         + '&estado=in.(abierto,en_cobro)'
         + '&order=created_at.asc'
-        + '&select=id,numero_orden,mesa,tipo_pedido,estado,items,total,terminal_origen,created_at',
-      { headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON, 'Accept': 'application/json' } }
-    );
-    if(!res.ok){ console.warn('[CajaSync] Error HTTP:', res.status); return; }
-
-    const rows = await res.json();
+        + '&select=id,numero_orden,mesa,tipo_pedido,estado,items,total,terminal_origen,created_at');
     if(!Array.isArray(rows)) return;
 
     // Conservar tickets locales (de esta caja), reemplazar los de satélite
@@ -12488,23 +12316,12 @@ async function leerModoDesdeActivaciones(){
   try{
     // Consultar activaciones por device_id (identificador único del dispositivo)
     // Traer: modo, sucursal, nombre_terminal, licencia_id
-    const res = await fetch(
-      SUPA_URL + '/rest/v1/activaciones'
-        + '?device_id=eq.' + encodeURIComponent(deviceId)
+    const rows = await supaGet('activaciones',
+        'device_id=eq.' + encodeURIComponent(deviceId)
         + '&email=eq.'     + encodeURIComponent(email)
         + '&activa=eq.true'
         + '&select=modo,sucursal,nombre_terminal,licencia_id'
-        + '&limit=1',
-      { headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON, 'Accept': 'application/json' } }
-    );
-
-    if(!res.ok){
-      console.warn('[Modo] Error HTTP al leer activaciones:', res.status);
-      MODO_TERMINAL = localStorage.getItem('pos_modo_terminal') || 'caja';
-      return MODO_TERMINAL;
-    }
-
-    const rows = await res.json();
+        + '&limit=1');
     const activ = Array.isArray(rows) && rows[0] ? rows[0] : null;
 
     if(!activ){
@@ -12647,20 +12464,10 @@ async function sateliteConfigurarModo(modo){
   const terminal = localStorage.getItem('pos_terminal');
   if(email && terminal && navigator.onLine && !USAR_DEMO){
     try{
-      await fetch(
-        SUPA_URL + '/rest/v1/activaciones'
-          + '?email=eq.' + encodeURIComponent(email)
+      await supaPatch('activaciones',
+        'email=eq.' + encodeURIComponent(email)
           + '&nombre_terminal=eq.' + encodeURIComponent(terminal),
-        {
-          method:  'PATCH',
-          headers: {
-            'apikey':        SUPA_ANON,
-            'Authorization': 'Bearer ' + SUPA_ANON,
-            'Content-Type':  'application/json',
-          },
-          body: JSON.stringify({ modo }),
-        }
-      );
+        { modo }, true);
       console.log('[Satélite] Modo ' + modo + ' guardado en Supabase para terminal:', terminal);
     } catch(e){
       console.warn('[Satélite] No se pudo guardar modo en Supabase:', e.message);
@@ -12688,15 +12495,11 @@ async function sateliteVerificarCajaActiva(){
 
   try{
     // Buscar turno abierto para esta licencia (cualquier terminal)
-    const res = await fetch(
-      SUPA_URL + '/rest/v1/pos_turno'
-        + '?licencia_email=eq.' + encodeURIComponent(email)
+    const rows = await supaGet('pos_turno',
+        'licencia_email=eq.' + encodeURIComponent(email)
         + '&estado=eq.abierto'
         + '&limit=1'
-        + '&select=id,terminal,fecha_apertura',
-      { headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON, 'Accept': 'application/json' } }
-    );
-    const rows = await res.json();
+        + '&select=id,terminal,fecha_apertura');
     const hayTurno = Array.isArray(rows) && rows.length > 0;
     if(hayTurno){
       console.log('[Satélite] Caja activa detectada — turno de terminal:', rows[0].terminal);
@@ -12740,13 +12543,11 @@ async function mesasCargar(){
 
   // Con internet — cargar desde Supabase y cachear
   try{
-    const rs = await fetch(SUPA_URL+'/rest/v1/pos_salones?licencia_id=eq.'+licId+'&activo=eq.true&order=orden.asc,id.asc',
-      {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
-    mesasSalones = await rs.json();
+    mesasSalones = await supaGet('pos_salones',
+      'licencia_id=eq.'+licId+'&activo=eq.true&order=orden.asc,id.asc');
 
-    const rm = await fetch(SUPA_URL+'/rest/v1/pos_mesas?licencia_id=eq.'+licId+'&activo=eq.true&order=orden.asc,id.asc',
-      {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
-    mesasMesas = await rm.json();
+    mesasMesas = await supaGet('pos_mesas',
+      'licencia_id=eq.'+licId+'&activo=eq.true&order=orden.asc,id.asc');
 
     // Cachear en IndexedDB para uso offline
     if(db){
@@ -13078,9 +12879,8 @@ async function guardarSalon(salonId){
     const email = localStorage.getItem('lic_email');
     if(email && !USAR_DEMO){
       try{
-        const lr = await fetch(SUPA_URL+'/rest/v1/licencias?email_cliente=ilike.'+encodeURIComponent(email)+'&activa=eq.true&select=id&limit=1',
-          {headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Accept':'application/json'}});
-        const ld = await lr.json();
+        const ld = await supaGet('licencias',
+          'email_cliente=ilike.'+encodeURIComponent(email)+'&activa=eq.true&select=id&limit=1');
         if(ld&&ld[0]){ licId=ld[0].id; localStorage.setItem('ali',String(licId)); }
       }catch(e){}
     }
@@ -13094,21 +12894,12 @@ async function guardarSalon(salonId){
   try{
     if(salonId){
       // Solo editar nombre y color
-      const r = await fetch(SUPA_URL+'/rest/v1/pos_salones?id=eq.'+salonId,{
-        method:'PATCH',
-        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body:JSON.stringify({nombre, color:mesaColorSel})
-      });
-      if(!r.ok){ const t=await r.text(); throw new Error(t); }
+      await supaPatch('pos_salones', 'id=eq.'+salonId,
+        {nombre, color:mesaColorSel}, true);
     } else {
       // Crear salón y obtener su id
-      const r = await fetch(SUPA_URL+'/rest/v1/pos_salones',{
-        method:'POST',
-        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=representation'},
-        body:JSON.stringify({licencia_id:licId, sucursal_id:sucId, nombre, color:mesaColorSel})
-      });
-      if(!r.ok){ const t=await r.text(); throw new Error(t); }
-      const data = await r.json();
+      const data = await supaPost('pos_salones',
+        {licencia_id:licId, sucursal_id:sucId, nombre, color:mesaColorSel});
       const nuevoSalonId = Array.isArray(data) ? data[0].id : data.id;
 
       // Crear mesas automáticamente si cantMesas > 0
@@ -13123,12 +12914,9 @@ async function guardarSalon(salonId){
             capacidad:   4,
           });
         }
-        const rm = await fetch(SUPA_URL+'/rest/v1/pos_mesas',{
-          method:'POST',
-          headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
-          body:JSON.stringify(mesasPayload)
-        });
-        if(!rm.ok){ console.warn('[Mesas] Error creando mesas:', await rm.text()); }
+        try {
+          await supaPost('pos_mesas', mesasPayload, null, true);
+        } catch(em){ console.warn('[Mesas] Error creando mesas:', em.message); }
       }
     }
     await mesasCargar();
@@ -13143,10 +12931,7 @@ async function guardarSalon(salonId){
 async function eliminarSalon(id){
   if(!confirm('¿Borrar este salón y todas sus mesas?')) return;
   try{
-    await fetch(SUPA_URL+'/rest/v1/pos_salones?id=eq.'+id,{
-      method:'DELETE',
-      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}
-    });
+    await supaDelete('pos_salones', 'id=eq.'+id);
     await mesasCargar();
     if(mesaSalonSel===id) mesaSalonSel = (mesasSalones[0] && mesasSalones[0].id)||null;
     toast('✓ Salón eliminado');
@@ -13183,17 +12968,9 @@ async function guardarMesa(salonId, mesaId){
   const sucId = parseInt(localStorage.getItem('pos_sucursal_id'))||null;
   try{
     if(mesaId){
-      await fetch(SUPA_URL+'/rest/v1/pos_mesas?id=eq.'+mesaId,{
-        method:'PATCH',
-        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body:JSON.stringify({nombre, capacidad:cap})
-      });
+      await supaPatch('pos_mesas', 'id=eq.'+mesaId, {nombre, capacidad:cap}, true);
     } else {
-      await fetch(SUPA_URL+'/rest/v1/pos_mesas',{
-        method:'POST',
-        headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body:JSON.stringify({salon_id:salonId, licencia_id:licId, sucursal_id:sucId, nombre, capacidad:cap})
-      });
+      await supaPost('pos_mesas', {salon_id:salonId, licencia_id:licId, sucursal_id:sucId, nombre, capacidad:cap}, null, true);
     }
     await mesasCargar();
     toast('✓ Mesa guardada');
@@ -13204,10 +12981,7 @@ async function guardarMesa(salonId, mesaId){
 async function eliminarMesa(id){
   if(!confirm('¿Borrar esta mesa?')) return;
   try{
-    await fetch(SUPA_URL+'/rest/v1/pos_mesas?id=eq.'+id,{
-      method:'DELETE',
-      headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+SUPA_ANON}
-    });
+    await supaDelete('pos_mesas', 'id=eq.'+id);
     await mesasCargar();
     toast('✓ Mesa eliminada');
     abrirGestionMesas();
