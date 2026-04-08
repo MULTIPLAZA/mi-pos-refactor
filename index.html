@@ -3611,6 +3611,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="js/config.js"></script>
+<script src="js/state.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/ventas.js"></script>
 <script src="js/cobro.js"></script>
@@ -3902,7 +3903,7 @@ function updUI(){
   updBtnComandaCobro(); // actualizar badge de comanda pendiente
 }
 function toggleTicket(){
-  showTkt=!showTkt;
+  setShowTkt(!showTkt);
   document.getElementById('tpanel').classList.toggle('open',showTkt);
   document.getElementById('prodView').style.display=showTkt?'none':'flex';
   if(showTkt)renderTkt();
@@ -4359,10 +4360,9 @@ async function sateliteEnviarPedido(){
   // ── Guardar backup local en pendientes[] ─────────────────────────────────
   // Permite que el satélite funcione sin internet y que el panel de mesas
   // muestre la mesa como "ocupada" aunque Supabase no respondió.
-  const nro = ticketCounter++;
-  localStorage.setItem('pos_ticket_counter', ticketCounter);
+  const nro = incrementTicketCounter();
 
-  pendientes.push({
+  addPendiente({
     nro:              nro,
     obs:              mesaNombre || (tipo === 'delivery' ? 'Delivery' : 'Para llevar'),
     cart:             JSON.parse(JSON.stringify(cart)),
@@ -4386,10 +4386,9 @@ async function sateliteEnviarPedido(){
   toast('Pedido #' + String(nro).padStart(4, '0') + ' enviado · ' + mesaMsg + syncMsg);
 
   // ── Limpiar estado para próximo pedido ───────────────────────────────────
-  cart             = [];
-  currentTicketNro = null;
-  mesaActual       = null;
-  tipoPedido       = 'llevar';
+  clearCart();
+  setCurrentTicketNro(null);
+  clearMesaActual();
   setTipoPedido('llevar');
   updMesaBtn();
   updUI();
@@ -5635,7 +5634,7 @@ function marcarPedidoSateliteCobrado(pedidoId){
   .catch(function(e){ console.warn('[CajaSync] Error marcando cobrado:', e.message); });
 
   // Eliminar de pendientes[] local inmediatamente (no esperar a Supabase)
-  pendientes = pendientes.filter(function(p){ return p.supabasePedidoId !== pedidoId; });
+  setPendientes(pendientes.filter(function(p){ return p.supabasePedidoId !== pedidoId; }));
   guardarPendientesLocal();
   updBtnGuardar();
   if(typeof renderMesasScreen === 'function') renderMesasScreen();
@@ -6199,12 +6198,12 @@ function descartarPendiente(i){
   if(!confirm('¿Descartar el ticket #'+String(t.nro).padStart(4,'0')+'? Se eliminará de la lista de pendientes.')) return;
   // Si es el ticket activo actualmente, limpiar carrito
   if(currentTicketNro === t.nro){
-    cart = [];
-    currentTicketNro = null;
+    clearCart();
+    setCurrentTicketNro(null);
     updUI();
     updBtnGuardar();
   }
-  pendientes.splice(i, 1);
+  removePendiente(i);
   try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){}
   toast('Ticket descartado');
   renderVentasList();
@@ -8755,9 +8754,9 @@ function cerrarSesion(){
 
   // ── Reset de variables en memoria ─────────────────────────────────────────
   // Sin esto, la sesión anterior quedaría en RAM aunque el localStorage esté limpio
-  if(typeof pendientes !== 'undefined') pendientes = [];
-  if(typeof cart !== 'undefined') cart = [];
-  if(typeof currentTicketNro !== 'undefined') currentTicketNro = null;
+  if(typeof pendientes !== 'undefined') setPendientes([]);
+  if(typeof cart !== 'undefined') clearCart();
+  if(typeof currentTicketNro !== 'undefined') setCurrentTicketNro(null);
   if(typeof turnoData !== 'undefined'){
     turnoData.fechaApertura   = null;
     turnoData.efectivoInicial = 0;
@@ -8767,7 +8766,7 @@ function cerrarSesion(){
     turnoData.supaId          = null;
     turnoData.dbId            = null;
   }
-  if(typeof mesaActual !== 'undefined') mesaActual = null;
+  if(typeof mesaActual !== 'undefined') clearMesaActual();
   if(typeof MODO_TERMINAL !== 'undefined') MODO_TERMINAL = 'caja';
 
   toast('Sesión cerrada — reconectando...');
@@ -11837,14 +11836,13 @@ async function iniciarApp(){
     if(rp){
       const sp = JSON.parse(rp);
       if(Array.isArray(sp) && sp.length > 0){
-        pendientes = sp.map(p => ({ ...p, cart: p.cart || p.items || [] }));
+        setPendientes(sp.map(p => ({ ...p, cart: p.cart || p.items || [] })));
         const mx = sp.reduce((m,p)=>Math.max(m, p.nro||0), 0);
-        if(mx >= ticketCounter) ticketCounter = mx + 1;
+        if(mx >= ticketCounter) setTicketCounter(mx + 1);
             }
     }
     const savedCounter = parseInt(localStorage.getItem('pos_ticket_counter')||'1');
-    if(savedCounter > ticketCounter) ticketCounter = savedCounter;
-    localStorage.setItem('pos_ticket_counter', ticketCounter);
+    if(savedCounter > ticketCounter) setTicketCounter(savedCounter);
     } catch(e){ console.warn('[App] Pendientes:', e.message); }
 
   // ── PASO 3: Restaurar turno ──────────────────────────────
@@ -12236,7 +12234,7 @@ async function cajaSyncPedidosSatelite(){
       };
     });
 
-    pendientes = locales.concat(satelites);
+    setPendientes(locales.concat(satelites));
     guardarPendientesLocal();
     updBtnGuardar();
 
@@ -12520,7 +12518,7 @@ async function sateliteVerificarCajaActiva(){
 let mesasSalones  = [];   // [{id, nombre, color, activo}]
 let mesasMesas    = [];   // [{id, salon_id, nombre, capacidad}]
 let mesaSalonSel  = null; // id del salón activo en la pantalla
-let mesaActual    = null; // {id, salon_id, nombre} — mesa asignada al ticket actual
+// mesaActual — declared in state.js
 
 // ── Cargar desde Supabase o IndexedDB (offline) ───────
 async function mesasCargar(){
@@ -12634,7 +12632,7 @@ function onMesaTap(mesaId){
 
   if(pend){
     // Mesa OCUPADA → cargar su ticket y volver al POS
-    mesaActual = mesa;
+    setMesaActual(mesa);
     cargarTicket(pendientes.indexOf(pend));  // cargarTicket ya hace goTo('scSale')
     setTipoPedido('local');
     updMesaBtn();
@@ -12644,7 +12642,7 @@ function onMesaTap(mesaId){
     // Mesa LIBRE → asignar al ticket actual (vaciar si había otro)
     if(mesaActual && mesaActual.id !== mesa.id){
       // Había otra mesa asignada sin guardar — limpiar
-      mesaActual = null;
+      clearMesaActual();
     }
     // Si hay carrito activo de otra fuente, preguntar
     if(cart.length > 0 && currentTicketNro === null){
@@ -12652,8 +12650,7 @@ function onMesaTap(mesaId){
         return;
       }
     }
-    mesaActual = mesa;
-    tipoPedido = 'local';
+    setMesaActual(mesa);
     setTipoPedido('local');
     updMesaBtn();
     updTabTicketHeader();
@@ -12680,10 +12677,9 @@ function guardarConMesa(){
       const mesaNombreUpd = mesaActual.nombre;
       guardarPendientesLocal();
       // Limpiar y volver a mesas
-      cart = [];
-      currentTicketNro = null;
-      mesaActual = null;
-      tipoPedido = 'llevar';
+      clearCart();
+      setCurrentTicketNro(null);
+      clearMesaActual();
       setTipoPedido('llevar');
       updMesaBtn();
       updUI();
@@ -12699,9 +12695,9 @@ function guardarConMesa(){
     }
   }
   // Crear nuevo pendiente
-  const nro = ticketCounter++; localStorage.setItem('pos_ticket_counter', ticketCounter);
+  const nro = incrementTicketCounter();
   const mesaNombre = mesaActual.nombre;
-  pendientes.push({
+  addPendiente({
     nro,
     obs:           obs,
     cart:          JSON.parse(JSON.stringify(cart)),
@@ -12713,10 +12709,9 @@ function guardarConMesa(){
   guardarPendientesLocal();
 
   // Limpiar carrito y mesa para nueva venta
-  cart = [];
-  currentTicketNro = null;
-  mesaActual = null;
-  tipoPedido = 'llevar';
+  clearCart();
+  setCurrentTicketNro(null);
+  clearMesaActual();
   setTipoPedido('llevar');
   updMesaBtn();
   updUI();
@@ -12755,7 +12750,7 @@ function updMesaBtn(){
 
 // ── Limpiar mesa al confirmar pago ────────────────────
 function mesaLimpiarAlPagar(){
-  mesaActual = null;
+  clearMesaActual();
   updMesaBtn();
 }
 
