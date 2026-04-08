@@ -3610,6 +3610,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="js/config.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/ventas.js"></script>
 <script src="js/cobro.js"></script>
@@ -11384,7 +11385,7 @@ const BTPrinter = {
 };
 
 
-const SUPA_URL    = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
+// SUPA_URL y SUPA_ANON vienen de js/config.js
 const APP_VERSION = 'v1.9.0 (2026-04-08)';
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -11413,7 +11414,7 @@ const APP_VERSION = 'v1.9.0 (2026-04-08)';
 //   - Todo lo demás (catálogo, mesas, delivery, carrito) → sin cambios
 // ══════════════════════════════════════════════════════════════════════════════
 let MODO_TERMINAL = localStorage.getItem('pos_modo_terminal') || 'caja';
-const SUPA_ANON   = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
+// SUPA_ANON ahora en js/config.js
 
 async function supaRPC(fn, params){
   const url = SUPA_URL + '/rest/v1/rpc/' + fn;

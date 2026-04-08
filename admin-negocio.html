@@ -377,6 +377,7 @@ tr:last-child td{border-bottom:none;}
 
 <div class="toast" id="toast"></div>
 
+<script src="js/config.js"></script>
 <script>
 function toggleAdminTheme(){
   var current = document.documentElement.getAttribute('data-theme') || 'dark';
@@ -400,9 +401,7 @@ function applyAdminTheme(){
   if(sbBtn) sbBtn.textContent = icon;
 }
 
-// ── CREDENCIALES ──────────────────────────────────────────
-const SUPA_URL  = 'https://kmreiniqgcvqgdtzvmel.supabase.co';
-const SUPA_ANON = 'sb_publishable_j6btNHo1o3tSprmYUJITPw_8AsYgcvJ';
+// ── CREDENCIALES vienen de js/config.js ──
 const TIM_KEY   = 'pos_timbrados';
 
 let SE=null, SP=null, SV=null, SLI=null, curPage='dashboard';
