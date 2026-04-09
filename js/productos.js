@@ -163,7 +163,7 @@ function guardarDescuentosConfig(){
       clave: 'descuentos_config',
       valor: JSON.stringify(DESCUENTOS)
     }, 'licencia_email,clave')
-  .catch(e=>console.warn('[Desc] No se pudo guardar en Supabase:', e.message));
+  .catch(e=>{ console.warn('[Desc] No se pudo guardar en Supabase:', e.message); toast('Error al guardar descuento en la nube'); });
 }
 
 async function cargarDescuentosConfig(){
@@ -443,7 +443,7 @@ async function cropConfirmar(){
           }
         });
         // Limpiar cache local de la imagen anterior
-        if(db) try { await db.config.delete('img_cache_'+imgAnterior); } catch(e){}
+        if(db) try { await db.config.delete('img_cache_'+imgAnterior); } catch(e){/* IndexedDB cache cleanup — no afecta funcionalidad */}
         console.log('[Imagen] Anterior eliminada:', oldPath);
       } catch(ed){ console.warn('[Imagen] Error borrando anterior:', ed.message); }
     }
@@ -473,7 +473,7 @@ async function cropConfirmar(){
       try {
         await db.config.put({ clave:'img_cache_'+publicUrl, valor: previewUrl });
         console.log('[Imagen] Cacheada en IndexedDB');
-      } catch(e){}
+      } catch(e){/* IndexedDB cache write — no afecta funcionalidad */}
     }
     console.log('[Imagen] Subida OK:', publicUrl);
     toast('✅ Imagen guardada');
@@ -538,10 +538,10 @@ async function quitarImagen(){
         method: 'DELETE',
         headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer '+SUPA_ANON }
       });
-      if(db) try { await db.config.delete('img_cache_'+imgAnterior); } catch(e){}
+      if(db) try { await db.config.delete('img_cache_'+imgAnterior); } catch(e){/* IndexedDB cache cleanup — no afecta funcionalidad */}
       console.log('[Imagen] Eliminada del Storage:', oldPath);
       toast('🗑 Imagen eliminada');
-    } catch(e){ console.warn('[Imagen] Error borrando:', e.message); }
+    } catch(e){ console.warn('[Imagen] Error borrando:', e.message); toast('Error al eliminar imagen'); }
   }
   window._artImagenAnterior = null;
   artImagenBase64 = ''; // string vacío = borrar imagen (distinto de null = no cambiar)
@@ -670,7 +670,7 @@ async function reactivarArticulo(prodIdx){
         'id=eq.'+p.id+'&licencia_email=eq.'+encodeURIComponent(email),
         {activo:true}, true);
       console.log('[Producto] Reactivado OK:', p.name);
-    } catch(e){ console.warn('[Producto] Sin conexión:', e.message); }
+    } catch(e){ console.warn('[Producto] Sin conexión:', e.message); toast('Error al reactivar producto en la nube'); }
   }
 
   filterP();
@@ -856,7 +856,7 @@ async function eliminarArticulo(){
         'id=eq.'+prod.id+'&licencia_email=eq.'+encodeURIComponent(email),
         {activo:false}, true);
       console.log('[Producto] Desactivado OK:', prod.name);
-    } catch(e){ console.warn('[Producto] Sin conexión:', e.message); }
+    } catch(e){ console.warn('[Producto] Sin conexión:', e.message); toast('Error al desactivar producto en la nube'); }
   }
 
   filterP();

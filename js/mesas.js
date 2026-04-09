@@ -44,14 +44,14 @@ async function mesasCargar(){
         console.log('[Mesas] Cacheadas en IndexedDB:', mesasSalones.length, 'salones,', mesasMesas.length, 'mesas');
       }catch(e){ console.warn('[Mesas] Error cacheando:', e.message); }
     }
-  }catch(e){ console.warn('[Mesas] Error cargando:', e.message); }
+  }catch(e){ console.warn('[Mesas] Error cargando:', e.message); toast('Error al cargar mesas'); }
 }
 
 // ── Abrir pantalla mesas ──────────────────────────────
 async function abrirPantallaMesas(){
   // Sync de pedidos satélite antes de mostrar las mesas
   // para que las mesas ocupadas (rojo) reflejen el estado real de Supabase
-  cajaSyncPedidosSatelite().catch(function(){});
+  cajaSyncPedidosSatelite().catch(function(e){ console.warn('[Mesas] Error sincronizando pedidos satélite:', e.message); });
   await mesasCargar();
   if(mesasSalones.length === 0){
     const ok = confirm('No hay salones configurados. ¿Deseas crear uno ahora?');
@@ -366,7 +366,7 @@ async function guardarSalon(salonId){
         const ld = await supaGet('licencias',
           'email_cliente=ilike.'+encodeURIComponent(email)+'&activa=eq.true&select=id&limit=1');
         if(ld&&ld[0]){ licId=ld[0].id; localStorage.setItem('ali',String(licId)); }
-      }catch(e){}
+      }catch(e){ console.warn('[Mesas] Error recuperando licencia:', e.message); }
     }
   }
   if(!licId){ toast('Error: sin licencia configurada'); return; }
@@ -400,7 +400,7 @@ async function guardarSalon(salonId){
         }
         try {
           await supaPost('pos_mesas', mesasPayload, null, true);
-        } catch(em){ console.warn('[Mesas] Error creando mesas:', em.message); }
+        } catch(em){ console.warn('[Mesas] Error creando mesas:', em.message); toast('Error al crear mesas automáticas'); }
       }
     }
     await mesasCargar();

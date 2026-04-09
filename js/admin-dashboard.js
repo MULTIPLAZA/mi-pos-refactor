@@ -126,7 +126,7 @@ function setFD(f,b){
 }
 
 var _dashCharts={};
-function _destroyChart(id){ if(_dashCharts[id]){try{_dashCharts[id].destroy();}catch(e){} delete _dashCharts[id];} }
+function _destroyChart(id){ if(_dashCharts[id]){try{_dashCharts[id].destroy();}catch(e){/* chart already destroyed */} delete _dashCharts[id];} }
 function _mkChart(id,cfg){ _destroyChart(id); var el=document.getElementById(id); if(!el)return; _dashCharts[id]=new Chart(el,cfg); return _dashCharts[id]; }
 function _isDark(){ return !document.documentElement.hasAttribute('data-theme')||document.documentElement.getAttribute('data-theme')==='dark'; }
 
@@ -212,7 +212,7 @@ async function loadDashData(f){
           if(!prodsMap[nom]) prodsMap[nom]={tot:0,qty:0,cat:cat};
           prodsMap[nom].tot+=sub; prodsMap[nom].qty+=qty;
         });
-      }catch(e){}
+      }catch(e){ console.warn('[Dash] Error parseando items venta:', e.message); }
     });
 
     // Gráfico categorías — donut con %
@@ -306,7 +306,7 @@ async function loadDashData(f){
     // Heatmap
     if(!_dashCharts['_heatDone']) await _renderHeatmap(hoy,fmt,p2,textColor);
 
-  }catch(e){ console.warn('[Dash]',e.message); }
+  }catch(e){ toast('Error al cargar dashboard'); console.warn('[Dash]',e.message); }
 }
 
 async function _render7Dias(hoy,fmt,p2,textColor,gridColor,fontFam){
@@ -335,7 +335,7 @@ async function _render7Dias(hoy,fmt,p2,textColor,gridColor,fontFam){
         items.forEach(function(it){
           if(!it.esDescuento) costos[diffDays]+=(it.costo||0)*(it.qty||1);
         });
-      }catch(e){}
+      }catch(e){ console.warn('[Dash] Error parseando items 7dias:', e.message); }
     }
   });
   var utilidad=totales.map(function(t,i){return Math.max(0,t-costos[i]);});
@@ -409,7 +409,7 @@ async function _renderInsights(hoy,fmt,p2){
     }
     if($$('horaMasActiva')) $$('horaMasActiva').textContent=p2(maxHrIdx)+':00';
     if($$('horaMasActivaSub')) $$('horaMasActivaSub').textContent='Prom. \u20B2'+gs(Math.round(maxHr))+' por hora';
-  }catch(e){ console.warn('[Insights]',e.message); }
+  }catch(e){ toast('Error al cargar insights'); console.warn('[Insights]',e.message); }
 }
 
 async function _renderComprasGastos(fd){
@@ -418,7 +418,7 @@ async function _renderComprasGastos(fd){
   // Obtener licencia_id
   var licId=SLI;
   if(!licId){
-    try{ licId=(await sg('licencias','email_cliente=ilike.'+encodeURIComponent(SE)+'&activa=eq.true&select=id&limit=1'))[0].id; SLI=licId; }catch(e){}
+    try{ licId=(await sg('licencias','email_cliente=ilike.'+encodeURIComponent(SE)+'&activa=eq.true&select=id&limit=1'))[0].id; SLI=licId; }catch(e){ console.warn('[Dash] Error obteniendo licencia:', e.message); }
   }
 
   var _card=function(tot,cnt,rows,tipo){
@@ -602,14 +602,14 @@ function renderVT(v){
   var mb=function(m){var u=(m||'').toUpperCase();return u==='EFECTIVO'?'<span class="tag tag-g">EF</span>':u==='POS'?'<span class="tag tag-b">POS</span>':'<span class="tag tag-o">TR</span>';};
   var tipoTag=function(x){
     var tieneF=x.tiene_factura||false;
-    try{ if(x.factura){ var fac=typeof x.factura==='string'?JSON.parse(x.factura):x.factura; if(fac&&fac.nro_factura) tieneF=true; } }catch(e){}
+    try{ if(x.factura){ var fac=typeof x.factura==='string'?JSON.parse(x.factura):x.factura; if(fac&&fac.nro_factura) tieneF=true; } }catch(e){ console.warn('[Ventas] Error parseando factura:', e.message); }
     return tieneF?'<span class="tag tag-b" style="font-size:10px;">FACTURA</span>':'<span class="tag tag-gr" style="font-size:10px;">TICKET</span>';
   };
   var detalleHtml=function(x){
     var items=[];
-    try{ items=typeof x.items==='string'?JSON.parse(x.items):(x.items||[]); }catch(e){}
+    try{ items=typeof x.items==='string'?JSON.parse(x.items):(x.items||[]); }catch(e){ console.warn('[Ventas] Error parseando items:', e.message); }
     var factura=null;
-    try{ factura=x.factura?(typeof x.factura==='string'?JSON.parse(x.factura):x.factura):null; }catch(e){}
+    try{ factura=x.factura?(typeof x.factura==='string'?JSON.parse(x.factura):x.factura):null; }catch(e){ console.warn('[Ventas] Error parseando factura detalle:', e.message); }
     return '<tr id="det_'+x.id+'" style="display:none;"><td colspan="6" style="padding:0;background:var(--card2);">'+
       '<div style="padding:14px;border-top:2px solid var(--green);">'+
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px;">'+
@@ -723,7 +723,7 @@ async function renderTerminales(){
 async function renderCajas(){
   document.getElementById('content').innerHTML='<div class="ph"><div><div class="pt">Cajas / Turnos</div><div class="ps">Control por terminal</div></div><div class="dbar"><button class="dbtn on" onclick="filtrCj(\'todas\',this)">Todas</button><button class="dbtn" onclick="filtrCj(\'abiertas\',this)">Abiertas</button><button class="dbtn" onclick="filtrCj(\'cerradas\',this)">Cerradas</button></div></div><div class="kg k3"><div class="kc" style="--c:var(--green)"><div class="kc-l">Abiertas</div><div class="kc-v" id="cjA">—</div></div><div class="kc" style="--c:var(--orange)"><div class="kc-l">Cerradas hoy</div><div class="kc-v" id="cjC">—</div></div><div class="kc" style="--c:var(--blue)"><div class="kc-l">Recaudado hoy</div><div class="kc-v" id="cjT">₲0</div></div></div><div id="cajasBody"><div class="loading"><span class="sp"></span>Cargando...</div></div>';
   try{allCjs=await sg('pos_turno','licencia_email=ilike.'+encodeURIComponent(SE)+'&order=fecha_apertura.desc&limit=100');}
-  catch(e){allCjs=[];}
+  catch(e){ toast('Error al cargar cajas'); console.warn('[Cajas]', e.message); allCjs=[]; }
   renderCajasData();
 }
 
@@ -743,7 +743,7 @@ function renderCajasData(){
     if(c.fecha_apertura&&c.fecha_cierre){var ms=new Date(c.fecha_cierre)-new Date(c.fecha_apertura);durTxt=Math.floor(ms/3600000)+'h '+Math.floor((ms%3600000)/60000)+'m';}
     else if(c.fecha_apertura&&ab){var ms2=Date.now()-new Date(c.fecha_apertura);durTxt=Math.floor(ms2/3600000)+'h '+Math.floor((ms2%3600000)/60000)+'m (en curso)';}
     var pagos='';
-    if(c.resumen_pagos){try{var rp=typeof c.resumen_pagos==='string'?JSON.parse(c.resumen_pagos):c.resumen_pagos;pagos=Object.keys(rp).map(function(k){return '<div class="cj-dr"><span style="color:var(--muted)">'+k+'</span><span style="font-weight:600">'+gs(rp[k])+'</span></div>';}).join('');}catch(ex){}}
+    if(c.resumen_pagos){try{var rp=typeof c.resumen_pagos==='string'?JSON.parse(c.resumen_pagos):c.resumen_pagos;pagos=Object.keys(rp).map(function(k){return '<div class="cj-dr"><span style="color:var(--muted)">'+k+'</span><span style="font-weight:600">'+gs(rp[k])+'</span></div>';}).join('');}catch(ex){ console.warn('[Cajas] Error parseando resumen_pagos:', ex.message); }}
     if(!pagos){if(c.total_efectivo!=null)pagos+='<div class="cj-dr"><span style="color:var(--muted)">Efectivo</span><span style="font-weight:600">'+gs(c.total_efectivo)+'</span></div>';if(c.total_tarjeta!=null)pagos+='<div class="cj-dr"><span style="color:var(--muted)">Tarjeta/POS</span><span style="font-weight:600">'+gs(c.total_tarjeta)+'</span></div>';if(c.total_transfer!=null)pagos+='<div class="cj-dr"><span style="color:var(--muted)">Transferencia</span><span style="font-weight:600">'+gs(c.total_transfer)+'</span></div>';}
     var difHTML='';
     if(!ab&&c.efectivo_inicial!=null&&c.total_efectivo!=null&&c.efectivo_cierre!=null){var esp=(c.efectivo_inicial||0)+(c.total_efectivo||0),dif=(c.efectivo_cierre||0)-esp,dc=dif===0?'var(--muted)':dif>0?'var(--green)':'var(--red)';difHTML='<div class="cj-dr"><span style="color:var(--muted)">Esperado</span><span>'+gs(esp)+'</span></div><div class="cj-dr"><span style="color:var(--muted)">Al cierre</span><span>'+gs(c.efectivo_cierre)+'</span></div><div class="cj-dr"><span style="color:var(--muted)">Diferencia</span><span style="font-weight:700;color:'+dc+'">'+(dif>=0?'+':'')+gs(dif)+'</span></div>';}

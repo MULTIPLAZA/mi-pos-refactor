@@ -72,7 +72,7 @@ function licGetDeviceId(){
   cookieSet('pos_device_id', id, 365); // cookie dura 1 año
   sessionStorage.setItem(SK.deviceId, id);
   if(typeof db !== 'undefined' && db){
-    try { db.config.put({key:'device_id', value:id}); } catch(e){}
+    try { db.config.put({key:'device_id', value:id}); } catch(e){ console.warn('[licencia] Error persistiendo device_id en IndexedDB:', e.message); }
   }
   return id;
 }
@@ -102,7 +102,7 @@ async function licGetDeviceIdAsync(){
         return id;
       }
     }
-  } catch(e){}
+  } catch(e){ console.warn('[licencia] Error leyendo device_id de IndexedDB:', e.message); }
 
   // 3. No ID found anywhere — generate a NEW unique one for THIS device
   const rand = typeof crypto !== 'undefined' && crypto.randomUUID
@@ -114,7 +114,7 @@ async function licGetDeviceIdAsync(){
   localStorage.setItem(SK.deviceId, id);
   sessionStorage.setItem(SK.deviceId, id);
   if(typeof db !== 'undefined' && db){
-    try { db.config.put({key:'device_id', value:id}); } catch(e){}
+    try { db.config.put({key:'device_id', value:id}); } catch(e){ console.warn('[licencia] Error persistiendo device_id en IndexedDB:', e.message); }
   }
   return id;
 }
@@ -270,7 +270,7 @@ async function licInit(){
         }catch(e){ console.warn('[licInit] No se pudo recuperar config:', e.message); }
       }
     } else {
-      licCheckPeriodico().catch(()=>{});
+      licCheckPeriodico().catch(function(e){ console.warn('[Licencia] Error en check periódico:', e.message); });
     }
     return true;
   }
@@ -339,7 +339,7 @@ async function licInit(){
               try{
                 const cfg = await recuperarConfigTerminalSupabase();
                 if(cfg) aplicarConfigTerminal(cfg);
-              }catch(e){}
+              }catch(e){ console.warn('[licInit] Error recuperando config terminal:', e.message); }
 
               recuperado = true;
               console.log('[licInit] ✓ Sesión restaurada automáticamente — sin re-registro');
@@ -523,13 +523,13 @@ async function doEntrar(){
           console.log('[Setup] Sucursal ID:', result.sucursal_id, '| Depósito ID:', result.deposito_id);
         }
       }
-    } catch(e){ console.log('Setup Supabase:', e.message); }
+    } catch(e){ console.warn('[Setup Supabase]', e.message); toast('Error al configurar en servidor: '+e.message); }
   }
 
   await licGetDeviceIdAsync();
   await guardarConfigTerminalSupabase({negocio, terminal, sucursal, deposito});
   if(typeof db!=='undefined'&&db){
-    try{await db.config.put({key:'terminal_cfg',value:JSON.stringify({negocio,terminal,sucursal,deposito})});}catch(e){}
+    try{await db.config.put({key:'terminal_cfg',value:JSON.stringify({negocio,terminal,sucursal,deposito})});}catch(e){ console.warn('[licencia] Error guardando config en IndexedDB:', e.message); }
   }
   document.getElementById('scActivado').style.display='none';
   await iniciarApp();

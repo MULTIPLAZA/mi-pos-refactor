@@ -354,7 +354,7 @@ async function doOpenShift(){
   // Esperar a que IndexedDB asigne el dbId ANTES de guardar en localStorage
   // para que turnoData.dbId quede persistido correctamente
   if(db){
-    try { await dbAbrirTurno(v); } catch(e){}
+    try { await dbAbrirTurno(v); } catch(e){ console.warn('[Turno] Error al abrir turno en IndexedDB:', e.message); }
   }
   // Persistir en localStorage DESPUÉS de tener el dbId
   turnoGuardar();
@@ -422,7 +422,7 @@ async function obtenerFechaServidor(){
 // Sincronizar el offset al arrancar (background, sin bloquear)
 function sincronizarFechaServidor(){
   _serverOffsetOk = false; // forzar recálculo
-  obtenerFechaServidor().catch(function(){});
+  obtenerFechaServidor().catch(function(e){ console.warn('[FechaServidor] Error en sincronización background:', e.message); });
 }
 
 function supaInsertTurno(estado, efectivoInicial){
@@ -716,7 +716,7 @@ function mostrarPreviewRecibo(html, size){
     try {
       const h = iframe.contentDocument.body.scrollHeight;
       iframe.style.height = (h+10)+'px';
-    } catch(e){}
+    } catch(e){ /* safe to ignore: optional iframe auto-height */ }
   }, 200);
 }
 
@@ -1025,7 +1025,7 @@ async function confirmarCierre(){
   var doc = iframeCierre.contentWindow.document;
   doc.open(); doc.write(cierreTicketHTML); doc.close();
   setTimeout(function(){
-    try{ iframeCierre.style.height = (iframeCierre.contentWindow.document.body.scrollHeight+20)+'px'; }catch(e){}
+    try{ iframeCierre.style.height = (iframeCierre.contentWindow.document.body.scrollHeight+20)+'px'; }catch(e){ /* safe to ignore: optional iframe auto-height */ }
   }, 200);
   // Guardar datos para buildCierreBTPS ANTES de limpiar turnoData
   cierreData = {
@@ -1853,7 +1853,7 @@ async function imprimirPCUSB(htmlContent, size){
   try {
     var ports=await navigator.serial.getPorts();
     if(ports&&ports.length>0) serialPort=ports[0];
-  } catch(e){}
+  } catch(e){ /* safe to ignore: Web Serial API may not be available */ }
 
   if(serialPort){
     try{

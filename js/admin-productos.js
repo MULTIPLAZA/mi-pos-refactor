@@ -370,7 +370,7 @@ async function impConfirmar(){
 
   _imp.rows=[];
   if(btn){btn.disabled=false;btn.textContent='Importar ahora';}
-  try{allPrds=await sg('pos_productos','licencia_email=ilike.'+encodeURIComponent(SE)+'&activo=eq.true&order=nombre.asc&limit=500');}catch(e){}
+  try{allPrds=await sg('pos_productos','licencia_email=ilike.'+encodeURIComponent(SE)+'&activo=eq.true&order=nombre.asc&limit=500');}catch(e){ console.warn('[Import] Error recargando productos:', e.message); }
 }
 
 async function renderProductos(){

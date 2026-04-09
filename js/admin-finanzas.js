@@ -151,10 +151,10 @@ async function renderGastos(tab){
   var c=document.getElementById('content');
   c.innerHTML='<div class="loading"><span class="sp"></span>Cargando...</div>';
   if(!_gastosLicId){
-    try{ _gastosLicId=SLI||(await sg('licencias','email_cliente=ilike.'+encodeURIComponent(SE)+'&activa=eq.true&select=id&limit=1'))[0].id; }catch(e){}
+    try{ _gastosLicId=SLI||(await sg('licencias','email_cliente=ilike.'+encodeURIComponent(SE)+'&activa=eq.true&select=id&limit=1'))[0].id; }catch(e){ console.warn('[Gastos] Error obteniendo licencia:', e.message); }
   }
   _plan.licId=_gastosLicId;
-  if(!_plan.cats.length) await planCargar().catch(function(){});
+  if(!_plan.cats.length) await planCargar().catch(function(e){ console.warn('[Gastos] Error cargando plan:', e.message); });
 
   var tabs='<div class="admin-tabs">'
     +'<button class="atab'+(tab==='lista'?' on':'')+'" onclick="renderGastos(&apos;lista&apos;)">📋 Listado</button>'
@@ -337,7 +337,7 @@ async function renderBalance(){
   c.innerHTML='<div class="loading"><span class="sp"></span>Cargando...</div>';
   var licId=SLI||(await sg('licencias','email_cliente=ilike.'+encodeURIComponent(SE)+'&activa=eq.true&select=id&limit=1'))[0].id;
   _plan.licId=licId;
-  if(!_plan.cats.length) await planCargar().catch(function(){});
+  if(!_plan.cats.length) await planCargar().catch(function(e){ console.warn('[Gastos] Error cargando plan:', e.message); });
 
   var hoy=new Date(), d1=new Date(hoy.getFullYear(),hoy.getMonth(),1);
   var fdDef=d1.getFullYear()+'-'+pad(d1.getMonth()+1)+'-'+pad(d1.getDate());
@@ -399,7 +399,7 @@ async function balanceBuscar(licId){
     ventas.forEach(function(v){
       ventaBruta+=(v.total||0);
       var items=[];
-      try{ items=typeof v.items==='string'?JSON.parse(v.items):(v.items||[]); }catch(e){}
+      try{ items=typeof v.items==='string'?JSON.parse(v.items):(v.items||[]); }catch(e){ console.warn('[Balance] Error parseando items:', e.message); }
       items.forEach(function(it){
         costoVentas+=(costoMap[it.id]||0)*(parseFloat(it.qty)||1);
       });
@@ -497,7 +497,7 @@ async function balanceBuscar(licId){
           +'&periodo=gte.'+fd.substring(0,7)
           +'&select=iva_pagar,iva_favor,debito_total,credito_total,periodo&limit=1');
         if(ivaRows&&ivaRows.length) ivaData=ivaRows[0];
-      }catch(e){}
+      }catch(e){ console.warn('[Balance] Error cargando IVA:', e.message); }
       var utilidadAntesIva=utilidadNeta;
       var ivaAPagar=ivaData?Math.round(ivaData.iva_pagar||0):null;
       var utilidadFinal=ivaAPagar!==null?utilidadNeta-ivaAPagar:utilidadNeta;
@@ -713,7 +713,7 @@ async function renderIVA(){
     );
     _iva.prodMap={};
     prds.forEach(function(p){ _iva.prodMap[p.id]=p.iva||'10'; });
-  }catch(e){ _iva.prodMap={}; }
+  }catch(e){ console.warn('[IVA] Error cargando productos:', e.message); _iva.prodMap={}; }
 
   // Período default: mes actual
   var hoy=new Date();
@@ -721,7 +721,7 @@ async function renderIVA(){
 
   // Historial de liquidaciones
   var historial=[];
-  try{ historial=await sg('iva_liquidaciones','licencia_id=eq.'+licId+'&order=periodo.desc&limit=24'); }catch(e){}
+  try{ historial=await sg('iva_liquidaciones','licencia_id=eq.'+licId+'&order=periodo.desc&limit=24'); }catch(e){ console.warn('[IVA] Error cargando historial:', e.message); }
 
   c.innerHTML=
     '<div class="ph"><div><div class="pt">Liquidación de IVA</div>'
@@ -771,7 +771,7 @@ async function ivaCalcular(){
     var venta10=0, venta5=0, ventaExenta=0;
     ventas.forEach(function(v){
       var items=[];
-      try{ items=typeof v.items==='string'?JSON.parse(v.items):(v.items||[]); }catch(e){}
+      try{ items=typeof v.items==='string'?JSON.parse(v.items):(v.items||[]); }catch(e){ console.warn('[IVA] Error parseando items:', e.message); }
       items.forEach(function(it){
         var qty=parseFloat(it.qty)||1;
         var precio=parseFloat(it.precio||it.price)||0;
@@ -863,7 +863,7 @@ async function ivaCalcular(){
         var r=await supaPost('iva_liquidaciones',data,null);
         data.id=Array.isArray(r)?r[0].id:r.id;
       }
-    }catch(e){ console.warn('[IVA] save error:', e.message); }
+    }catch(e){ toast('Error al guardar liquidación IVA'); console.warn('[IVA] save error:', e.message); }
 
     ivaRenderResultado(data);
 
@@ -982,7 +982,7 @@ async function testConexion(){
     await sg('licencias','limit=1'); console.log('[Supabase] Conectividad OK');
     await sg('timbrados','limit=1'); console.log('[Supabase] timbrados OK');
     await sg('timbrado_terminales','limit=1'); console.log('[Supabase] timbrado_terminales OK');
-  }catch(e){console.error('[Supabase] Error:', e.message);}
+  }catch(e){console.warn('[Supabase] Error:', e.message);}
 }
 
 async function cargarTimbradosDesdeSupabase(){
@@ -1009,7 +1009,7 @@ async function cargarTimbradosDesdeSupabase(){
     localStorage.setItem('pos_timbrados_mapa',JSON.stringify(mapa));
     console.log('[Carga] OK:',timbrados.length,'timbrados,',timbrados.reduce(function(s,t){return s+(t.asignaciones||[]).length;},0),'terminales');
   }catch(e){
-    console.warn('[Carga] Error:',e.message);
+    toast('Error al cargar timbrados'); console.warn('[Carga] Error:',e.message);
     try{timbrados=JSON.parse(localStorage.getItem(TIM_KEY)||'[]');}catch(e2){timbrados=[];}
   }
 }

@@ -180,7 +180,7 @@ async function iniciarApp(){
         supaLoadCategorias(),
         supaLoadProductos(),
       ]);
-    } catch(e){ console.warn('[App] Carga Supabase:', e.message); }
+    } catch(e){ console.warn('[App] Carga Supabase:', e.message); toast('Error al cargar datos de la nube'); }
   }
 
   // ── PASO 5: Sync background ───────────────────────────────
@@ -337,7 +337,7 @@ function guardarDepositoId(){
     deposito:    localStorage.getItem('pos_deposito')||'',
     sucursal_id: sucId || localStorage.getItem('pos_sucursal_id'),
     deposito_id: depId,
-  }).catch(()=>{});
+  }).catch(e=>{ console.warn('[Terminal] Error guardando config en Supabase:', e && e.message); });
   toast('✓ Depósito ID '+depId+' guardado');
   renderGeneralInfo();
 }
@@ -480,7 +480,7 @@ async function renderVentasList(){
         // Ordenar por fecha descendente
         ventas = byTurno.sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
       }
-    } catch(e){ ventas = []; }
+    } catch(e){ console.warn('[Turno] Error cargando ventas:', e.message); ventas = []; }
   }
 
   const activas   = ventas.filter(v => !v.anulada || v.anulada === 0);
@@ -522,7 +522,7 @@ async function renderVentasList(){
     const anulada = !!v.anulada;
     const fecha = v.fecha ? new Date(v.fecha).toLocaleString('es-PY',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
     let items = [];
-    try { items = JSON.parse(v.items||'[]'); } catch(e){}
+    try { items = JSON.parse(v.items||'[]'); } catch(e){ /* safe to ignore: fallback to empty items */ }
     const metodo = (v.metodo_pago||'EFECTIVO').toUpperCase();
     const facturada = !!v.tiene_factura;
     const nroFact = v.factura ? (function(){ var _f = typeof v.factura==='string' ? JSON.parse(v.factura) : v.factura; return (_f && _f.nro_factura) || ''; })() : '';
@@ -842,7 +842,7 @@ async function reconstruirVentasTurno(){
         nroTicket:   v.nro_ticket || null,
         items:       (() => { try { return JSON.parse(v.items||'[]'); } catch(e){ return []; } })(),
       }));
-  } catch(e){ console.warn('[Turno] Error reconstruyendo ventas:', e.message); }
+  } catch(e){ console.warn('[Turno] Error reconstruyendo ventas:', e.message); toast('Error al cargar ventas del turno'); }
 }
 
 function toggleVentaCard(id){
@@ -862,15 +862,15 @@ function toggleVentaCard(id){
     await initDB();
     dbOk = true;
   } catch(e){
-    console.log('[DB] Error al iniciar:', e.message);
+    console.warn('[DB] Error al iniciar:', e.message);
   }
 
   // Lanzar licInit y carga de IndexedDB en paralelo
   const [ok] = await Promise.all([
     licInit(),
     dbOk ? Promise.all([
-      dbLoadCategorias().catch(e => console.log('[DB] Categorías:', e.message)),
-      dbLoadProductos().catch(e => console.log('[DB] Productos:', e.message)),
+      dbLoadCategorias().catch(e => console.warn('[DB] Categorías:', e.message)),
+      dbLoadProductos().catch(e => console.warn('[DB] Productos:', e.message)),
     ]) : Promise.resolve(),
   ]);
 

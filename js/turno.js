@@ -149,7 +149,7 @@ function supaInsertVenta(data){
       turnoData.ventas[turnoData.ventas.length - 1].dbId = dbId;
       turnoGuardar();
     }
-  }).catch(()=>{});
+  }).catch(function(e){ console.warn('[Turno] Error guardando dbId en IndexedDB:', e.message); });
 
   // Enviar a Supabase
   if(USAR_DEMO || !navigator.onLine){
@@ -294,7 +294,7 @@ async function syncVentasPendientes(){
         datos.licencia_email = email;
         await supaPost('pos_ventas', datos, null, true);
         await db.sync_queue.update(item.id, { sincronizado: 1 });
-      } catch(e){ break; } // sin internet, parar
+      } catch(e){ console.warn('[Sync ventas] Error sincronizando item:', e.message); break; }
     }
   } catch(e){ console.warn('[Sync ventas]', e.message); }
 }
@@ -450,7 +450,7 @@ function guardarEgreso(){
     dbSaveEgreso(egreso).then(dbId => {
       if(dbId) egreso.dbId = dbId;
       turnoGuardar();
-    }).catch(()=>{});
+    }).catch(function(e){ console.warn('[Turno] Error guardando egreso en IndexedDB:', e.message); });
   }
   document.getElementById('egresoModal').classList.remove('open');
   renderTurno();
@@ -462,7 +462,7 @@ async function emitirFacturaPostCobro(ventaId){
 
   // Validar timbrado primero
   let tims = [];
-  try { tims = JSON.parse(localStorage.getItem('pos_timbrados')||'[]'); } catch(e){}
+  try { tims = JSON.parse(localStorage.getItem('pos_timbrados')||'[]'); } catch(e){ /* safe: fallback to empty array */ }
   const hoy = new Date();
   const vigentes = tims.filter(t=>{
     if(t.tipo==='electronico') return true;
@@ -608,7 +608,7 @@ async function fpConfirmar(ventaId){
 function marcarPresupuesto(idx, esPresupuesto){
   if(!pendientes[idx]) return;
   pendientes[idx].esPresupuesto = !!esPresupuesto;
-  try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){}
+  try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){ /* safe: pendientes persist best-effort */ }
   toast(esPresupuesto ? '📋 Ticket marcado como presupuesto' : '⏱ Ticket marcado como pendiente');
   // Si el modal de cierre de turno está abierto, refrescarlo
   const modalAbierto = !!document.getElementById('pendCierreOv');
@@ -759,7 +759,7 @@ function descartarPendiente(i){
     updBtnGuardar();
   }
   removePendiente(i);
-  try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){}
+  try{ localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); }catch(e){ /* safe: pendientes persist best-effort */ }
   toast('Ticket descartado');
   renderVentasList();
 }

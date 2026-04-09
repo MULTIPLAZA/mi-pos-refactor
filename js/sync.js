@@ -81,7 +81,7 @@ async function dbLoadConfig(){
     }
     if(terminal) configData.terminal = terminal;
     console.log('[DB] Config cargada');
-  } catch(e){ console.log('[DB] Config no disponible aún'); }
+  } catch(e){ console.warn('[DB] Config no disponible aún:', e.message); }
 }
 
 async function dbSaveConfigAll(){
@@ -163,7 +163,7 @@ async function dbLoadProductos(){
     curCat = 'Todos los artículos';
     const lbl2 = document.getElementById('catLbl');
     if(lbl2) lbl2.textContent = 'Todos los artículos';
-  } catch(e){ console.log('[DB] Productos no disponibles aún'); }
+  } catch(e){ console.warn('[DB] Productos no disponibles aún:', e.message); }
 }
 
 // ── CATEGORÍAS ────────────────────────────────────────────
@@ -188,7 +188,7 @@ async function dbLoadCategorias(){
     CATEGORIAS_DEFAULT.length = 0;
     CATEGORIAS.forEach(c => CATEGORIAS_DEFAULT.push(c.nombre));
     console.log('[DB] Categorias cargadas:', CATEGORIAS.length);
-  } catch(e){ console.log('[DB] Categorias no disponibles aún'); }
+  } catch(e){ console.warn('[DB] Categorias no disponibles aún:', e.message); }
 }
 
 // ── VENTAS ────────────────────────────────────────────────
@@ -286,7 +286,7 @@ let syncEnProceso = false;
 async function syncConSupabase(){
   if(syncEnProceso || !navigator.onLine) return;
   if(typeof SUPA_URL === 'undefined' || SUPA_URL.includes('XXXX')) return;
-  if(!db){ console.log('[Sync] Sin BD local, omitiendo sync'); return; }
+  if(!db){ console.warn('[Sync] Sin BD local, omitiendo sync'); return; }
 
   syncEnProceso = true;
   try {
@@ -318,7 +318,7 @@ async function syncConSupabase(){
           try {
             const inserted = await res.clone().json();
             if(inserted && inserted[0]) supaId = inserted[0].id;
-          } catch(e){}
+          } catch(e){ /* safe to ignore: optional ID extraction from response */ }
         }
 
         await db.sync_queue.update(item.id, { sincronizado: 1, error_msg: null });
@@ -337,12 +337,12 @@ async function syncConSupabase(){
                 vd.turno_id = supaId;
                 await db.sync_queue.update(v.id, { datos: JSON.stringify(vd) });
               }
-            } catch(e){}
+            } catch(e){ console.warn('[Sync] Error actualizando turno_id en item pendiente:', e.message); }
           }
           console.log('[Sync] turno_id actualizado en ventas pendientes: local', localTurnoId, '→ supa', supaId);
         }
       } catch(e){
-        console.log('[Sync] Error en item', item.id, e.message);
+        console.warn('[Sync] Error en item', item.id, e.message);
         const esErrorRed     = e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('ERR_INTERNET') || !navigator.onLine;
         const esDuplicado    = e.message.includes('23505') || e.message.includes('duplicate key') || e.message.includes('409');
 
@@ -378,7 +378,7 @@ async function syncConSupabase(){
     await limpiarSyncQueue();
     updSyncBadge();
   } catch(e){
-    console.log('[Sync] Error general:', e.message);
+    console.warn('[Sync] Error general:', e.message);
   }
   syncEnProceso = false;
 }
@@ -491,7 +491,7 @@ async function renderSyncPanel(){
       pendientes    = await db.sync_queue.where('sincronizado').equals(0).count();
       errores       = await db.sync_queue.where('sincronizado').equals(2).count();
       sincronizados = await db.sync_queue.where('sincronizado').equals(1).count();
-    } catch(e){}
+    } catch(e){ /* safe to ignore: optional sync stats for UI panel */ }
   }
 
   let html = '';
@@ -527,7 +527,7 @@ async function renderSyncPanel(){
       const items = await db.sync_queue.where('sincronizado').equals(2).limit(20).toArray();
       items.forEach(item => {
         let datos = {};
-        try { datos = JSON.parse(item.datos); } catch(e){}
+        try { datos = JSON.parse(item.datos); } catch(e){ /* safe to ignore: fallback to empty datos */ }
         const fecha = item.timestamp ? new Date(item.timestamp).toLocaleString('es-PY') : '—';
         const total = datos.total ? gs(datos.total) : '';
         html += '<div class="sync-item-row error">';
@@ -549,7 +549,7 @@ async function renderSyncPanel(){
       const items = await db.sync_queue.where('sincronizado').equals(0).limit(20).toArray();
       items.forEach(item => {
         let datos = {};
-        try { datos = JSON.parse(item.datos); } catch(e){}
+        try { datos = JSON.parse(item.datos); } catch(e){ /* safe to ignore: fallback to empty datos */ }
         const fecha = item.timestamp ? new Date(item.timestamp).toLocaleString('es-PY') : '—';
         const total = datos.total ? gs(datos.total) : '';
         html += '<div class="sync-item-row pending">';
@@ -558,7 +558,7 @@ async function renderSyncPanel(){
         html += '</div>';
       });
       if(pendientes > 20) html += '<div style="text-align:center;font-size:12px;color:var(--muted);padding:8px;">...y ' + (pendientes - 20) + ' más</div>';
-    } catch(e){}
+    } catch(e){ /* safe to ignore: optional pending items UI rendering */ }
     html += '</div>';
   }
 

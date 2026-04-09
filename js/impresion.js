@@ -43,7 +43,7 @@ function mostrarPreviewRecibo(html, size){
     try {
       const h = iframe.contentDocument.body.scrollHeight;
       iframe.style.height = (h+10)+'px';
-    } catch(e){}
+    } catch(e){ /* safe: optional iframe auto-height */ }
   }, 200);
 }
 
@@ -92,7 +92,7 @@ function imprimirComandaActual(){
       const ticketIdx = pendientes.findIndex(p => p.nro === currentTicketNro);
       if(ticketIdx >= 0){
         pendientes[ticketIdx].cart = JSON.parse(JSON.stringify(cart));
-        try { localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); } catch(e){}
+        try { localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); } catch(e){ /* safe: pendientes persist best-effort */ }
       }
     }
   }
@@ -179,12 +179,12 @@ function abrirVentanaImpresion(html, size){
       };
       // Fallback si onload no dispara (algunos Android)
       setTimeout(function(){
-        try{ win.focus(); win.print(); }catch(e){}
+        try{ win.focus(); win.print(); }catch(e){ /* safe: fallback print attempt, may fail on some browsers */ }
         setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
       }, 1500);
       return;
     }
-  }catch(e){ console.warn('[Print] Blob falló:', e.message); }
+  }catch(e){ console.warn('[Print] Blob falló:', e.message); toast('Error de impresión: '+e.message); }
 
   // Método 2: iframe visible temporalmente — funciona cuando window.open bloqueado
   try{
@@ -208,7 +208,7 @@ function abrirVentanaImpresion(html, size){
       }
     }, 800);
     return;
-  }catch(e){ console.warn('[Print] iframe falló:', e.message); }
+  }catch(e){ console.warn('[Print] iframe falló:', e.message); toast('Error de impresión: '+e.message); }
 
   // Método 3 directo si todo falla
   _imprimirConCSSMedia(html, mmW);
@@ -704,6 +704,7 @@ function imprimirConQuickPrinter(html, size){
     return true;
   } catch(e){
     console.warn('[QuickPrinter]', e.message);
+    toast('Error de impresión: '+e.message);
     return false;
   }
 }
@@ -744,12 +745,12 @@ function imprimirDirecto(html, size){
         }, 500);
       };
       setTimeout(function(){
-        try{ win.print(); }catch(e){}
+        try{ win.print(); }catch(e){ /* safe: fallback print attempt */ }
         setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
       }, 2000);
       return;
     }
-  } catch(e){ console.warn('[Print] Blob falló:', e.message); }
+  } catch(e){ console.warn('[Print] Blob falló:', e.message); toast('Error de impresión: '+e.message); }
 
   // Método 2: @media print directo en la página
   const bodyMatch  = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
@@ -987,7 +988,7 @@ async function conectarBluetooth(tipo){
     try {
       const raw = window.AndroidPrint.getPairedBtPrinters();
       let lista = [];
-      try { lista = JSON.parse(raw); } catch(e) { lista = []; }
+      try { lista = JSON.parse(raw); } catch(e) { /* safe: malformed JSON defaults to empty list */ lista = []; }
 
       // Verificar si devolvió un error
       if(lista.length > 0 && lista[0].error){
@@ -1389,7 +1390,7 @@ async function imprimirPCUSB(htmlContent, size){
   try {
     var ports=await navigator.serial.getPorts();
     if(ports&&ports.length>0) serialPort=ports[0];
-  } catch(e){}
+  } catch(e){ /* safe: serial API may not be available */ }
 
   if(serialPort){
     try{
@@ -1401,7 +1402,7 @@ async function imprimirPCUSB(htmlContent, size){
       writer.releaseLock();
       toast('\u2713 Impreso por USB');
       return;
-    }catch(e){ console.warn('Serial fallback:', e.message); }
+    }catch(e){ console.warn('[Print] Serial fallback:', e.message); toast('Error de impresión USB: '+e.message); }
   }
 
   // Descargar .bin para imprimir manualmente con impresora-usb.bat

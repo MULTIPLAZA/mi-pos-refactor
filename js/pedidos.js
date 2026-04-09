@@ -218,7 +218,7 @@ function imprimirComandaPreCobro(){
     const ticketIdx = pendientes.findIndex(p => p.nro === currentTicketNro);
     if(ticketIdx >= 0){
       pendientes[ticketIdx].cart = JSON.parse(JSON.stringify(cart));
-      try { localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); } catch(e){}
+      try { localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); } catch(e){ console.warn('[Comanda] Error guardando pendientes:', e.message); }
       console.log('[Comanda] Estado enviado guardado en ticket #'+currentTicketNro);
     }
   }
@@ -246,7 +246,7 @@ function imprimirComandaActual(){
       const ticketIdx = pendientes.findIndex(p => p.nro === currentTicketNro);
       if(ticketIdx >= 0){
         pendientes[ticketIdx].cart = JSON.parse(JSON.stringify(cart));
-        try { localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); } catch(e){}
+        try { localStorage.setItem('pos_pendientes', JSON.stringify(pendientes)); } catch(e){ console.warn('[Comanda] Error guardando pendientes:', e.message); }
       }
     }
   }
@@ -314,7 +314,7 @@ async function cajaSyncPedidosSatelite(){
 
     var satelites = rows.map(function(p){
       var items = [];
-      try { items = typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || []); } catch(e){}
+      try { items = typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || []); } catch(e){ console.warn('[CajaSync] Error parseando items de pedido:', e.message); }
 
       // Resolver mesa_id local por nombre
       var mesaId = null;
